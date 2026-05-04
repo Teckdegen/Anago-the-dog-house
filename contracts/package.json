@@ -1,0 +1,25 @@
+{
+  "name": "doghouse-contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:all": "hardhat run scripts/deployAll.ts --network monadTestnet",
+    "deploy:vesting": "hardhat run scripts/deployVesting.ts --network monadTestnet",
+    "deploy:cliff": "hardhat run scripts/deployVestingCliff.ts --network monadTestnet",
+    "deploy:lock": "hardhat run scripts/deployTokenLock.ts --network monadTestnet",
+    "deploy:factory": "hardhat run scripts/deployFactory.ts --network monadTestnet",
+    "verify": "hardhat verify --network monadTestnet"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@nomicfoundation/hardhat-verify": "^2.0.10",
+    "@openzeppelin/contracts": "^5.1.0",
+    "dotenv": "^16.4.5",
+    "hardhat": "^2.22.17",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.3"
+  }
+}
