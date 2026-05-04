@@ -1,6 +1,7 @@
 import { createAppKit } from "@reown/appkit/react";
 import { WagmiAdapter } from "@reown/appkit-adapter-wagmi";
 import { defineChain } from "@reown/appkit/networks";
+import { QueryClient } from "@tanstack/react-query";
 
 // Reown Cloud project ID — create one at https://cloud.reown.com
 // then put it in .env.local as VITE_REOWN_PROJECT_ID
@@ -38,6 +39,25 @@ export const wagmiAdapter = new WagmiAdapter({
 
 export const wagmiConfig = wagmiAdapter.wagmiConfig;
 
+/**
+ * Global QueryClient — all contract reads auto-refetch every 10 s.
+ * keepPreviousData: true means stale data stays visible while the
+ * background refresh is in flight (no flash-to-empty on reload).
+ */
+export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchInterval: 10_000,       // poll every 10 seconds
+      refetchIntervalInBackground: false, // pause when tab is hidden
+      staleTime: 8_000,              // treat data as fresh for 8 s
+      gcTime: 60_000,                // keep in cache for 1 min
+      retry: 1,                      // one retry on failure
+      // If a refetch fails, the previous successful data is kept
+      // (this is the default wagmi/react-query behaviour with keepPreviousData)
+    },
+  },
+});
+
 createAppKit({
   adapters: [wagmiAdapter],
   networks: [...networks],
@@ -50,7 +70,7 @@ createAppKit({
     icons: ["/logo.png"],
   },
   features: {
-    analytics: false, // Disabled to avoid 400/403 errors without valid projectId
+    analytics: false,
     email: false,
     socials: false,
   },

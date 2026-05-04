@@ -107,6 +107,7 @@ function PoolsTab() {
     address: YIELD_FARM_NFT,
     abi: YIELD_FARM_NFT_ABI,
     functionName: "poolLength",
+    query: { refetchInterval: 10_000 },
   });
 
   const poolCount = Number(poolLengthQuery.data ?? 0);
@@ -230,6 +231,7 @@ function PoolCard({ poolId }: { poolId: number }) {
     abi: YIELD_FARM_NFT_ABI,
     functionName: "getPoolInfo",
     args: [BigInt(poolId)],
+    query: { refetchInterval: 10_000 },
   });
 
   const [stakeToken, totalStaked, active] = poolInfoQuery.data ?? [];
@@ -456,6 +458,7 @@ function StatsTab() {
     address: YIELD_FARM_NFT,
     abi: YIELD_FARM_NFT_ABI,
     functionName: "poolLength",
+    query: { refetchInterval: 10_000 },
   });
 
   const poolCount = Number(poolLengthQuery.data ?? 0);

@@ -34,6 +34,7 @@ function FarmPage() {
     address: contracts.yieldFarmNFT,
     abi: YIELD_FARM_NFT_ABI,
     functionName: "poolLength",
+    query: { refetchInterval: 10_000 },
   });
 
   const poolCount = Number(poolLengthQuery.data ?? 0);
@@ -165,6 +166,7 @@ function FarmCard({ poolId }: { poolId: number }) {
     abi: YIELD_FARM_NFT_ABI,
     functionName: "getPoolInfo",
     args: [BigInt(poolId)],
+    query: { refetchInterval: 10_000 },
   });
 
   const [stakeToken, totalStaked, active] = poolInfoQuery.data ?? [];
@@ -174,14 +176,14 @@ function FarmCard({ poolId }: { poolId: number }) {
     address: stakeToken,
     abi: ERC20_ABI,
     functionName: "symbol",
-    query: { enabled: !!stakeToken },
+    query: { enabled: !!stakeToken, refetchInterval: 10_000 },
   });
 
   const tokenDecimalsQuery = useReadContract({
     address: stakeToken,
     abi: ERC20_ABI,
     functionName: "decimals",
-    query: { enabled: !!stakeToken },
+    query: { enabled: !!stakeToken, refetchInterval: 10_000 },
   });
 
   const symbol = tokenSymbolQuery.data as string | undefined;

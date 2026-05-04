@@ -46,7 +46,7 @@ function VestingRow({
       { address: vesting.token, abi: ERC20_ABI, functionName: "symbol"   as const },
       { address: vesting.token, abi: ERC20_ABI, functionName: "decimals" as const },
     ],
-    query: { enabled: !!vesting.token },
+    query: { enabled: !!vesting.token, refetchInterval: 10_000 },
   });
   const symbol   = (metaQ.data?.[0]?.result as string  | undefined) ?? vesting.token.slice(0, 6);
   const decimals = (metaQ.data?.[1]?.result as number  | undefined) ?? 18;
@@ -249,7 +249,7 @@ function VestingPage() {
   const symbolsQ = useReadContracts({
     allowFailure: true,
     contracts: uniqueTokens.map((t) => ({ address: t, abi: ERC20_ABI, functionName: "symbol" as const })),
-    query: { enabled: uniqueTokens.length > 0 },
+    query: { enabled: uniqueTokens.length > 0, refetchInterval: 10_000 },
   });
   const symbolMap = useMemo(() => {
     const m: Record<string, string> = {};

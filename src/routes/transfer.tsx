@@ -95,7 +95,7 @@ function TransferPage() {
   // 1. Fetch user's token IDs
   const idsQ = useReadContracts({
     contracts: [{ address: contractAddress, abi: abi as any, functionName: listFn, args: address ? [address] : undefined }],
-    query: { enabled: !!address },
+    query: { enabled: !!address, refetchInterval: 10_000 },
   });
   const tokenIds = (idsQ.data?.[0]?.result as bigint[] | undefined) ?? [];
 
@@ -104,7 +104,7 @@ function TransferPage() {
     contracts: tokenIds.map((id) => ({
       address: contractAddress, abi: abi as any, functionName: detailFn, args: [id] as const,
     })),
-    query: { enabled: tokenIds.length > 0 },
+    query: { enabled: tokenIds.length > 0, refetchInterval: 10_000 },
   });
 
   // 3. Build positions, filter to active only
@@ -133,7 +133,7 @@ function TransferPage() {
     contracts: farmPoolIds.map((poolId) => ({
       address: contractAddress, abi: abi as any, functionName: "getPoolInfo", args: [poolId] as const,
     })),
-    query: { enabled: isFarm && farmPoolIds.length > 0 },
+    query: { enabled: isFarm && farmPoolIds.length > 0, refetchInterval: 10_000 },
   });
 
   const farmStakeTokens = useMemo(() => {
@@ -151,7 +151,7 @@ function TransferPage() {
       { address: t, abi: ERC20_ABI, functionName: "symbol" as const },
       { address: t, abi: ERC20_ABI, functionName: "decimals" as const },
     ]),
-    query: { enabled: allTokenAddrs.length > 0 },
+    query: { enabled: allTokenAddrs.length > 0, refetchInterval: 10_000 },
   });
 
   const tokenMeta = useMemo(() => {

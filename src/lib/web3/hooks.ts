@@ -10,6 +10,8 @@ import { CONTRACTS, TOKEN_LOCK_ABI, VESTING_NFT_ABI } from "./contracts";
 import { ERC20_ABI, EXPLORER_API, getTokenList, type TokenInfo } from "./tokens";
 
 const ZERO = "0x0000000000000000000000000000000000000000" as const;
+/** 10-second poll interval used on all contract reads */
+const POLL = 10_000 as const;
 
 export function useContractAddresses() {
   const chainId = useChainId();
@@ -71,7 +73,7 @@ export function useUserTokens(): {
   }, [seed, discovered]);
 
   const hasNative = seed.some((t) => t.address === ZERO);
-  const nativeBal = useBalance({ address, query: { enabled: !!address && hasNative } });
+  const nativeBal = useBalance({ address, query: { enabled: !!address && hasNative, refetchInterval: POLL } });
   const reads = useReadContracts({
     allowFailure: true,
     contracts: erc20s.map((t) => ({
@@ -80,7 +82,7 @@ export function useUserTokens(): {
       functionName: "balanceOf" as const,
       args: address ? ([address] as const) : undefined,
     })),
-    query: { enabled: !!address && erc20s.length > 0 },
+    query: { enabled: !!address && erc20s.length > 0, refetchInterval: POLL },
   });
 
   const tokens = useMemo(() => {
@@ -122,7 +124,7 @@ export function useUserLocks(): { locks: LockView[]; isLoading: boolean } {
     abi: TOKEN_LOCK_ABI,
     functionName: "locksOf",
     args: address ? [address] : undefined,
-    query: { enabled: !!address && tokenLock !== ZERO },
+    query: { enabled: !!address && tokenLock !== ZERO, refetchInterval: POLL },
   });
   const ids = (idsQ.data as bigint[] | undefined) ?? [];
 
@@ -133,7 +135,7 @@ export function useUserLocks(): { locks: LockView[]; isLoading: boolean } {
       { address: tokenLock, abi: TOKEN_LOCK_ABI, functionName: "getLock" as const, args: [id] as const },
       { address: tokenLock, abi: TOKEN_LOCK_ABI, functionName: "ownerOf" as const, args: [id] as const },
     ]),
-    query: { enabled: ids.length > 0 },
+    query: { enabled: ids.length > 0, refetchInterval: POLL },
   });
 
   const locks = useMemo<LockView[]>(() => {
@@ -162,7 +164,7 @@ export function useAllLocks(limit = 100): { locks: LockView[]; isLoading: boolea
       { address: tokenLock, abi: TOKEN_LOCK_ABI, functionName: "locksLength" as const },
       { address: tokenLock, abi: TOKEN_LOCK_ABI, functionName: "totalLocks"  as const },
     ],
-    query: { enabled: tokenLock !== ZERO },
+    query: { enabled: tokenLock !== ZERO, refetchInterval: POLL },
   });
 
   const total = useMemo(() => {
@@ -189,7 +191,7 @@ export function useAllLocks(limit = 100): { locks: LockView[]; isLoading: boolea
       { address: tokenLock, abi: TOKEN_LOCK_ABI, functionName: "getLock"  as const, args: [id] as const },
       { address: tokenLock, abi: TOKEN_LOCK_ABI, functionName: "ownerOf"  as const, args: [id] as const },
     ]),
-    query: { enabled: ids.length > 0 },
+    query: { enabled: ids.length > 0, refetchInterval: POLL },
   });
 
   const locks = useMemo<LockView[]>(() => {
@@ -270,7 +272,7 @@ export function useProtocolStats() {
       { address: tokenLock,  abi: TOKEN_LOCK_ABI,  functionName: "tokensLength"  as const },
       { address: vestingNFT, abi: VESTING_NFT_ABI, functionName: "totalVestings" as const },
     ],
-    query: { enabled: tokenLock !== ZERO },
+    query: { enabled: tokenLock !== ZERO, refetchInterval: POLL },
   });
 
   const pick = (i: number) => Number((countsQ.data?.[i]?.status === "success" ? countsQ.data[i].result : 0n) as bigint);
@@ -316,7 +318,7 @@ export function useUserVestings(): {
     abi: VESTING_NFT_ABI,
     functionName: "vestingsOf",
     args: address ? [address] : undefined,
-    query: { enabled: !!address && vestingNFT !== ZERO },
+    query: { enabled: !!address && vestingNFT !== ZERO, refetchInterval: POLL },
   });
   const ids = (idsQ.data as bigint[] | undefined) ?? [];
 
@@ -326,7 +328,7 @@ export function useUserVestings(): {
       { address: vestingNFT, abi: VESTING_NFT_ABI, functionName: "getVesting" as const, args: [id] as const },
       { address: vestingNFT, abi: VESTING_NFT_ABI, functionName: "claimableAmount" as const, args: [id] as const },
     ]),
-    query: { enabled: ids.length > 0 },
+    query: { enabled: ids.length > 0, refetchInterval: POLL },
   });
 
   const vestings = useMemo<VestingView[]>(() => {

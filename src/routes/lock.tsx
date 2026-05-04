@@ -95,7 +95,7 @@ function LockRow({
       { address: token, abi: ERC20_ABI, functionName: "symbol" as const },
       { address: token, abi: ERC20_ABI, functionName: "decimals" as const },
     ] : [],
-    query: { enabled: !staticMeta },
+    query: { enabled: !staticMeta, refetchInterval: 10_000 },
   });
   const symbol = staticMeta?.symbol ?? (onChain.data?.[0]?.result as string | undefined) ?? `${token.slice(0, 6)}…`;
   const decimals = staticMeta?.decimals ?? (onChain.data?.[1]?.result as number | undefined) ?? 18;
@@ -203,7 +203,7 @@ function TokenLeaderboard({
       { address: row.address, abi: ERC20_ABI, functionName: "decimals" as const },
       { address: row.address, abi: ERC20_ABI, functionName: "totalSupply" as const },
     ]),
-    query: { enabled: tokenLb.length > 0 },
+    query: { enabled: tokenLb.length > 0, refetchInterval: 10_000 },
   });
 
   return (
@@ -291,7 +291,7 @@ function UserLeaderboard({
       { address: t, abi: ERC20_ABI, functionName: "symbol" as const },
       { address: t, abi: ERC20_ABI, functionName: "decimals" as const },
     ]),
-    query: { enabled: uniqueTokens.length > 0 },
+    query: { enabled: uniqueTokens.length > 0, refetchInterval: 10_000 },
   });
 
   const tokenInfo = useMemo(() => {
