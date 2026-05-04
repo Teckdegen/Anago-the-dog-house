@@ -106,9 +106,9 @@ export function useUserTokens(): {
 export type LockView = {
   id: bigint;
   token: `0x${string}`;
-  owner: `0x${string}`;
+  owner: `0x${string}`;   // current NFT owner (fetched via ownerOf)
   amount: bigint;
-  unlockAt: bigint;
+  unlockAt: bigint;       // maps to contract's unlockTime
   createdAt: bigint;
   withdrawn: boolean;
 };
@@ -126,23 +126,26 @@ export function useUserLocks(): { locks: LockView[]; isLoading: boolean } {
   });
   const ids = (idsQ.data as bigint[] | undefined) ?? [];
 
+  // Fetch lock details + ownerOf in one multicall
   const detailsQ = useReadContracts({
-    allowFailure: false,
-    contracts: ids.map((id) => ({
-      address: tokenLock,
-      abi: TOKEN_LOCK_ABI,
-      functionName: "getLock" as const,
-      args: [id] as const,
-    })),
+    allowFailure: true,
+    contracts: ids.flatMap((id) => [
+      { address: tokenLock, abi: TOKEN_LOCK_ABI, functionName: "getLock" as const, args: [id] as const },
+      { address: tokenLock, abi: TOKEN_LOCK_ABI, functionName: "ownerOf" as const, args: [id] as const },
+    ]),
     query: { enabled: ids.length > 0 },
   });
 
   const locks = useMemo<LockView[]>(() => {
     if (!detailsQ.data) return [];
-    return detailsQ.data.map((d, i) => {
-      const r = d as { token: `0x${string}`; owner: `0x${string}`; amount: bigint; unlockAt: bigint; createdAt: bigint; withdrawn: boolean };
-      return { id: ids[i], ...r };
-    });
+    return ids.map((id, i) => {
+      const lockRes = detailsQ.data[i * 2];
+      const ownerRes = detailsQ.data[i * 2 + 1];
+      if (lockRes?.status !== "success") return null;
+      const r = lockRes.result as { token: `0x${string}`; amount: bigint; unlockTime: bigint; createdAt: bigint; withdrawn: boolean };
+      const owner = (ownerRes?.status === "success" ? ownerRes.result : "0x0000000000000000000000000000000000000000") as `0x${string}`;
+      return { id, token: r.token, owner, amount: r.amount, unlockAt: r.unlockTime, createdAt: r.createdAt, withdrawn: r.withdrawn };
+    }).filter(Boolean) as LockView[];
   }, [detailsQ.data, ids]);
 
   return { locks, isLoading: idsQ.isLoading || detailsQ.isLoading };
@@ -167,26 +170,26 @@ export function useAllLocks(limit = 100): { locks: LockView[]; isLoading: boolea
     return result;
   }, [total, limit]);
 
+  // Fetch lock details + ownerOf in one multicall
   const detailsQ = useReadContracts({
     allowFailure: true,
-    contracts: ids.map((id) => ({
-      address: tokenLock,
-      abi: TOKEN_LOCK_ABI,
-      functionName: "getLock" as const,
-      args: [id] as const,
-    })),
+    contracts: ids.flatMap((id) => [
+      { address: tokenLock, abi: TOKEN_LOCK_ABI, functionName: "getLock" as const, args: [id] as const },
+      { address: tokenLock, abi: TOKEN_LOCK_ABI, functionName: "ownerOf" as const, args: [id] as const },
+    ]),
     query: { enabled: ids.length > 0 },
   });
 
   const locks = useMemo<LockView[]>(() => {
     if (!detailsQ.data) return [];
-    return detailsQ.data
-      .map((d, i) => {
-        if (d?.status !== "success") return null;
-        const r = d.result as { token: `0x${string}`; owner: `0x${string}`; amount: bigint; unlockAt: bigint; createdAt: bigint; withdrawn: boolean };
-        return { id: ids[i], ...r };
-      })
-      .filter(Boolean) as LockView[];
+    return ids.map((id, i) => {
+      const lockRes = detailsQ.data[i * 2];
+      const ownerRes = detailsQ.data[i * 2 + 1];
+      if (lockRes?.status !== "success") return null;
+      const r = lockRes.result as { token: `0x${string}`; amount: bigint; unlockTime: bigint; createdAt: bigint; withdrawn: boolean };
+      const owner = (ownerRes?.status === "success" ? ownerRes.result : "0x0000000000000000000000000000000000000000") as `0x${string}`;
+      return { id, token: r.token, owner, amount: r.amount, unlockAt: r.unlockTime, createdAt: r.createdAt, withdrawn: r.withdrawn };
+    }).filter(Boolean) as LockView[];
   }, [detailsQ.data, ids]);
 
   return { locks, isLoading: lengthQ.isLoading || detailsQ.isLoading };
@@ -195,41 +198,42 @@ export function useAllLocks(limit = 100): { locks: LockView[]; isLoading: boolea
 // ──────────────────────────────────────────────────────────────────────────
 //                              LEADERBOARDS
 // ──────────────────────────────────────────────────────────────────────────
+/**
+ * Computes token and user leaderboards entirely off-chain from the allLocks
+ * data. No extra contract functions needed — just iterates the fetched locks.
+ */
 export function useLockLeaderboards(limit = 50) {
-  const { tokenLock } = useContractAddresses();
+  const { locks, isLoading } = useAllLocks(500);
 
-  const tokensQ = useReadContract({
-    address: tokenLock,
-    abi: TOKEN_LOCK_ABI,
-    functionName: "tokenLeaderboard",
-    args: [0n, BigInt(limit)],
-    query: { enabled: tokenLock !== ZERO, refetchInterval: 10_000 },
-  });
-  const usersQ = useReadContract({
-    address: tokenLock,
-    abi: TOKEN_LOCK_ABI,
-    functionName: "userLeaderboard",
-    args: [0n, BigInt(limit)],
-    query: { enabled: tokenLock !== ZERO, refetchInterval: 10_000 },
-  });
+  const { tokens, users } = useMemo(() => {
+    // Aggregate active (non-withdrawn) locks by token and by owner
+    const byToken = new Map<`0x${string}`, bigint>();
+    const byUser  = new Map<`0x${string}`, bigint>();
 
-  const tokens = useMemo(() => {
-    const d = tokensQ.data as readonly [readonly `0x${string}`[], readonly bigint[]] | undefined;
-    if (!d) return [];
-    const [addrs, amts] = d;
-    return addrs.map((address, i) => ({ address, amount: amts[i] }))
-      .sort((a, b) => (b.amount > a.amount ? 1 : b.amount < a.amount ? -1 : 0));
-  }, [tokensQ.data]);
+    for (const lock of locks) {
+      if (lock.withdrawn) continue;
 
-  const users = useMemo(() => {
-    const d = usersQ.data as readonly [readonly `0x${string}`[], readonly bigint[]] | undefined;
-    if (!d) return [];
-    const [addrs, amts] = d;
-    return addrs.map((address, i) => ({ address, amount: amts[i] }))
-      .sort((a, b) => (b.amount > a.amount ? 1 : b.amount < a.amount ? -1 : 0));
-  }, [usersQ.data]);
+      const tok = lock.token.toLowerCase() as `0x${string}`;
+      byToken.set(tok, (byToken.get(tok) ?? 0n) + lock.amount);
 
-  return { tokens, users, isLoading: tokensQ.isLoading || usersQ.isLoading };
+      const usr = lock.owner.toLowerCase() as `0x${string}`;
+      byUser.set(usr, (byUser.get(usr) ?? 0n) + lock.amount);
+    }
+
+    const tokens = Array.from(byToken.entries())
+      .map(([address, amount]) => ({ address, amount }))
+      .sort((a, b) => (b.amount > a.amount ? 1 : b.amount < a.amount ? -1 : 0))
+      .slice(0, limit);
+
+    const users = Array.from(byUser.entries())
+      .map(([address, amount]) => ({ address, amount }))
+      .sort((a, b) => (b.amount > a.amount ? 1 : b.amount < a.amount ? -1 : 0))
+      .slice(0, limit);
+
+    return { tokens, users };
+  }, [locks, limit]);
+
+  return { tokens, users, isLoading };
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -238,17 +242,21 @@ export function useLockLeaderboards(limit = 50) {
 export function useProtocolStats() {
   const { tokenLock, vestingFactory } = useContractAddresses();
 
-  const locksLen = useReadContract({ address: tokenLock, abi: TOKEN_LOCK_ABI, functionName: "locksLength", query: { enabled: tokenLock !== ZERO } });
+  const locksLen   = useReadContract({ address: tokenLock,      abi: TOKEN_LOCK_ABI,      functionName: "locksLength",      query: { enabled: tokenLock      !== ZERO } });
+  const tokensLen  = useReadContract({ address: tokenLock,      abi: TOKEN_LOCK_ABI,      functionName: "tokensLength",     query: { enabled: tokenLock      !== ZERO } });
   const walletsLen = useReadContract({ address: vestingFactory, abi: VESTING_FACTORY_ABI, functionName: "allWalletsLength", query: { enabled: vestingFactory !== ZERO } });
-  const board = useReadContract({ address: tokenLock, abi: TOKEN_LOCK_ABI, functionName: "tokenLeaderboard", args: [0n, 200n], query: { enabled: tokenLock !== ZERO } });
 
-  const totalLocks = (locksLen.data as bigint | undefined) ?? 0n;
-  const totalSchedules = (walletsLen.data as bigint | undefined) ?? 0n;
-  const boardData = board.data as readonly [readonly `0x${string}`[], readonly bigint[]] | undefined;
-  const tokensLocked = boardData ? boardData[0].length : 0;
-  const rawLockedSum = boardData ? boardData[1].reduce((acc, v) => acc + v, 0n) : 0n;
+  const totalLocks     = Number((locksLen.data   as bigint | undefined) ?? 0n);
+  const totalSchedules = Number((walletsLen.data  as bigint | undefined) ?? 0n);
+  const tokensLocked   = Number((tokensLen.data   as bigint | undefined) ?? 0n);
 
-  return { totalLocks: Number(totalLocks), totalSchedules: Number(totalSchedules), tokensLocked, rawLockedSum, isLoading: locksLen.isLoading || walletsLen.isLoading || board.isLoading };
+  return {
+    totalLocks,
+    totalSchedules,
+    tokensLocked,
+    rawLockedSum: 0n, // computed off-chain via useLockLeaderboards if needed
+    isLoading: locksLen.isLoading || walletsLen.isLoading || tokensLen.isLoading,
+  };
 }
 
 // ──────────────────────────────────────────────────────────────────────────

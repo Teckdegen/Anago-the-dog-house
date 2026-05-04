@@ -100,75 +100,65 @@ export const VESTING_FACTORY_ABI = [
 ] as const;
 
 export const TOKEN_LOCK_ABI = [
+  // ── Write ──────────────────────────────────────────────────────────────
   {
     type: "function",
     name: "createLock",
     stateMutability: "nonpayable",
     inputs: [
-      { name: "token", type: "address" },
-      { name: "amount", type: "uint256" },
-      { name: "unlockAt", type: "uint64" },
+      { name: "token",      type: "address" },
+      { name: "amount",     type: "uint256" },
+      { name: "unlockTime", type: "uint256" },
     ],
-    outputs: [{ name: "id", type: "uint256" }],
+    outputs: [{ name: "tokenId", type: "uint256" }],
   },
   {
     type: "function",
     name: "withdraw",
     stateMutability: "nonpayable",
-    inputs: [{ name: "id", type: "uint256" }],
+    inputs: [{ name: "tokenId", type: "uint256" }],
     outputs: [],
   },
-  {
-    type: "function",
-    name: "extendLock",
-    stateMutability: "nonpayable",
-    inputs: [
-      { name: "id", type: "uint256" },
-      { name: "newUnlockAt", type: "uint64" },
-    ],
-    outputs: [],
-  },
-  {
-    type: "function",
-    name: "transferLockOwnership",
-    stateMutability: "nonpayable",
-    inputs: [
-      { name: "id", type: "uint256" },
-      { name: "newOwner", type: "address" },
-    ],
-    outputs: [],
-  },
+  // ── Lock reads ─────────────────────────────────────────────────────────
   {
     type: "function",
     name: "getLock",
     stateMutability: "view",
-    inputs: [{ name: "id", type: "uint256" }],
+    inputs: [{ name: "tokenId", type: "uint256" }],
     outputs: [
       {
         type: "tuple",
         components: [
-          { name: "token", type: "address" },
-          { name: "owner", type: "address" },
-          { name: "amount", type: "uint128" },
-          { name: "unlockAt", type: "uint64" },
-          { name: "createdAt", type: "uint64" },
-          { name: "withdrawn", type: "bool" },
+          { name: "token",      type: "address" },
+          { name: "amount",     type: "uint256" },
+          { name: "unlockTime", type: "uint256" },
+          { name: "createdAt",  type: "uint256" },
+          { name: "withdrawn",  type: "bool"    },
         ],
       },
     ],
   },
   {
     type: "function",
-    name: "totalLocked",
+    name: "isUnlocked",
     stateMutability: "view",
-    inputs: [{ name: "token", type: "address" }],
-    outputs: [{ type: "uint256" }],
+    inputs: [{ name: "tokenId", type: "uint256" }],
+    outputs: [{ type: "bool" }],
   },
+  // ── ERC-721 owner lookup ───────────────────────────────────────────────
   {
     type: "function",
-    name: "totalLockedBy",
+    name: "ownerOf",
     stateMutability: "view",
-    inputs: [{ name: "user", type: "address" }],
+    inputs: [{ name: "tokenId", type: "uint256" }],
+    outputs: [{ type: "address" }],
+  },
+  // ── Counts ─────────────────────────────────────────────────────────────
+  {
+    type: "function",
+    name: "locksLength",
+    stateMutability: "view",
+    inputs: [],
     outputs: [{ type: "uint256" }],
   },
   {
@@ -185,37 +175,12 @@ export const TOKEN_LOCK_ABI = [
     inputs: [],
     outputs: [{ type: "uint256" }],
   },
-  {
-    type: "function",
-    name: "tokenLeaderboard",
-    stateMutability: "view",
-    inputs: [
-      { name: "offset", type: "uint256" },
-      { name: "limit", type: "uint256" },
-    ],
-    outputs: [
-      { name: "tokens_", type: "address[]" },
-      { name: "amounts", type: "uint256[]" },
-    ],
-  },
-  {
-    type: "function",
-    name: "userLeaderboard",
-    stateMutability: "view",
-    inputs: [
-      { name: "offset", type: "uint256" },
-      { name: "limit", type: "uint256" },
-    ],
-    outputs: [
-      { name: "users", type: "address[]" },
-      { name: "amounts", type: "uint256[]" },
-    ],
-  },
+  // ── Index reads (for off-chain leaderboard computation) ────────────────
   {
     type: "function",
     name: "locksOf",
     stateMutability: "view",
-    inputs: [{ name: "user", type: "address" }],
+    inputs: [{ name: "owner", type: "address" }],
     outputs: [{ type: "uint256[]" }],
   },
   {
@@ -227,45 +192,134 @@ export const TOKEN_LOCK_ABI = [
   },
   {
     type: "function",
-    name: "locksLength",
+    name: "locksOfCreator",
     stateMutability: "view",
-    inputs: [],
-    outputs: [{ type: "uint256" }],
+    inputs: [{ name: "creator", type: "address" }],
+    outputs: [{ type: "uint256[]" }],
   },
   {
     type: "function",
-    name: "isUnlocked",
+    name: "allTokens",
     stateMutability: "view",
-    inputs: [{ name: "id", type: "uint256" }],
-    outputs: [{ type: "bool" }],
+    inputs: [],
+    outputs: [{ type: "address[]" }],
   },
+  {
+    type: "function",
+    name: "allLockers",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "address[]" }],
+  },
+  // ── Events ─────────────────────────────────────────────────────────────
   {
     type: "event",
     name: "LockCreated",
     inputs: [
-      { name: "id", type: "uint256", indexed: true },
-      { name: "owner", type: "address", indexed: true },
-      { name: "token", type: "address", indexed: true },
-      { name: "amount", type: "uint256", indexed: false },
-      { name: "unlockAt", type: "uint64", indexed: false },
+      { name: "tokenId",    type: "uint256", indexed: true  },
+      { name: "creator",    type: "address", indexed: true  },
+      { name: "token",      type: "address", indexed: true  },
+      { name: "amount",     type: "uint256", indexed: false },
+      { name: "unlockTime", type: "uint256", indexed: false },
     ],
   },
   {
     type: "event",
-    name: "LockWithdrawn",
+    name: "TokensWithdrawn",
     inputs: [
-      { name: "id", type: "uint256", indexed: true },
-      { name: "owner", type: "address", indexed: true },
-      { name: "amount", type: "uint256", indexed: false },
+      { name: "tokenId",   type: "uint256", indexed: true  },
+      { name: "recipient", type: "address", indexed: true  },
+      { name: "token",     type: "address", indexed: true  },
+      { name: "amount",    type: "uint256", indexed: false },
+    ],
+  },
+] as const;
+
+// ── TOKEN_LOCK_NFT_ABI — used by transfer.tsx ─────────────────────────────
+// Alias of TOKEN_LOCK_ABI with the ERC-721 transfer functions included.
+export const TOKEN_LOCK_NFT_ABI = [
+  ...TOKEN_LOCK_ABI,
+  {
+    type: "function",
+    name: "transferFrom",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "from",    type: "address" },
+      { name: "to",      type: "address" },
+      { name: "tokenId", type: "uint256" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "safeTransferFrom",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "from",    type: "address" },
+      { name: "to",      type: "address" },
+      { name: "tokenId", type: "uint256" },
+    ],
+    outputs: [],
+  },
+] as const;
+
+// ── VESTING_NFT_ABI — used by transfer.tsx ────────────────────────────────
+// Minimal ABI for the vesting NFT contract (ERC-721 positions).
+export const VESTING_NFT_ABI = [
+  {
+    type: "function",
+    name: "vestingsOf",
+    stateMutability: "view",
+    inputs: [{ name: "owner", type: "address" }],
+    outputs: [{ type: "uint256[]" }],
+  },
+  {
+    type: "function",
+    name: "getVesting",
+    stateMutability: "view",
+    inputs: [{ name: "tokenId", type: "uint256" }],
+    outputs: [
+      {
+        type: "tuple",
+        components: [
+          { name: "token",       type: "address" },
+          { name: "beneficiary", type: "address" },
+          { name: "totalAmount", type: "uint256" },
+          { name: "released",    type: "uint256" },
+          { name: "startTime",   type: "uint256" },
+          { name: "duration",    type: "uint256" },
+          { name: "cliff",       type: "uint256" },
+        ],
+      },
     ],
   },
   {
-    type: "event",
-    name: "LockExtended",
+    type: "function",
+    name: "ownerOf",
+    stateMutability: "view",
+    inputs: [{ name: "tokenId", type: "uint256" }],
+    outputs: [{ type: "address" }],
+  },
+  {
+    type: "function",
+    name: "transferFrom",
+    stateMutability: "nonpayable",
     inputs: [
-      { name: "id", type: "uint256", indexed: true },
-      { name: "oldUnlockAt", type: "uint64", indexed: false },
-      { name: "newUnlockAt", type: "uint64", indexed: false },
+      { name: "from",    type: "address" },
+      { name: "to",      type: "address" },
+      { name: "tokenId", type: "uint256" },
     ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "safeTransferFrom",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "from",    type: "address" },
+      { name: "to",      type: "address" },
+      { name: "tokenId", type: "uint256" },
+    ],
+    outputs: [],
   },
 ] as const;
