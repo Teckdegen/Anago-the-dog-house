@@ -25,6 +25,8 @@ export function CreateLockDialog({ open, onClose }: Props) {
   const [confirmed, setConfirmed] = useState(false);
 
   const autoLockRef = useRef(false);
+  // Capture lock params at click time to avoid stale closure in the effect
+  const pendingLockRef = useRef<{ token: string; amount: bigint; unlockAt: bigint } | null>(null);
 
   const parsedAmount = (() => {
     if (!token || !amount) return 0n;
@@ -50,17 +52,15 @@ export function CreateLockDialog({ open, onClose }: Props) {
   const lockRcpt = useWaitForTransactionReceipt({ hash: lockTx.data });
 
   useEffect(() => {
-    if (approveRcpt.isSuccess && autoLockRef.current) {
+    if (approveRcpt.isSuccess && autoLockRef.current && pendingLockRef.current) {
       autoLockRef.current = false;
-      allowanceQ.refetch().then(() => {
-        if (!token) return;
-        const unlockAt = BigInt(Math.floor(Date.now() / 1000) + duration);
-        lockTx.writeContract({
-          address: tokenLock,
-          abi: TOKEN_LOCK_ABI,
-          functionName: "createLock",
-          args: [token.address, parsedAmount, unlockAt],
-        });
+      const { token: tokenAddr, amount: amt, unlockAt } = pendingLockRef.current;
+      pendingLockRef.current = null;
+      lockTx.writeContract({
+        address: tokenLock,
+        abi: TOKEN_LOCK_ABI,
+        functionName: "createLock",
+        args: [tokenAddr as `0x${string}`, amt, unlockAt],
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -79,7 +79,13 @@ export function CreateLockDialog({ open, onClose }: Props) {
   }, [lockRcpt.isSuccess]);
 
   const handleApproveAndLock = () => {
-    if (!token) return;
+    if (!token || parsedAmount === 0n) return;
+    // Capture params now so the effect doesn't use stale values
+    pendingLockRef.current = {
+      token: token.address,
+      amount: parsedAmount,
+      unlockAt: BigInt(Math.floor(Date.now() / 1000) + duration),
+    };
     autoLockRef.current = true;
     approveTx.writeContract({
       address: token.address,
@@ -105,6 +111,7 @@ export function CreateLockDialog({ open, onClose }: Props) {
     approveTx.reset();
     lockTx.reset();
     autoLockRef.current = false;
+    pendingLockRef.current = null;
     onClose();
   };
 
