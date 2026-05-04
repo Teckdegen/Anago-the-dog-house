@@ -6,7 +6,7 @@ import {
   useReadContract,
   useReadContracts,
 } from "wagmi";
-import { CONTRACTS, TOKEN_LOCK_ABI, VESTING_FACTORY_ABI } from "./contracts";
+import { CONTRACTS, TOKEN_LOCK_ABI, VESTING_NFT_ABI } from "./contracts";
 import { ERC20_ABI, EXPLORER_API, getTokenList, type TokenInfo } from "./tokens";
 
 const ZERO = "0x0000000000000000000000000000000000000000" as const;
@@ -240,83 +240,82 @@ export function useLockLeaderboards(limit = 50) {
 //                              PROTOCOL STATS
 // ──────────────────────────────────────────────────────────────────────────
 export function useProtocolStats() {
-  const { tokenLock, vestingFactory } = useContractAddresses();
+  const { tokenLock, vestingNFT } = useContractAddresses();
 
-  const locksLen   = useReadContract({ address: tokenLock,      abi: TOKEN_LOCK_ABI,      functionName: "locksLength",      query: { enabled: tokenLock      !== ZERO } });
-  const tokensLen  = useReadContract({ address: tokenLock,      abi: TOKEN_LOCK_ABI,      functionName: "tokensLength",     query: { enabled: tokenLock      !== ZERO } });
-  const walletsLen = useReadContract({ address: vestingFactory, abi: VESTING_FACTORY_ABI, functionName: "allWalletsLength", query: { enabled: vestingFactory !== ZERO } });
+  const locksLen    = useReadContract({ address: tokenLock,  abi: TOKEN_LOCK_ABI,  functionName: "locksLength",    query: { enabled: tokenLock  !== ZERO } });
+  const tokensLen   = useReadContract({ address: tokenLock,  abi: TOKEN_LOCK_ABI,  functionName: "tokensLength",   query: { enabled: tokenLock  !== ZERO } });
+  const vestingsLen = useReadContract({ address: vestingNFT, abi: VESTING_NFT_ABI, functionName: "totalVestings",  query: { enabled: vestingNFT !== ZERO } });
 
-  const totalLocks     = Number((locksLen.data   as bigint | undefined) ?? 0n);
-  const totalSchedules = Number((walletsLen.data  as bigint | undefined) ?? 0n);
-  const tokensLocked   = Number((tokensLen.data   as bigint | undefined) ?? 0n);
+  const totalLocks     = Number((locksLen.data    as bigint | undefined) ?? 0n);
+  const totalSchedules = Number((vestingsLen.data  as bigint | undefined) ?? 0n);
+  const tokensLocked   = Number((tokensLen.data    as bigint | undefined) ?? 0n);
 
   return {
     totalLocks,
     totalSchedules,
     tokensLocked,
-    rawLockedSum: 0n, // computed off-chain via useLockLeaderboards if needed
-    isLoading: locksLen.isLoading || walletsLen.isLoading || tokensLen.isLoading,
+    rawLockedSum: 0n,
+    isLoading: locksLen.isLoading || vestingsLen.isLoading || tokensLen.isLoading,
   };
 }
 
 // ──────────────────────────────────────────────────────────────────────────
 //                              VESTINGS
 // ──────────────────────────────────────────────────────────────────────────
+
+export type VestingView = {
+  id: bigint;
+  token: `0x${string}`;
+  totalAmount: bigint;
+  startTime: bigint;
+  duration: bigint;
+  cliffDuration: bigint;
+  claimed: bigint;
+  revoked: boolean;
+  claimable: bigint;
+};
+
 export function useUserVestings(): {
-  wallets: `0x${string}`[];
-  walletTokens: Record<string, `0x${string}`>;
+  vestings: VestingView[];
   isLoading: boolean;
 } {
   const { address } = useAccount();
-  const { vestingFactory } = useContractAddresses();
+  const { vestingNFT } = useContractAddresses();
 
-  const beneficiaryQ = useReadContract({
-    address: vestingFactory,
-    abi: VESTING_FACTORY_ABI,
-    functionName: "walletsOfBeneficiary",
+  const idsQ = useReadContract({
+    address: vestingNFT,
+    abi: VESTING_NFT_ABI,
+    functionName: "vestingsOf",
     args: address ? [address] : undefined,
-    query: { enabled: !!address && vestingFactory !== ZERO },
+    query: { enabled: !!address && vestingNFT !== ZERO },
   });
-  const creatorQ = useReadContract({
-    address: vestingFactory,
-    abi: VESTING_FACTORY_ABI,
-    functionName: "walletsOfCreator",
-    args: address ? [address] : undefined,
-    query: { enabled: !!address && vestingFactory !== ZERO },
-  });
+  const ids = (idsQ.data as bigint[] | undefined) ?? [];
 
-  const wallets = useMemo(() => {
-    const a = (beneficiaryQ.data as `0x${string}`[] | undefined) ?? [];
-    const b = (creatorQ.data as `0x${string}`[] | undefined) ?? [];
-    return Array.from(new Set([...a, ...b]));
-  }, [beneficiaryQ.data, creatorQ.data]);
-
-  // Read the token stored for each wallet from the factory (on-chain, device-agnostic)
-  const tokenReads = useReadContracts({
+  const detailsQ = useReadContracts({
     allowFailure: true,
-    contracts: wallets.map((w) => ({
-      address: vestingFactory,
-      abi: VESTING_FACTORY_ABI,
-      functionName: "tokenOf" as const,
-      args: [w] as const,
-    })),
-    query: { enabled: wallets.length > 0 && vestingFactory !== ZERO },
+    contracts: ids.flatMap((id) => [
+      { address: vestingNFT, abi: VESTING_NFT_ABI, functionName: "getVesting" as const, args: [id] as const },
+      { address: vestingNFT, abi: VESTING_NFT_ABI, functionName: "claimableAmount" as const, args: [id] as const },
+    ]),
+    query: { enabled: ids.length > 0 },
   });
 
-  const walletTokens = useMemo(() => {
-    const map: Record<string, `0x${string}`> = {};
-    wallets.forEach((w, i) => {
-      const r = tokenReads.data?.[i];
-      if (r?.status === "success") map[w] = r.result as `0x${string}`;
-    });
-    return map;
-  }, [wallets, tokenReads.data]);
+  const vestings = useMemo<VestingView[]>(() => {
+    if (!detailsQ.data) return [];
+    return ids.map((id, i) => {
+      const vestRes = detailsQ.data[i * 2];
+      const claimRes = detailsQ.data[i * 2 + 1];
+      if (vestRes?.status !== "success") return null;
+      const v = vestRes.result as {
+        token: `0x${string}`; totalAmount: bigint; startTime: bigint;
+        duration: bigint; cliffDuration: bigint; claimed: bigint; revoked: boolean;
+      };
+      const claimable = claimRes?.status === "success" ? (claimRes.result as bigint) : 0n;
+      return { id, ...v, claimable };
+    }).filter(Boolean) as VestingView[];
+  }, [detailsQ.data, ids]);
 
-  return {
-    wallets,
-    walletTokens,
-    isLoading: beneficiaryQ.isLoading || creatorQ.isLoading || tokenReads.isLoading,
-  };
+  return { vestings, isLoading: idsQ.isLoading || detailsQ.isLoading };
 }
 
 // ──────────────────────────────────────────────────────────────────────────

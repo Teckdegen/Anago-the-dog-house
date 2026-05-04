@@ -4,13 +4,14 @@
  */
 export const CONTRACTS: Record<
   number,
-  { vestingFactory: `0x${string}`; tokenLock: `0x${string}`; yieldFarmNFT: `0x${string}` }
+  { vestingFactory: `0x${string}`; tokenLock: `0x${string}`; yieldFarmNFT: `0x${string}`; vestingNFT: `0x${string}` }
 > = {
   // Monad testnet (chainId 10143)
   10143: {
-    vestingFactory: "0x83Cfd62A53210139f52DB6451bD0aaBDC71De283",
-    tokenLock:      "0x2167d1c0713bcDD77f6932c355EF7A7b983B0299",
-    yieldFarmNFT:   "0x330b72ea1A45b392BfccE383d1876F5e3d7bb74d",
+    vestingFactory: "0x83Cfd62A53210139f52DB6451bD0aaBDC71De283", // legacy — kept for reference
+    tokenLock:      "0xe6A045525C053259e096d2c48973856D9f06143f", // TokenLockNFT
+    vestingNFT:     "0x2f0326D9eDDB98da0d05CfD7e7C94cbAEdacB206", // VestingNFT
+    yieldFarmNFT:   "0x330b72ea1A45b392BfccE383d1876F5e3d7bb74d", // YieldFarmNFT
   },
 };
 
@@ -264,16 +265,30 @@ export const TOKEN_LOCK_NFT_ABI = [
   },
 ] as const;
 
-// ── VESTING_NFT_ABI — used by transfer.tsx ────────────────────────────────
-// Minimal ABI for the vesting NFT contract (ERC-721 positions).
+// ── VESTING_NFT_ABI ────────────────────────────────────────────────────────
 export const VESTING_NFT_ABI = [
+  // ── Write ──────────────────────────────────────────────────────────────
   {
     type: "function",
-    name: "vestingsOf",
-    stateMutability: "view",
-    inputs: [{ name: "owner", type: "address" }],
-    outputs: [{ type: "uint256[]" }],
+    name: "createVesting",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "beneficiary",    type: "address" },
+      { name: "token",          type: "address" },
+      { name: "amount",         type: "uint256" },
+      { name: "duration",       type: "uint256" },
+      { name: "cliffDuration",  type: "uint256" },
+    ],
+    outputs: [{ name: "tokenId", type: "uint256" }],
   },
+  {
+    type: "function",
+    name: "claim",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "tokenId", type: "uint256" }],
+    outputs: [],
+  },
+  // ── Read ───────────────────────────────────────────────────────────────
   {
     type: "function",
     name: "getVesting",
@@ -283,16 +298,37 @@ export const VESTING_NFT_ABI = [
       {
         type: "tuple",
         components: [
-          { name: "token",       type: "address" },
-          { name: "beneficiary", type: "address" },
-          { name: "totalAmount", type: "uint256" },
-          { name: "released",    type: "uint256" },
-          { name: "startTime",   type: "uint256" },
-          { name: "duration",    type: "uint256" },
-          { name: "cliff",       type: "uint256" },
+          { name: "token",         type: "address" },
+          { name: "totalAmount",   type: "uint256" },
+          { name: "startTime",     type: "uint256" },
+          { name: "duration",      type: "uint256" },
+          { name: "cliffDuration", type: "uint256" },
+          { name: "claimed",       type: "uint256" },
+          { name: "revoked",       type: "bool"    },
         ],
       },
     ],
+  },
+  {
+    type: "function",
+    name: "claimableAmount",
+    stateMutability: "view",
+    inputs: [{ name: "tokenId", type: "uint256" }],
+    outputs: [{ type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "vestingsOf",
+    stateMutability: "view",
+    inputs: [{ name: "owner", type: "address" }],
+    outputs: [{ type: "uint256[]" }],
+  },
+  {
+    type: "function",
+    name: "totalVestings",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "uint256" }],
   },
   {
     type: "function",
@@ -322,6 +358,29 @@ export const VESTING_NFT_ABI = [
       { name: "tokenId", type: "uint256" },
     ],
     outputs: [],
+  },
+  // ── Events ─────────────────────────────────────────────────────────────
+  {
+    type: "event",
+    name: "VestingCreated",
+    inputs: [
+      { name: "tokenId",       type: "uint256", indexed: true  },
+      { name: "creator",       type: "address", indexed: true  },
+      { name: "beneficiary",   type: "address", indexed: true  },
+      { name: "token",         type: "address", indexed: false },
+      { name: "amount",        type: "uint256", indexed: false },
+      { name: "duration",      type: "uint256", indexed: false },
+      { name: "cliffDuration", type: "uint256", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "TokensClaimed",
+    inputs: [
+      { name: "tokenId",     type: "uint256", indexed: true  },
+      { name: "beneficiary", type: "address", indexed: true  },
+      { name: "amount",      type: "uint256", indexed: false },
+    ],
   },
 ] as const;
 

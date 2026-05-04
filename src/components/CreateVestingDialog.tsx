@@ -1,12 +1,12 @@
-import { useState, useEffect } from "react";
-import { parseUnits } from "viem";
+import { useState, useEffect, useRef } from "react";
+import { parseUnits, maxUint256 } from "viem";
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { CheckCircle2 } from "lucide-react";
 import { Modal } from "./Modal";
 import { TokenPicker } from "./TokenPicker";
 import { DurationPicker } from "./DurationPicker";
 import { useContractAddresses } from "@/lib/web3/hooks";
-import { VESTING_FACTORY_ABI } from "@/lib/web3/contracts";
+import { VESTING_NFT_ABI } from "@/lib/web3/contracts";
 import { ERC20_ABI, type TokenInfo } from "@/lib/web3/tokens";
 import { formatAmount } from "@/lib/web3/format";
 import { useToast } from "./Toast";
@@ -18,7 +18,7 @@ type Props = { open: boolean; onClose: () => void };
 
 export function CreateVestingDialog({ open, onClose }: Props) {
   const { address } = useAccount();
-  const { vestingFactory } = useContractAddresses();
+  const { vestingNFT } = useContractAddresses();
   const { toast } = useToast();
 
   const [token, setToken] = useState<(TokenInfo & { balance: bigint }) | undefined>();
@@ -27,6 +27,15 @@ export function CreateVestingDialog({ open, onClose }: Props) {
   const [duration, setDuration] = useState(365 * 86400);
   const [withCliff, setWithCliff] = useState(false);
   const [cliff, setCliff] = useState(90 * 86400);
+
+  // Capture vesting params at approve-click time to avoid stale closure
+  const pendingVestRef = useRef<{
+    beneficiary: `0x${string}`;
+    token: `0x${string}`;
+    amount: bigint;
+    duration: bigint;
+    cliff: bigint;
+  } | null>(null);
 
   const parsedAmount = (() => {
     if (!token || !amount) return 0n;
@@ -37,7 +46,7 @@ export function CreateVestingDialog({ open, onClose }: Props) {
     address: token?.address,
     abi: ERC20_ABI,
     functionName: "allowance",
-    args: address && token ? [address, vestingFactory] : undefined,
+    args: address && token ? [address, vestingNFT] : undefined,
     query: {
       enabled: !!address && !!token && token.address !== ZERO,
       refetchInterval: 2000,
@@ -47,69 +56,74 @@ export function CreateVestingDialog({ open, onClose }: Props) {
   const needsApproval = parsedAmount > 0n && parsedAmount > allowance;
 
   const approveTx = useWriteContract();
-  const vestTx = useWriteContract();
+  const vestTx    = useWriteContract();
   const approveRcpt = useWaitForTransactionReceipt({ hash: approveTx.data });
-  const vestRcpt = useWaitForTransactionReceipt({ hash: vestTx.data });
+  const vestRcpt    = useWaitForTransactionReceipt({ hash: vestTx.data });
 
-  if (approveRcpt.isSuccess) allowanceQ.refetch();
+  // After approval confirmed → fire createVesting with captured params
+  useEffect(() => {
+    if (approveRcpt.isSuccess && pendingVestRef.current) {
+      const p = pendingVestRef.current;
+      pendingVestRef.current = null;
+      vestTx.writeContract({
+        address: vestingNFT,
+        abi: VESTING_NFT_ABI,
+        functionName: "createVesting",
+        args: [p.beneficiary, p.token, p.amount, p.duration, p.cliff],
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [approveRcpt.isSuccess]);
 
   useEffect(() => {
     if (vestRcpt.isSuccess && token) {
-      toast("success", "Vesting deployed & funded", `${token.symbol} schedule is live and releasing to the beneficiary.`);
+      toast("success", "Vesting created", `${token.symbol} vesting schedule is live.`);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vestRcpt.isSuccess]);
 
-  const factoryUnset = vestingFactory === ZERO;
+  const contractUnset = vestingNFT === ZERO;
   const validBeneficiary = isAddress(beneficiary);
   const cliffInvalid = withCliff && cliff > duration;
 
-  const handleApprove = () => {
-    if (!token) return;
+  const handleApproveAndCreate = () => {
+    if (!token || parsedAmount === 0n || !validBeneficiary) return;
+    // Capture params now
+    pendingVestRef.current = {
+      beneficiary: beneficiary as `0x${string}`,
+      token: token.address,
+      amount: parsedAmount,
+      duration: BigInt(duration),
+      cliff: withCliff ? BigInt(cliff) : 0n,
+    };
     approveTx.writeContract({
       address: token.address,
       abi: ERC20_ABI,
       functionName: "approve",
-      args: [vestingFactory, parsedAmount],
+      args: [vestingNFT, maxUint256],
     });
   };
 
   const handleCreate = () => {
-    if (!validBeneficiary || !token) return;
-    const start = BigInt(Math.floor(Date.now() / 1000));
-    if (withCliff) {
-      vestTx.writeContract({
-        address: vestingFactory,
-        abi: VESTING_FACTORY_ABI,
-        functionName: "createVestingWithCliff",
-        args: [
-          beneficiary as `0x${string}`,
-          token.address,
-          parsedAmount,
-          start,
-          BigInt(duration),
-          BigInt(cliff),
-        ],
-      });
-    } else {
-      vestTx.writeContract({
-        address: vestingFactory,
-        abi: VESTING_FACTORY_ABI,
-        functionName: "createVesting",
-        args: [
-          beneficiary as `0x${string}`,
-          token.address,
-          parsedAmount,
-          start,
-          BigInt(duration),
-        ],
-      });
-    }
+    if (!token || parsedAmount === 0n || !validBeneficiary) return;
+    vestTx.writeContract({
+      address: vestingNFT,
+      abi: VESTING_NFT_ABI,
+      functionName: "createVesting",
+      args: [
+        beneficiary as `0x${string}`,
+        token.address,
+        parsedAmount,
+        BigInt(duration),
+        withCliff ? BigInt(cliff) : 0n,
+      ],
+    });
   };
 
   const reset = () => {
     vestTx.reset();
     approveTx.reset();
+    pendingVestRef.current = null;
     setBeneficiary("");
     setToken(undefined);
     setAmount("");
@@ -117,11 +131,15 @@ export function CreateVestingDialog({ open, onClose }: Props) {
     onClose();
   };
 
+  const approving = approveTx.isPending || approveRcpt.isLoading;
+  const creating  = vestTx.isPending  || vestRcpt.isLoading;
+  const busy      = approving || creating;
+
   return (
     <Modal open={open} onClose={onClose} title="New Vesting Schedule">
-      {factoryUnset ? (
+      {contractUnset ? (
         <Notice tone="warn">
-          VestingFactory not configured. Set the address in{" "}
+          VestingNFT not configured. Set the address in{" "}
           <code style={{ color: "rgba(196,168,240,0.7)" }}>src/lib/web3/contracts.ts</code>.
         </Notice>
       ) : !address ? (
@@ -169,20 +187,15 @@ export function CreateVestingDialog({ open, onClose }: Props) {
               {/* Step 3 — Beneficiary */}
               <div>
                 <Label>3. Beneficiary</Label>
-
-                {/* "Use my address" checkbox card */}
                 <button
                   type="button"
-                  onClick={() => {
-                    if (address) setBeneficiary(beneficiary === address ? "" : address);
-                  }}
+                  onClick={() => address && setBeneficiary(beneficiary === address ? "" : address)}
                   className="w-full flex items-center gap-3 rounded-xl px-4 py-3 mb-3 transition"
                   style={{
                     background: beneficiary === address ? "rgba(155,127,212,0.15)" : "rgba(155,127,212,0.05)",
                     border: `1px solid ${beneficiary === address ? "rgba(155,127,212,0.55)" : "rgba(155,127,212,0.2)"}`,
                   }}
                 >
-                  {/* checkbox */}
                   <span
                     className="w-4 h-4 rounded flex items-center justify-center shrink-0 transition"
                     style={{
@@ -197,16 +210,12 @@ export function CreateVestingDialog({ open, onClose }: Props) {
                     )}
                   </span>
                   <div className="text-left min-w-0">
-                    <p className="font-grotesk text-[12px] uppercase tracking-wider" style={{ color: "#EDE0FF" }}>
-                      Use my address
-                    </p>
+                    <p className="font-grotesk text-[12px] uppercase tracking-wider" style={{ color: "#EDE0FF" }}>Use my address</p>
                     <p className="font-mono text-[9px] truncate mt-0.5" style={{ color: "rgba(196,168,240,0.5)" }}>
                       {address ?? "Connect wallet first"}
                     </p>
                   </div>
                 </button>
-
-                {/* manual input */}
                 <input
                   value={beneficiary}
                   onChange={(e) => setBeneficiary(e.target.value.trim())}
@@ -219,9 +228,7 @@ export function CreateVestingDialog({ open, onClose }: Props) {
                   }}
                 />
                 {beneficiary && !validBeneficiary && (
-                  <p className="font-mono text-[10px] mt-1.5" style={{ color: "rgba(255,120,120,0.9)" }}>
-                    Not a valid address.
-                  </p>
+                  <p className="font-mono text-[10px] mt-1.5" style={{ color: "rgba(255,120,120,0.9)" }}>Not a valid address.</p>
                 )}
               </div>
 
@@ -231,7 +238,7 @@ export function CreateVestingDialog({ open, onClose }: Props) {
                 <DurationPicker value={duration} onChange={setDuration} />
               </div>
 
-              {/* Step 5 — Cliff (optional) */}
+              {/* Step 5 — Cliff */}
               <div>
                 <button
                   onClick={() => setWithCliff((v) => !v)}
@@ -242,12 +249,8 @@ export function CreateVestingDialog({ open, onClose }: Props) {
                   }}
                 >
                   <div className="text-left">
-                    <p className="font-grotesk text-[11px] uppercase tracking-wider" style={{ color: "#EDE0FF" }}>
-                      Add a cliff
-                    </p>
-                    <p className="font-mono text-[9px] mt-0.5" style={{ color: "rgba(196,168,240,0.5)" }}>
-                      Nothing vests until cliff date
-                    </p>
+                    <p className="font-grotesk text-[11px] uppercase tracking-wider" style={{ color: "#EDE0FF" }}>Add a cliff</p>
+                    <p className="font-mono text-[9px] mt-0.5" style={{ color: "rgba(196,168,240,0.5)" }}>Nothing vests until cliff date</p>
                   </div>
                   <Toggle on={withCliff} />
                 </button>
@@ -263,28 +266,42 @@ export function CreateVestingDialog({ open, onClose }: Props) {
                 )}
               </div>
 
+              {/* Step progress */}
+              {approving && (
+                <div className="flex items-center gap-3 px-4 py-3 rounded-xl"
+                  style={{ background: "rgba(155,127,212,0.08)", border: "1px solid rgba(155,127,212,0.2)" }}>
+                  <span className="w-2 h-2 rounded-full shrink-0 animate-pulse" style={{ background: "#9B7FD4" }} />
+                  <p className="font-mono text-[11px]" style={{ color: "rgba(196,168,240,0.8)" }}>
+                    Step 1 of 2 — Approving {token.symbol}…
+                  </p>
+                </div>
+              )}
+              {creating && (
+                <div className="flex items-center gap-3 px-4 py-3 rounded-xl"
+                  style={{ background: "rgba(155,127,212,0.08)", border: "1px solid rgba(155,127,212,0.2)" }}>
+                  <span className="w-2 h-2 rounded-full shrink-0 animate-pulse" style={{ background: "#9B7FD4" }} />
+                  <p className="font-mono text-[11px]" style={{ color: "rgba(196,168,240,0.8)" }}>
+                    {needsApproval ? "Step 2 of 2 — " : ""}Creating vesting schedule…
+                  </p>
+                </div>
+              )}
+
               {/* Action */}
               {needsApproval ? (
                 <ActionButton
-                  onClick={handleApprove}
-                  disabled={parsedAmount === 0n || approveTx.isPending || approveRcpt.isLoading}
-                  loading={approveTx.isPending || approveRcpt.isLoading}
-                  label={`Approve ${token.symbol}`}
-                  loadingLabel="Approving…"
+                  onClick={handleApproveAndCreate}
+                  disabled={parsedAmount === 0n || !validBeneficiary || cliffInvalid || busy}
+                  loading={busy}
+                  label={`Approve & Create Vesting`}
+                  loadingLabel={approving ? "Approving…" : "Creating…"}
                 />
               ) : (
                 <ActionButton
                   onClick={handleCreate}
-                  disabled={
-                    parsedAmount === 0n ||
-                    !validBeneficiary ||
-                    cliffInvalid ||
-                    vestTx.isPending ||
-                    vestRcpt.isLoading
-                  }
-                  loading={vestTx.isPending || vestRcpt.isLoading}
-                  label="Deploy &amp; Fund Vesting"
-                  loadingLabel="Deploying…"
+                  disabled={parsedAmount === 0n || !validBeneficiary || cliffInvalid || busy}
+                  loading={busy}
+                  label="Create Vesting Schedule"
+                  loadingLabel="Creating…"
                 />
               )}
 
@@ -301,7 +318,7 @@ export function CreateVestingDialog({ open, onClose }: Props) {
   );
 }
 
-// ── helpers ───────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────
 
 function Label({ children }: { children: React.ReactNode }) {
   return (
@@ -334,17 +351,15 @@ function ActionButton({ onClick, disabled, loading, label, loadingLabel }: {
       disabled={disabled}
       className="w-full rounded-xl py-3 font-grotesk text-[12px] uppercase tracking-wider transition disabled:opacity-40 active:scale-[0.99]"
       style={{ background: "rgba(155,127,212,0.2)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.5)" }}
-      dangerouslySetInnerHTML={{ __html: loading ? loadingLabel : label }}
-    />
+    >
+      {loading ? loadingLabel : label}
+    </button>
   );
 }
 
 function Notice({ children, tone }: { children: React.ReactNode; tone: "info" | "warn" }) {
   return (
-    <div
-      className="rounded-xl px-4 py-3"
-      style={{ background: "rgba(155,127,212,0.06)", border: "1px solid rgba(155,127,212,0.2)" }}
-    >
+    <div className="rounded-xl px-4 py-3" style={{ background: "rgba(155,127,212,0.06)", border: "1px solid rgba(155,127,212,0.2)" }}>
       <p className="font-mono text-[11px] leading-relaxed" style={{ color: tone === "warn" ? "rgba(255,180,50,0.9)" : "rgba(196,168,240,0.7)" }}>
         {children}
       </p>
@@ -362,10 +377,10 @@ function SuccessState({ onDone }: { onDone: () => void }) {
         <CheckCircle2 className="w-6 h-6" style={{ color: "#C4A8F0" }} strokeWidth={1.5} />
       </div>
       <p className="font-grotesk uppercase tracking-wider text-[16px] mb-1" style={{ color: "#EDE0FF" }}>
-        Vesting deployed &amp; funded
+        Vesting Created
       </p>
       <p className="font-mono text-[10px] max-w-[280px] mx-auto leading-relaxed mt-1" style={{ color: "rgba(196,168,240,0.6)" }}>
-        Tokens are now locked in the vesting wallet and will release linearly to the beneficiary.
+        Tokens are locked in the vesting contract and will release linearly to the beneficiary.
       </p>
       <button
         onClick={onDone}
