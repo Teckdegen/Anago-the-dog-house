@@ -142,9 +142,10 @@ export function useUserLocks(): { locks: LockView[]; isLoading: boolean } {
       const lockRes = detailsQ.data[i * 2];
       const ownerRes = detailsQ.data[i * 2 + 1];
       if (lockRes?.status !== "success") return null;
-      const r = lockRes.result as { token: `0x${string}`; amount: bigint; unlockTime: bigint; createdAt: bigint; withdrawn: boolean };
+      const r = lockRes.result as { token: `0x${string}`; amount: bigint; unlockTime?: bigint; unlockAt?: bigint; createdAt: bigint; withdrawn: boolean };
       const owner = (ownerRes?.status === "success" ? ownerRes.result : "0x0000000000000000000000000000000000000000") as `0x${string}`;
-      return { id, token: r.token, owner, amount: r.amount, unlockAt: r.unlockTime, createdAt: r.createdAt, withdrawn: r.withdrawn };
+      const unlockAt = r.unlockTime ?? r.unlockAt ?? 0n;
+      return { id, token: r.token, owner, amount: r.amount, unlockAt, createdAt: r.createdAt, withdrawn: r.withdrawn };
     }).filter(Boolean) as LockView[];
   }, [detailsQ.data, ids]);
 
@@ -154,13 +155,24 @@ export function useUserLocks(): { locks: LockView[]; isLoading: boolean } {
 export function useAllLocks(limit = 100): { locks: LockView[]; isLoading: boolean } {
   const { tokenLock } = useContractAddresses();
 
-  const lengthQ = useReadContract({
-    address: tokenLock,
-    abi: TOKEN_LOCK_ABI,
-    functionName: "locksLength",
+  // Try locksLength() first (new contract), fall back to totalLocks() (old contract)
+  const lengthQ = useReadContracts({
+    allowFailure: true,
+    contracts: [
+      { address: tokenLock, abi: TOKEN_LOCK_ABI, functionName: "locksLength" as const },
+      { address: tokenLock, abi: TOKEN_LOCK_ABI, functionName: "totalLocks"  as const },
+    ],
     query: { enabled: tokenLock !== ZERO },
   });
-  const total = Number((lengthQ.data as bigint | undefined) ?? 0n);
+
+  const total = useMemo(() => {
+    const a = lengthQ.data?.[0];
+    const b = lengthQ.data?.[1];
+    const val = (a?.status === "success" ? a.result : null)
+             ?? (b?.status === "success" ? b.result : null)
+             ?? 0n;
+    return Number(val as bigint);
+  }, [lengthQ.data]);
 
   const ids = useMemo<bigint[]>(() => {
     if (total === 0) return [];
@@ -174,8 +186,8 @@ export function useAllLocks(limit = 100): { locks: LockView[]; isLoading: boolea
   const detailsQ = useReadContracts({
     allowFailure: true,
     contracts: ids.flatMap((id) => [
-      { address: tokenLock, abi: TOKEN_LOCK_ABI, functionName: "getLock" as const, args: [id] as const },
-      { address: tokenLock, abi: TOKEN_LOCK_ABI, functionName: "ownerOf" as const, args: [id] as const },
+      { address: tokenLock, abi: TOKEN_LOCK_ABI, functionName: "getLock"  as const, args: [id] as const },
+      { address: tokenLock, abi: TOKEN_LOCK_ABI, functionName: "ownerOf"  as const, args: [id] as const },
     ]),
     query: { enabled: ids.length > 0 },
   });
@@ -183,12 +195,19 @@ export function useAllLocks(limit = 100): { locks: LockView[]; isLoading: boolea
   const locks = useMemo<LockView[]>(() => {
     if (!detailsQ.data) return [];
     return ids.map((id, i) => {
-      const lockRes = detailsQ.data[i * 2];
+      const lockRes  = detailsQ.data[i * 2];
       const ownerRes = detailsQ.data[i * 2 + 1];
       if (lockRes?.status !== "success") return null;
-      const r = lockRes.result as { token: `0x${string}`; amount: bigint; unlockTime: bigint; createdAt: bigint; withdrawn: boolean };
-      const owner = (ownerRes?.status === "success" ? ownerRes.result : "0x0000000000000000000000000000000000000000") as `0x${string}`;
-      return { id, token: r.token, owner, amount: r.amount, unlockAt: r.unlockTime, createdAt: r.createdAt, withdrawn: r.withdrawn };
+      const r = lockRes.result as {
+        token: `0x${string}`; amount: bigint;
+        unlockTime?: bigint; unlockAt?: bigint;
+        createdAt: bigint; withdrawn: boolean;
+      };
+      const owner = (ownerRes?.status === "success"
+        ? ownerRes.result
+        : "0x0000000000000000000000000000000000000000") as `0x${string}`;
+      const unlockAt = r.unlockTime ?? r.unlockAt ?? 0n;
+      return { id, token: r.token, owner, amount: r.amount, unlockAt, createdAt: r.createdAt, withdrawn: r.withdrawn };
     }).filter(Boolean) as LockView[];
   }, [detailsQ.data, ids]);
 
@@ -242,20 +261,30 @@ export function useLockLeaderboards(limit = 50) {
 export function useProtocolStats() {
   const { tokenLock, vestingNFT } = useContractAddresses();
 
-  const locksLen    = useReadContract({ address: tokenLock,  abi: TOKEN_LOCK_ABI,  functionName: "locksLength",    query: { enabled: tokenLock  !== ZERO } });
-  const tokensLen   = useReadContract({ address: tokenLock,  abi: TOKEN_LOCK_ABI,  functionName: "tokensLength",   query: { enabled: tokenLock  !== ZERO } });
-  const vestingsLen = useReadContract({ address: vestingNFT, abi: VESTING_NFT_ABI, functionName: "totalVestings",  query: { enabled: vestingNFT !== ZERO } });
+  // Try both function names — locksLength (new) or totalLocks (old deployed contract)
+  const countsQ = useReadContracts({
+    allowFailure: true,
+    contracts: [
+      { address: tokenLock,  abi: TOKEN_LOCK_ABI,  functionName: "locksLength"   as const },
+      { address: tokenLock,  abi: TOKEN_LOCK_ABI,  functionName: "totalLocks"    as const },
+      { address: tokenLock,  abi: TOKEN_LOCK_ABI,  functionName: "tokensLength"  as const },
+      { address: vestingNFT, abi: VESTING_NFT_ABI, functionName: "totalVestings" as const },
+    ],
+    query: { enabled: tokenLock !== ZERO },
+  });
 
-  const totalLocks     = Number((locksLen.data    as bigint | undefined) ?? 0n);
-  const totalSchedules = Number((vestingsLen.data  as bigint | undefined) ?? 0n);
-  const tokensLocked   = Number((tokensLen.data    as bigint | undefined) ?? 0n);
+  const pick = (i: number) => Number((countsQ.data?.[i]?.status === "success" ? countsQ.data[i].result : 0n) as bigint);
+
+  const totalLocks     = pick(0) || pick(1); // whichever returns non-zero
+  const tokensLocked   = pick(2);
+  const totalSchedules = pick(3);
 
   return {
     totalLocks,
     totalSchedules,
     tokensLocked,
     rawLockedSum: 0n,
-    isLoading: locksLen.isLoading || vestingsLen.isLoading || tokensLen.isLoading,
+    isLoading: countsQ.isLoading,
   };
 }
 

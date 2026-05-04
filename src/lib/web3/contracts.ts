@@ -163,6 +163,14 @@ export const TOKEN_LOCK_ABI = [
     inputs: [],
     outputs: [{ type: "uint256" }],
   },
+  // alias — older deployments expose totalLocks() instead of locksLength()
+  {
+    type: "function",
+    name: "totalLocks",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "uint256" }],
+  },
   {
     type: "function",
     name: "tokensLength",
