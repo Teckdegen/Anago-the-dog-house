@@ -236,6 +236,9 @@ export function CreateVestingDialog({ open, onClose }: Props) {
               <div>
                 <Label>4. Vesting Duration</Label>
                 <DurationPicker value={duration} onChange={setDuration} />
+                <p className="font-mono text-[9px] mt-1.5" style={{ color: "rgba(196,168,240,0.4)" }}>
+                  Tokens release linearly over this period. E.g. 365 days = ~0.27% unlocked per day.
+                </p>
               </div>
 
               {/* Step 5 — Cliff */}
@@ -250,16 +253,22 @@ export function CreateVestingDialog({ open, onClose }: Props) {
                 >
                   <div className="text-left">
                     <p className="font-grotesk text-[11px] uppercase tracking-wider" style={{ color: "#EDE0FF" }}>Add a cliff</p>
-                    <p className="font-mono text-[9px] mt-0.5" style={{ color: "rgba(196,168,240,0.5)" }}>Nothing vests until cliff date</p>
+                    <p className="font-mono text-[9px] mt-0.5" style={{ color: "rgba(196,168,240,0.5)" }}>
+                      0% vests until cliff date, then linear from cliff → end
+                    </p>
                   </div>
                   <Toggle on={withCliff} />
                 </button>
                 {withCliff && (
                   <div className="mt-3">
                     <DurationPicker value={cliff} onChange={setCliff} />
-                    {cliffInvalid && (
+                    {cliffInvalid ? (
                       <p className="font-mono text-[10px] mt-2" style={{ color: "rgba(255,120,120,0.9)" }}>
                         Cliff must be ≤ vesting duration.
+                      </p>
+                    ) : (
+                      <p className="font-mono text-[9px] mt-1.5" style={{ color: "rgba(196,168,240,0.4)" }}>
+                        Nothing claimable for the first {Math.round(cliff / 86400)} days, then linear release until end.
                       </p>
                     )}
                   </div>

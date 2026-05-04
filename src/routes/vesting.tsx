@@ -71,13 +71,51 @@ function VestingRow({
     });
   };
 
-  const endTs   = Number(vesting.startTime) + Number(vesting.duration);
-  const ended   = Date.now() / 1000 >= endTs;
-  const endDate = new Date(endTs * 1000).toLocaleDateString();
+  // ── Linear vesting math (mirrors contract _claimableAmount) ──────────
+  const nowSec      = Math.floor(Date.now() / 1000);
+  const startTime   = Number(vesting.startTime);
+  const duration    = Number(vesting.duration);
+  const cliff       = Number(vesting.cliffDuration);
+  const endTime     = startTime + duration;
+  const cliffTime   = startTime + cliff;
+  const hasCliff    = cliff > 0;
 
-  const pct = vesting.totalAmount > 0n
-    ? Number((vesting.claimed * 100n) / vesting.totalAmount)
+  // How much has linearly vested so far (before subtracting claimed)
+  const vestedSoFar: bigint = (() => {
+    if (nowSec < cliffTime) return 0n; // cliff not passed
+    if (nowSec >= endTime)  return vesting.totalAmount; // fully vested
+    const elapsed = BigInt(nowSec - startTime);
+    return (vesting.totalAmount * elapsed) / BigInt(duration);
+  })();
+
+  // Progress = vested so far / total (shows how far along the schedule is)
+  const vestedPct = vesting.totalAmount > 0n
+    ? Number((vestedSoFar * 10000n) / vesting.totalAmount) / 100
     : 0;
+
+  // Claimed pct (separate indicator)
+  const claimedPct = vesting.totalAmount > 0n
+    ? Number((vesting.claimed * 10000n) / vesting.totalAmount) / 100
+    : 0;
+
+  const inCliff    = hasCliff && nowSec < cliffTime;
+  const fullyVested = nowSec >= endTime;
+  const endDate    = new Date(endTime * 1000).toLocaleDateString();
+  const cliffDate  = hasCliff ? new Date(cliffTime * 1000).toLocaleDateString() : null;
+
+  // Time remaining label
+  const timeLabel = (() => {
+    if (vesting.revoked) return "Revoked";
+    if (fullyVested)     return "Fully vested";
+    if (inCliff) {
+      const secsLeft = cliffTime - nowSec;
+      const daysLeft = Math.ceil(secsLeft / 86400);
+      return `Cliff: ${daysLeft}d left`;
+    }
+    const secsLeft = endTime - nowSec;
+    const daysLeft = Math.ceil(secsLeft / 86400);
+    return `${daysLeft}d remaining`;
+  })();
 
   return (
     <>
@@ -95,64 +133,103 @@ function VestingRow({
       />
 
       <div
-        className="grid sm:grid-cols-[2fr_1fr_1fr_1fr_1fr_100px] grid-cols-[2fr_1fr_100px] gap-2 px-5 py-3.5 items-center hover:bg-[rgba(155,127,212,0.04)] transition-colors"
+        className="px-5 py-4 hover:bg-[rgba(155,127,212,0.03)] transition-colors"
         style={{ borderBottom: isLast ? "none" : "1px solid rgba(155,127,212,0.15)" }}
       >
-        {/* Token + ID */}
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div
-            className="w-7 h-7 rounded-full flex items-center justify-center font-grotesk text-[10px] shrink-0"
-            style={{ background: "rgba(155,127,212,0.15)", border: "1px solid rgba(155,127,212,0.35)", color: "rgba(196,168,240,0.85)" }}
-          >
-            {symbol[0]}
-          </div>
-          <div className="min-w-0">
-            <p className="font-grotesk uppercase text-[12px] tracking-wider truncate" style={{ color: "#EDE0FF" }}>{symbol}</p>
-            <p className="font-mono text-[9px]" style={{ color: "rgba(196,168,240,0.45)" }}>NFT #{vesting.id.toString()}</p>
-          </div>
-        </div>
-
-        {/* Total */}
-        <div className="hidden sm:block text-right font-grotesk text-[12px] tabular-nums" style={{ color: "rgba(237,224,255,0.9)" }}>
-          {formatAmount(vesting.totalAmount, decimals)}
-        </div>
-
-        {/* Claimable */}
-        <div className="text-right font-grotesk text-[12px] tabular-nums" style={{ color: vesting.claimable > 0n ? "#9be8a4" : "rgba(196,168,240,0.6)" }}>
-          {formatAmount(vesting.claimable, decimals)}
-        </div>
-
-        {/* Progress */}
-        <div className="hidden sm:flex items-center justify-end gap-2">
-          <div className="w-16 h-1 rounded-full overflow-hidden" style={{ background: "rgba(155,127,212,0.2)" }}>
-            <div className="h-full rounded-full" style={{ width: `${Math.min(pct, 100)}%`, background: "#9B7FD4" }} />
-          </div>
-          <span className="font-mono text-[10px]" style={{ color: "rgba(196,168,240,0.55)" }}>{pct.toFixed(0)}%</span>
-        </div>
-
-        {/* End date */}
-        <div className="hidden sm:block text-right font-mono text-[10px]" style={{ color: ended ? "rgba(100,220,100,0.8)" : "rgba(196,168,240,0.6)" }}>
-          {endDate}
-        </div>
-
-        {/* Action */}
-        <div className="text-right">
-          {vesting.revoked ? (
-            <span className="font-mono text-[9px] uppercase" style={{ color: "rgba(255,100,100,0.5)" }}>Revoked</span>
-          ) : vesting.claimable > 0n ? (
-            <button
-              onClick={doClaim}
-              disabled={tx.isPending || rcpt.isLoading}
-              className="px-3 py-1 rounded-full font-grotesk text-[10px] uppercase tracking-wider disabled:opacity-50 transition"
-              style={{ background: "rgba(155,127,212,0.25)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.6)" }}
+        {/* Top row */}
+        <div className="grid sm:grid-cols-[2fr_1fr_1fr_1fr_100px] grid-cols-[2fr_1fr_100px] gap-2 items-center mb-3">
+          {/* Token + ID */}
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div
+              className="w-7 h-7 rounded-full flex items-center justify-center font-grotesk text-[10px] shrink-0"
+              style={{ background: "rgba(155,127,212,0.15)", border: "1px solid rgba(155,127,212,0.35)", color: "rgba(196,168,240,0.85)" }}
             >
-              {tx.isPending || rcpt.isLoading ? "…" : "Claim"}
-            </button>
-          ) : (
-            <span className="font-mono text-[9px] uppercase" style={{ color: "rgba(155,127,212,0.45)" }}>
-              {ended ? "Done" : "Vesting"}
-            </span>
+              {symbol[0]}
+            </div>
+            <div className="min-w-0">
+              <p className="font-grotesk uppercase text-[12px] tracking-wider truncate" style={{ color: "#EDE0FF" }}>{symbol}</p>
+              <p className="font-mono text-[9px]" style={{ color: "rgba(196,168,240,0.45)" }}>
+                NFT #{vesting.id.toString()}
+                {hasCliff && <span style={{ color: "rgba(196,168,240,0.35)" }}> · cliff {cliffDate}</span>}
+              </p>
+            </div>
+          </div>
+
+          {/* Total */}
+          <div className="hidden sm:block text-right font-grotesk text-[12px] tabular-nums" style={{ color: "rgba(237,224,255,0.9)" }}>
+            {formatAmount(vesting.totalAmount, decimals)}
+          </div>
+
+          {/* Claimable now */}
+          <div className="text-right">
+            <p className="font-grotesk text-[12px] tabular-nums" style={{ color: vesting.claimable > 0n ? "#9be8a4" : "rgba(196,168,240,0.5)" }}>
+              {formatAmount(vesting.claimable, decimals)}
+            </p>
+            <p className="font-mono text-[8px] mt-0.5" style={{ color: "rgba(196,168,240,0.35)" }}>claimable</p>
+          </div>
+
+          {/* End date */}
+          <div className="hidden sm:block text-right">
+            <p className="font-mono text-[10px]" style={{ color: fullyVested ? "rgba(100,220,100,0.8)" : "rgba(196,168,240,0.6)" }}>
+              {endDate}
+            </p>
+            <p className="font-mono text-[8px] mt-0.5" style={{ color: inCliff ? "rgba(255,180,50,0.7)" : "rgba(196,168,240,0.35)" }}>
+              {timeLabel}
+            </p>
+          </div>
+
+          {/* Action */}
+          <div className="text-right">
+            {vesting.revoked ? (
+              <span className="font-mono text-[9px] uppercase" style={{ color: "rgba(255,100,100,0.5)" }}>Revoked</span>
+            ) : vesting.claimable > 0n ? (
+              <button
+                onClick={doClaim}
+                disabled={tx.isPending || rcpt.isLoading}
+                className="px-3 py-1 rounded-full font-grotesk text-[10px] uppercase tracking-wider disabled:opacity-50 transition"
+                style={{ background: "rgba(155,127,212,0.25)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.6)" }}
+              >
+                {tx.isPending || rcpt.isLoading ? "…" : "Claim"}
+              </button>
+            ) : (
+              <span className="font-mono text-[9px] uppercase" style={{ color: "rgba(155,127,212,0.45)" }}>
+                {inCliff ? "In cliff" : fullyVested ? "Done" : "Vesting"}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Progress bar — shows vested so far vs claimed */}
+        <div className="relative w-full h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(155,127,212,0.12)" }}>
+          {/* Vested (but not yet claimed) — lighter purple */}
+          <div
+            className="absolute left-0 top-0 h-full rounded-full transition-all duration-500"
+            style={{ width: `${Math.min(vestedPct, 100)}%`, background: "rgba(155,127,212,0.45)" }}
+          />
+          {/* Claimed — solid purple */}
+          <div
+            className="absolute left-0 top-0 h-full rounded-full transition-all duration-500"
+            style={{ width: `${Math.min(claimedPct, 100)}%`, background: "#9B7FD4" }}
+          />
+          {/* Cliff marker */}
+          {hasCliff && duration > 0 && (
+            <div
+              className="absolute top-0 h-full w-px"
+              style={{
+                left: `${Math.min((cliff / duration) * 100, 100)}%`,
+                background: "rgba(255,180,50,0.7)",
+              }}
+            />
           )}
+        </div>
+        {/* Progress labels */}
+        <div className="flex items-center justify-between mt-1">
+          <span className="font-mono text-[8px]" style={{ color: "rgba(196,168,240,0.35)" }}>
+            {claimedPct.toFixed(1)}% claimed · {vestedPct.toFixed(1)}% vested
+          </span>
+          <span className="font-mono text-[8px]" style={{ color: "rgba(196,168,240,0.35)" }}>
+            {formatAmount(vesting.claimed, decimals)} / {formatAmount(vesting.totalAmount, decimals)} {symbol}
+          </span>
         </div>
       </div>
     </>
@@ -253,7 +330,7 @@ function VestingPage() {
           <div
             className="hidden sm:grid px-5 py-3 text-[9px] font-mono uppercase tracking-[0.2em]"
             style={{
-              gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr 100px",
+              gridTemplateColumns: "2fr 1fr 1fr 1fr 100px",
               borderBottom: "1px solid rgba(155,127,212,0.2)",
               background: "rgba(155,127,212,0.08)",
               color: "rgba(196,168,240,0.6)",
@@ -262,7 +339,6 @@ function VestingPage() {
             <div>Token</div>
             <div className="text-right">Total</div>
             <div className="text-right">Claimable</div>
-            <div className="text-right">Progress</div>
             <div className="text-right">End Date</div>
             <div />
           </div>
