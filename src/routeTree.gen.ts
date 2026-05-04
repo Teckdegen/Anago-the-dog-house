@@ -10,20 +10,22 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as VestingRouteImport } from './routes/vesting'
+import { Route as TransferRouteImport } from './routes/transfer'
 import { Route as LockRouteImport } from './routes/lock'
 import { Route as FarmRouteImport } from './routes/farm'
-import { Route as ClmmRouteImport } from './routes/clmm'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as ClmmRouteImport } from './routes/clmm'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 
-const DashboardRoute = DashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const VestingRoute = VestingRouteImport.update({
   id: '/vesting',
   path: '/vesting',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TransferRoute = TransferRouteImport.update({
+  id: '/transfer',
+  path: '/transfer',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LockRoute = LockRouteImport.update({
@@ -36,9 +38,19 @@ const FarmRoute = FarmRouteImport.update({
   path: '/farm',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ClmmRoute = ClmmRouteImport.update({
   id: '/clmm',
   path: '/clmm',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -49,60 +61,93 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/dashboard': typeof DashboardRoute
+  '/admin': typeof AdminRoute
   '/clmm': typeof ClmmRoute
+  '/dashboard': typeof DashboardRoute
   '/farm': typeof FarmRoute
   '/lock': typeof LockRoute
+  '/transfer': typeof TransferRoute
   '/vesting': typeof VestingRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/dashboard': typeof DashboardRoute
+  '/admin': typeof AdminRoute
   '/clmm': typeof ClmmRoute
+  '/dashboard': typeof DashboardRoute
   '/farm': typeof FarmRoute
   '/lock': typeof LockRoute
+  '/transfer': typeof TransferRoute
   '/vesting': typeof VestingRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/dashboard': typeof DashboardRoute
+  '/admin': typeof AdminRoute
   '/clmm': typeof ClmmRoute
+  '/dashboard': typeof DashboardRoute
   '/farm': typeof FarmRoute
   '/lock': typeof LockRoute
+  '/transfer': typeof TransferRoute
   '/vesting': typeof VestingRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/dashboard' | '/clmm' | '/farm' | '/lock' | '/vesting'
+  fullPaths:
+    | '/'
+    | '/admin'
+    | '/clmm'
+    | '/dashboard'
+    | '/farm'
+    | '/lock'
+    | '/transfer'
+    | '/vesting'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dashboard' | '/clmm' | '/farm' | '/lock' | '/vesting'
-  id: '__root__' | '/' | '/dashboard' | '/clmm' | '/farm' | '/lock' | '/vesting'
+  to:
+    | '/'
+    | '/admin'
+    | '/clmm'
+    | '/dashboard'
+    | '/farm'
+    | '/lock'
+    | '/transfer'
+    | '/vesting'
+  id:
+    | '__root__'
+    | '/'
+    | '/admin'
+    | '/clmm'
+    | '/dashboard'
+    | '/farm'
+    | '/lock'
+    | '/transfer'
+    | '/vesting'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  DashboardRoute: typeof DashboardRoute
+  AdminRoute: typeof AdminRoute
   ClmmRoute: typeof ClmmRoute
+  DashboardRoute: typeof DashboardRoute
   FarmRoute: typeof FarmRoute
   LockRoute: typeof LockRoute
+  TransferRoute: typeof TransferRoute
   VestingRoute: typeof VestingRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/dashboard': {
-      id: '/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof DashboardRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/vesting': {
       id: '/vesting'
       path: '/vesting'
       fullPath: '/vesting'
       preLoaderRoute: typeof VestingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/transfer': {
+      id: '/transfer'
+      path: '/transfer'
+      fullPath: '/transfer'
+      preLoaderRoute: typeof TransferRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/lock': {
@@ -119,11 +164,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FarmRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/clmm': {
       id: '/clmm'
       path: '/clmm'
       fullPath: '/clmm'
       preLoaderRoute: typeof ClmmRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -138,10 +197,12 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  DashboardRoute: DashboardRoute,
+  AdminRoute: AdminRoute,
   ClmmRoute: ClmmRoute,
+  DashboardRoute: DashboardRoute,
   FarmRoute: FarmRoute,
   LockRoute: LockRoute,
+  TransferRoute: TransferRoute,
   VestingRoute: VestingRoute,
 }
 export const routeTree = rootRouteImport

@@ -453,6 +453,42 @@ export const YIELD_FARM_NFT_ABI = [
       { name: "boost",    type: "uint256" },
     ],
   },
+  {
+    type: "function",
+    name: "positionsOf",
+    stateMutability: "view",
+    inputs: [{ name: "owner", type: "address" }],
+    outputs: [{ type: "uint256[]" }],
+  },
+  {
+    type: "function",
+    name: "ownerOf",
+    stateMutability: "view",
+    inputs: [{ name: "tokenId", type: "uint256" }],
+    outputs: [{ type: "address" }],
+  },
+  {
+    type: "function",
+    name: "transferFrom",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "from",    type: "address" },
+      { name: "to",      type: "address" },
+      { name: "tokenId", type: "uint256" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "safeTransferFrom",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "from",    type: "address" },
+      { name: "to",      type: "address" },
+      { name: "tokenId", type: "uint256" },
+    ],
+    outputs: [],
+  },
   // ── Write ──────────────────────────────────────────────────────────────
   {
     type: "function",
