@@ -21,19 +21,80 @@ export const Route = createFileRoute("/dashboard")({
   }),
 });
 
+/** Fetch MON/USD price — tries multiple sources */
+async function fetchMonPrice(): Promise<number> {
+  // 1. CoinGecko — try known IDs for MON
+  const cgIds = ["monad", "monad-testnet", "monad-2"];
+  for (const id of cgIds) {
+    try {
+      const r = await fetch(
+        `https://api.coingecko.com/api/v3/simple/price?ids=${id}&vs_currencies=usd`,
+        { signal: AbortSignal.timeout(5000) },
+      );
+      const d = await r.json();
+      const price = d?.[id]?.usd;
+      if (typeof price === "number" && price > 0) return price;
+    } catch { /* try next */ }
+  }
+
+  // 2. CoinGecko search fallback
+  try {
+    const r = await fetch("https://api.coingecko.com/api/v3/search?query=monad", {
+      signal: AbortSignal.timeout(5000),
+    });
+    const d = await r.json();
+    const coin = (d?.coins as any[])?.find(
+      (c) => c.symbol?.toLowerCase() === "mon" || c.name?.toLowerCase() === "monad",
+    );
+    if (coin?.id) {
+      const r2 = await fetch(
+        `https://api.coingecko.com/api/v3/simple/price?ids=${coin.id}&vs_currencies=usd`,
+        { signal: AbortSignal.timeout(5000) },
+      );
+      const d2 = await r2.json();
+      const price = d2?.[coin.id]?.usd;
+      if (typeof price === "number" && price > 0) return price;
+    }
+  } catch { /* try next */ }
+
+  // 3. CoinMarketCap public endpoint (no key needed for basic quotes)
+  try {
+    const r = await fetch(
+      "https://api.coinmarketcap.com/data-api/v3/cryptocurrency/market-pairs/latest?slug=monad&start=1&limit=1",
+      { signal: AbortSignal.timeout(5000) },
+    );
+    const d = await r.json();
+    const price = d?.data?.marketPairs?.[0]?.price;
+    if (typeof price === "number" && price > 0) return price;
+  } catch { /* give up */ }
+
+  return 0; // price unavailable
+}
+
 function DashboardPage() {
   const [unit, setUnit] = useState<"USD" | "MON">("USD");
   const { address, isConnected } = useAccount();
   const { locks } = useUserLocks();
   const { vestings } = useUserVestings();
 
-  const monBal = useBalance({ address, query: { enabled: !!address } });
+  const monBal = useBalance({ address, query: { enabled: !!address, refetchInterval: 10_000 } });
+
   const [monPrice, setMonPrice] = useState<number>(0);
+  const [priceLoading, setPriceLoading] = useState(true);
+
   useEffect(() => {
-    fetch("https://api.coingecko.com/api/v3/simple/price?ids=monad&vs_currencies=usd")
-      .then((r) => r.json())
-      .then((d) => { if (d?.monad?.usd) setMonPrice(d.monad.usd); })
-      .catch(() => {});
+    let cancelled = false;
+    const run = async () => {
+      setPriceLoading(true);
+      const price = await fetchMonPrice();
+      if (!cancelled) {
+        setMonPrice(price);
+        setPriceLoading(false);
+      }
+    };
+    run();
+    const interval = setInterval(run, 60_000);
+    return () => { cancelled = true; clearInterval(interval); };
   }, []);
 
   const monAmount = useMemo(() => {
@@ -46,10 +107,35 @@ function DashboardPage() {
     return (monAmount * monPrice).toFixed(2);
   }, [monAmount, monPrice]);
 
+  const priceAvailable = monPrice > 0;
+
   const displayValue = useMemo(() => {
-    if (unit === "MON") return monAmount !== null ? `${monAmount.toFixed(4)} MON` : "0.0000 MON";
-    return monUsd ? `$${monUsd}` : "$0.00";
-  }, [unit, monAmount, monUsd]);
+    if (unit === "MON") {
+      return monAmount !== null ? `${monAmount.toFixed(4)} MON` : "0.0000 MON";
+    }
+    // USD mode
+    if (priceLoading) return "Loading…";
+    if (!priceAvailable) {
+      // Price not on CoinGecko (testnet) — show MON amount with USD label
+      return monAmount !== null ? `${monAmount.toFixed(4)} MON` : "—";
+    }
+    return `$${monUsd ?? "0.00"}`;
+  }, [unit, monAmount, monUsd, priceAvailable, priceLoading]);
+
+  const subtitle = useMemo(() => {
+    if (!isConnected) return "connect wallet to load balances";
+    if (!monBal.data) return "loading…";
+    if (unit === "USD") {
+      if (priceLoading) return "fetching price…";
+      if (!priceAvailable) {
+        return `${monAmount?.toFixed(4) ?? "0"} MON · price unavailable (testnet)`;
+      }
+      return `${monAmount?.toFixed(4) ?? "0"} MON · $${monPrice.toFixed(4)} / MON`;
+    }
+    // MON mode
+    if (!priceAvailable) return "price unavailable (testnet)";
+    return monUsd ? `≈ $${monUsd} USD · $${monPrice.toFixed(4)} / MON` : "price unavailable";
+  }, [isConnected, monBal.data, unit, priceLoading, priceAvailable, monAmount, monPrice, monUsd]);
 
   const activeLocks = locks.filter((l) => !l.withdrawn);
   const claimableLocks = activeLocks.filter(
@@ -75,15 +161,15 @@ function DashboardPage() {
     },
     {
       label: "Yield Farms",
-      value: "$0.00",
-      sub: "$0.00 claimable",
+      value: "—",
+      sub: "stake to earn",
       color: "#6B4FA8",
       icon: Sprout,
       href: "/farm",
     },
     {
       label: "CLMM",
-      value: "$0.00",
+      value: "—",
       sub: "0 open positions",
       color: "#4A2D7A",
       icon: BarChart2,
@@ -129,13 +215,7 @@ function DashboardPage() {
             {displayValue}
           </p>
           <p className="font-mono text-[9px] mt-2" style={{ color: "rgba(196,168,240,0.65)" }}>
-            {isConnected
-              ? monBal.data
-                ? unit === "USD"
-                  ? `${monAmount?.toFixed(4) ?? "0.0000"} MON${monPrice ? ` · $${monPrice.toFixed(4)} / MON` : ""}`
-                  : monUsd ? `≈ $${monUsd} USD${monPrice ? ` · $${monPrice.toFixed(4)} / MON` : ""}` : "price unavailable"
-                : "loading…"
-              : "connect wallet to load balances"}
+            {subtitle}
           </p>
         </div>
 
