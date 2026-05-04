@@ -104,7 +104,12 @@ function DashboardPage() {
 
   const monUsd = useMemo(() => {
     if (monAmount === null || monPrice === 0) return null;
-    return (monAmount * monPrice).toFixed(2);
+    const usd = monAmount * monPrice;
+    // Use enough decimal places so small balances don't round to $0.00
+    if (usd === 0) return "0.00";
+    if (usd < 0.01) return usd.toFixed(6);
+    if (usd < 1)    return usd.toFixed(4);
+    return usd.toFixed(2);
   }, [monAmount, monPrice]);
 
   const priceAvailable = monPrice > 0;
