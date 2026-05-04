@@ -1,7 +1,10 @@
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
-import { LayoutDashboard, Timer, LockKeyhole, BarChart2, Sprout } from "lucide-react";
+import { LayoutDashboard, Timer, LockKeyhole, BarChart2, Sprout, Send, Shield } from "lucide-react";
 import { WalletStatusPill } from "./WalletStatusPill";
+import { useAccount } from "wagmi";
+
+const ADMIN_ADDRESS = "0x0F5ddCFA6b2BbD7E24f8B98a3634273A4B5a834C";
 
 const NAV = [
   { label: "Home",       href: "/"          },
@@ -10,17 +13,21 @@ const NAV = [
   { label: "Token Lock", href: "/lock"      },
   { label: "CLMM",       href: "/clmm"      },
   { label: "Yield Farm", href: "/farm"      },
+  { label: "Transfer",   href: "/transfer"  },
 ] as const;
 
 const BOTTOM_NAV = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Vest",      href: "/vesting",   icon: Timer           },
   { label: "Locks",     href: "/lock",      icon: LockKeyhole     },
-  { label: "CLMM",      href: "/clmm",      icon: BarChart2       },
   { label: "Farm",      href: "/farm",      icon: Sprout          },
+  { label: "Transfer",  href: "/transfer",  icon: Send            },
 ] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {
+  const { address } = useAccount();
+  const isAdmin = address?.toLowerCase() === ADMIN_ADDRESS.toLowerCase();
+
   return (
     <div
       className="min-h-screen text-cream overflow-x-hidden relative"
@@ -78,10 +85,24 @@ export function AppShell({ children }: { children: ReactNode }) {
                 </Link>
               </li>
             ))}
+            {/* Admin link — only visible to admin wallet */}
+            {isAdmin && (
+              <li>
+                <Link
+                  to="/admin"
+                  className="flex items-center gap-1.5 font-grotesk text-[11px] uppercase tracking-[0.1em] px-4 py-1.5 rounded-full transition-colors duration-200 whitespace-nowrap"
+                  style={{ color: "rgba(196,168,240,0.75)" }}
+                  activeProps={{ style: { color: "#EDE0FF", background: "rgba(155,127,212,0.2)" } }}
+                >
+                  <Shield className="w-3 h-3" strokeWidth={2} />
+                  Admin
+                </Link>
+              </li>
+            )}
           </ul>
         </nav>
 
-        {/* wallet status — read-only; the only Connect/Disconnect controls live on /dashboard */}
+        {/* wallet status */}
         <WalletStatusPill />
       </header>
 
@@ -112,6 +133,18 @@ export function AppShell({ children }: { children: ReactNode }) {
             <span className="font-grotesk text-[9px] uppercase tracking-wider">{label}</span>
           </Link>
         ))}
+        {/* Admin tab — only visible to admin wallet on mobile */}
+        {isAdmin && (
+          <Link
+            to="/admin"
+            className="flex flex-1 flex-col items-center justify-center gap-1 py-3 transition-colors"
+            style={{ color: "rgba(196,168,240,0.5)" }}
+            activeProps={{ style: { color: "#C4A8F0" } }}
+          >
+            <Shield className="w-5 h-5" strokeWidth={1.5} />
+            <span className="font-grotesk text-[9px] uppercase tracking-wider">Admin</span>
+          </Link>
+        )}
       </nav>
     </div>
   );
