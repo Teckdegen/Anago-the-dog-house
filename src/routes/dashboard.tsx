@@ -25,7 +25,7 @@ function DashboardPage() {
   const [unit, setUnit] = useState<"USD" | "MON">("USD");
   const { address, isConnected } = useAccount();
   const { locks } = useUserLocks();
-  const { wallets: vestingWallets } = useUserVestings();
+  const { vestings } = useUserVestings();
 
   const monBal = useBalance({ address, query: { enabled: !!address } });
   const [monPrice, setMonPrice] = useState<number>(0);
@@ -67,8 +67,8 @@ function DashboardPage() {
     },
     {
       label: "Vesting",
-      value: `${vestingWallets.length} schedules`,
-      sub: `${vestingWallets.length} schedules`,
+      value: `${vestings.length} schedules`,
+      sub: `${vestings.length} schedules`,
       color: "#9B7FD4",
       icon: Timer,
       href: "/vesting",

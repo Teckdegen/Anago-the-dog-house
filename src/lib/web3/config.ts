@@ -5,13 +5,13 @@ import { defineChain } from "@reown/appkit/networks";
 // Reown Cloud project ID — create one at https://cloud.reown.com
 // then put it in .env.local as VITE_REOWN_PROJECT_ID
 export const projectId =
-  (import.meta.env.VITE_REOWN_PROJECT_ID as string) || "REPLACE_ME";
+  (import.meta.env.VITE_REOWN_PROJECT_ID as string) || "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6";
 
-if (projectId === "REPLACE_ME" && import.meta.env.DEV) {
+if (projectId === "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6" && import.meta.env.DEV) {
   // eslint-disable-next-line no-console
   console.warn(
-    "[web3] VITE_REOWN_PROJECT_ID is not set — wallet connect will fail. " +
-      "Get one from https://cloud.reown.com",
+    "[web3] VITE_REOWN_PROJECT_ID is not set — using dummy ID. " +
+      "Get a real one from https://cloud.reown.com for production",
   );
 }
 
@@ -50,7 +50,7 @@ createAppKit({
     icons: ["/logo.png"],
   },
   features: {
-    analytics: false,
+    analytics: false, // Disabled to avoid 400/403 errors without valid projectId
     email: false,
     socials: false,
   },
