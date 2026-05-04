@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContract } from "wagmi";
 import { parseUnits } from "viem";
 import { AppShell } from "@/components/AppShell";
-import { Shield, Plus, Settings, TrendingUp, Users, DollarSign, CheckCircle2 } from "lucide-react";
+import { Shield, Plus, Settings, TrendingUp, Users, DollarSign } from "lucide-react";
 import { useToast } from "@/components/Toast";
 import { YIELD_FARM_NFT_ABI, ERC20_ABI } from "@/lib/web3/contracts";
 import { TokenPicker } from "@/components/TokenPicker";
@@ -470,26 +470,21 @@ function StatsTab() {
       </h2>
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={<Users />} label="Total Pools" value={poolCount.toString()} />
-        <StatCard icon={<DollarSign />} label="Total TVL" value="$0" />
-        <StatCard icon={<TrendingUp />} label="Total Rewards" value="0" />
-        <StatCard icon={<CheckCircle2 />} label="Active Farms" value="0" />
+        <StatCard label="Total Pools" value={poolCount.toString()} />
+        <StatCard label="Total TVL" value="$0" />
+        <StatCard label="Total Rewards" value="0" />
+        <StatCard label="Active Farms" value="0" />
       </div>
     </div>
   );
 }
 
-function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+function StatCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl p-5" style={{ border: "1px solid rgba(155,127,212,0.35)", background: "rgba(155,127,212,0.05)" }}>
-      <div className="flex items-center gap-2 mb-3">
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(155,127,212,0.15)", color: "rgba(196,168,240,0.7)" }}>
-          {icon}
-        </div>
-        <p className="font-mono text-[9px] uppercase tracking-wider" style={{ color: "rgba(196,168,240,0.55)" }}>
-          {label}
-        </p>
-      </div>
+      <p className="font-mono text-[9px] uppercase tracking-wider mb-3" style={{ color: "rgba(196,168,240,0.55)" }}>
+        {label}
+      </p>
       <p className="font-grotesk text-[24px] tabular-nums" style={{ color: "#EDE0FF" }}>
         {value}
       </p>
