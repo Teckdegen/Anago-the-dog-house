@@ -18,7 +18,7 @@ export function TokenBalanceSelector({
   selectedAddress,
   className = "",
 }: TokenBalanceSelectorProps) {
-  const { balances, isLoading, error, refetch } = useAllTokenBalances();
+  const { balances, isLoading, error, refetch, addToken } = useAllTokenBalances();
   const [search, setSearch] = useState("");
 
   const filtered = useMemo(() => {

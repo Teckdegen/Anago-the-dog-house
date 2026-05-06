@@ -24,7 +24,7 @@ export function TokenPicker({ selected, onSelect, excludeNative }: Props) {
   const [showManual, setShowManual] = useState(false);
   
   // Auto-discover all user tokens
-  const { balances, isLoading: loadingBalances, refetch } = useAllTokenBalances();
+  const { balances, isLoading: loadingBalances, refetch, addToken } = useAllTokenBalances();
 
   // Filter out native token if requested
   const filteredBalances = useMemo(() => {
@@ -258,7 +258,11 @@ export function TokenPicker({ selected, onSelect, excludeNative }: Props) {
 
           {manualResolved && (
             <button
-              onClick={() => onSelect(manualResolved)}
+              onClick={() => {
+                // Add to custom tokens and select
+                addToken(manualResolved);
+                onSelect(manualResolved);
+              }}
               className="w-full text-left rounded-xl p-3 transition active:scale-[0.99]"
               style={{
                 background: "rgba(155,127,212,0.1)",

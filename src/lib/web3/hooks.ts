@@ -7,7 +7,7 @@ import {
   useReadContracts,
 } from "wagmi";
 import { CONTRACTS, TOKEN_LOCK_ABI, VESTING_NFT_ABI } from "./contracts";
-import { ERC20_ABI, EXPLORER_API, getTokenList, type TokenInfo } from "./tokens";
+import { ERC20_ABI, getTokenList, type TokenInfo } from "./tokens";
 
 const ZERO = "0x0000000000000000000000000000000000000000" as const;
 /** 10-second poll interval used on all contract reads */
@@ -354,10 +354,12 @@ export function useUserVestings(): {
 // ──────────────────────────────────────────────────────────────────────────
 import { usePublicClient } from "wagmi";
 import { fetchAllBalances, type TokenBalance } from "./tokenBalances";
+import { addCustomToken } from "./customTokens";
+import type { TokenInfo as CustomTokenInfo } from "./tokens";
 
 /**
  * Hook to fetch all token balances for the connected wallet
- * Automatically discovers tokens from Monad Explorer API
+ * Automatically discovers tokens from RPC logs + includes custom tokens
  * No need to manually enter token addresses!
  */
 export function useAllTokenBalances(): {
@@ -365,6 +367,7 @@ export function useAllTokenBalances(): {
   isLoading: boolean;
   error: Error | null;
   refetch: () => void;
+  addToken: (token: CustomTokenInfo) => void;
 } {
   const { address } = useAccount();
   const chainId = useChainId();
@@ -406,6 +409,11 @@ export function useAllTokenBalances(): {
   }, [address, chainId, publicClient, refreshKey]);
 
   const refetch = () => setRefreshKey((k) => k + 1);
+  
+  const addToken = (token: CustomTokenInfo) => {
+    addCustomToken(chainId, token);
+    refetch(); // Refresh to include the new token
+  };
 
-  return { balances, isLoading, error, refetch };
+  return { balances, isLoading, error, refetch, addToken };
 }

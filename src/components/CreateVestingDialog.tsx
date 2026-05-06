@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { parseUnits, maxUint256 } from "viem";
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, usePublicClient } from "wagmi";
 import { CheckCircle2 } from "lucide-react";
 import { Modal } from "./Modal";
 import { TokenPicker } from "./TokenPicker";
@@ -9,6 +9,7 @@ import { useContractAddresses } from "@/lib/web3/hooks";
 import { VESTING_NFT_ABI } from "@/lib/web3/contracts";
 import { ERC20_ABI, type TokenInfo } from "@/lib/web3/tokens";
 import { formatAmount } from "@/lib/web3/format";
+import { prepareTransactionWithGas } from "@/lib/web3/gasUtils";
 import { useToast } from "./Toast";
 
 const ZERO = "0x0000000000000000000000000000000000000000" as const;
@@ -20,6 +21,7 @@ export function CreateVestingDialog({ open, onClose }: Props) {
   const { address } = useAccount();
   const { vestingNFT } = useContractAddresses();
   const { toast } = useToast();
+  const publicClient = usePublicClient();
 
   const [token, setToken] = useState<(TokenInfo & { balance: bigint }) | undefined>();
   const [amount, setAmount] = useState("");
@@ -62,18 +64,37 @@ export function CreateVestingDialog({ open, onClose }: Props) {
 
   // After approval confirmed → fire createVesting with captured params
   useEffect(() => {
-    if (approveRcpt.isSuccess && pendingVestRef.current) {
+    if (approveRcpt.isSuccess && pendingVestRef.current && publicClient) {
       const p = pendingVestRef.current;
       pendingVestRef.current = null;
-      vestTx.writeContract({
+      
+      // Prepare vesting transaction with gas estimation
+      const vestingRequest = {
         address: vestingNFT,
         abi: VESTING_NFT_ABI,
         functionName: "createVesting",
         args: [p.beneficiary, p.token, p.amount, p.duration, p.cliff],
-      });
+        account: address,
+      };
+
+      prepareTransactionWithGas(publicClient, vestingRequest)
+        .then((preparedVesting) => {
+          vestTx.writeContract({
+            address: vestingNFT,
+            abi: VESTING_NFT_ABI,
+            functionName: "createVesting",
+            args: [p.beneficiary, p.token, p.amount, p.duration, p.cliff],
+            gas: preparedVesting.gas,
+            gasPrice: preparedVesting.gasPrice,
+          });
+        })
+        .catch((error) => {
+          console.error("[CreateVesting] Auto-vesting preparation failed:", error);
+          toast("error", "Transaction Failed", "Failed to prepare vesting transaction after approval");
+        });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [approveRcpt.isSuccess]);
+  }, [approveRcpt.isSuccess, publicClient]);
 
   useEffect(() => {
     if (vestRcpt.isSuccess && token) {
@@ -86,38 +107,83 @@ export function CreateVestingDialog({ open, onClose }: Props) {
   const validBeneficiary = isAddress(beneficiary);
   const cliffInvalid = withCliff && cliff > duration;
 
-  const handleApproveAndCreate = () => {
-    if (!token || parsedAmount === 0n || !validBeneficiary) return;
-    // Capture params now
-    pendingVestRef.current = {
-      beneficiary: beneficiary as `0x${string}`,
-      token: token.address,
-      amount: parsedAmount,
-      duration: BigInt(duration),
-      cliff: withCliff ? BigInt(cliff) : 0n,
-    };
-    approveTx.writeContract({
-      address: token.address,
-      abi: ERC20_ABI,
-      functionName: "approve",
-      args: [vestingNFT, maxUint256],
-    });
+  const handleApproveAndCreate = async () => {
+    if (!token || parsedAmount === 0n || !validBeneficiary || !publicClient) return;
+    
+    try {
+      // Capture params now
+      pendingVestRef.current = {
+        beneficiary: beneficiary as `0x${string}`,
+        token: token.address,
+        amount: parsedAmount,
+        duration: BigInt(duration),
+        cliff: withCliff ? BigInt(cliff) : 0n,
+      };
+
+      // Prepare approval transaction with gas estimation
+      const approveRequest = {
+        address: token.address,
+        abi: ERC20_ABI,
+        functionName: "approve",
+        args: [vestingNFT, maxUint256],
+        account: address,
+      };
+
+      const preparedApprove = await prepareTransactionWithGas(publicClient, approveRequest);
+      
+      approveTx.writeContract({
+        address: token.address,
+        abi: ERC20_ABI,
+        functionName: "approve",
+        args: [vestingNFT, maxUint256],
+        gas: preparedApprove.gas,
+        gasPrice: preparedApprove.gasPrice,
+      });
+    } catch (error) {
+      console.error("[CreateVesting] Approve preparation failed:", error);
+      toast("error", "Transaction Failed", "Failed to prepare approval transaction");
+    }
   };
 
-  const handleCreate = () => {
-    if (!token || parsedAmount === 0n || !validBeneficiary) return;
-    vestTx.writeContract({
-      address: vestingNFT,
-      abi: VESTING_NFT_ABI,
-      functionName: "createVesting",
-      args: [
-        beneficiary as `0x${string}`,
-        token.address,
-        parsedAmount,
-        BigInt(duration),
-        withCliff ? BigInt(cliff) : 0n,
-      ],
-    });
+  const handleCreate = async () => {
+    if (!token || parsedAmount === 0n || !validBeneficiary || !publicClient) return;
+    
+    try {
+      // Prepare vesting creation transaction with gas estimation
+      const vestingRequest = {
+        address: vestingNFT,
+        abi: VESTING_NFT_ABI,
+        functionName: "createVesting",
+        args: [
+          beneficiary as `0x${string}`,
+          token.address,
+          parsedAmount,
+          BigInt(duration),
+          withCliff ? BigInt(cliff) : 0n,
+        ],
+        account: address,
+      };
+
+      const preparedVesting = await prepareTransactionWithGas(publicClient, vestingRequest);
+      
+      vestTx.writeContract({
+        address: vestingNFT,
+        abi: VESTING_NFT_ABI,
+        functionName: "createVesting",
+        args: [
+          beneficiary as `0x${string}`,
+          token.address,
+          parsedAmount,
+          BigInt(duration),
+          withCliff ? BigInt(cliff) : 0n,
+        ],
+        gas: preparedVesting.gas,
+        gasPrice: preparedVesting.gasPrice,
+      });
+    } catch (error) {
+      console.error("[CreateVesting] Vesting creation preparation failed:", error);
+      toast("error", "Transaction Failed", "Failed to prepare vesting transaction");
+    }
   };
 
   const reset = () => {

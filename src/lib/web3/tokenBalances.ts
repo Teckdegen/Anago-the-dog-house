@@ -3,8 +3,11 @@
  * Discovers and fetches all ERC-20 token balances for a user address
  */
 
-import { type TokenInfo, EXPLORER_API, ERC20_ABI } from "./tokens";
+import { type TokenInfo, getTokenList, ERC20_ABI } from "./tokens";
+import { discoverAllUserTokens } from "./tokenDiscovery";
 import type { PublicClient } from "viem";
+
+const ZERO = "0x0000000000000000000000000000000000000000" as `0x${string}`;
 
 export type TokenBalance = TokenInfo & {
   balance: bigint;
@@ -13,114 +16,16 @@ export type TokenBalance = TokenInfo & {
 
 /**
  * Fetch all token balances for a given address on Monad
- * Uses the Monad Explorer API to discover tokens the user has interacted with
+ * Uses RPC event logs to discover tokens the user has interacted with
  */
 export async function fetchUserTokenBalances(
   address: `0x${string}`,
   chainId: number,
   publicClient: PublicClient,
 ): Promise<TokenBalance[]> {
-  const explorerUrl = EXPLORER_API[chainId];
-  if (!explorerUrl) {
-    console.warn(`[tokenBalances] No explorer API configured for chain ${chainId}`);
-    return [];
-  }
-
   try {
-    // Fetch token transfers involving this address from the explorer
-    const tokensResponse = await fetch(
-      `${explorerUrl}?module=account&action=tokentx&address=${address}&page=1&offset=100`,
-    );
-
-    if (!tokensResponse.ok) {
-      console.error("[tokenBalances] Explorer API request failed:", tokensResponse.statusText);
-      return [];
-    }
-
-    const data = await tokensResponse.json();
-    
-    if (data.status !== "1" || !Array.isArray(data.result)) {
-      // No token transfers found or API error
-      return [];
-    }
-
-    // Extract unique token addresses
-    const tokenAddresses = new Set<`0x${string}`>();
-    for (const tx of data.result) {
-      if (tx.contractAddress) {
-        tokenAddresses.add(tx.contractAddress.toLowerCase() as `0x${string}`);
-      }
-    }
-
-    if (tokenAddresses.size === 0) {
-      return [];
-    }
-
-    // Fetch token metadata and balances in parallel
-    const tokenPromises = Array.from(tokenAddresses).map(async (tokenAddress) => {
-      try {
-        // Fetch token metadata
-        const [symbol, decimals, balance] = await Promise.all([
-          publicClient.readContract({
-            address: tokenAddress,
-            abi: ERC20_ABI,
-            functionName: "symbol",
-          }) as Promise<string>,
-          publicClient.readContract({
-            address: tokenAddress,
-            abi: ERC20_ABI,
-            functionName: "decimals",
-          }) as Promise<number>,
-          publicClient.readContract({
-            address: tokenAddress,
-            abi: ERC20_ABI,
-            functionName: "balanceOf",
-            args: [address],
-          }) as Promise<bigint>,
-        ]);
-
-        // Try to fetch name (optional, some tokens might not have it)
-        let name = symbol;
-        try {
-          name = await publicClient.readContract({
-            address: tokenAddress,
-            abi: ERC20_ABI,
-            functionName: "name",
-          }) as string;
-        } catch {
-          // Name is optional, use symbol as fallback
-        }
-
-        // Only return tokens with non-zero balance
-        if (balance > 0n) {
-          const balanceFormatted = formatTokenBalance(balance, decimals);
-          return {
-            address: tokenAddress,
-            symbol,
-            name,
-            decimals,
-            balance,
-            balanceFormatted,
-          } as TokenBalance;
-        }
-        return null;
-      } catch (error) {
-        console.warn(`[tokenBalances] Failed to fetch data for token ${tokenAddress}:`, error);
-        return null;
-      }
-    });
-
-    const results = await Promise.all(tokenPromises);
-    
-    // Filter out null results and sort by balance (descending)
-    return results
-      .filter((token): token is TokenBalance => token !== null)
-      .sort((a, b) => {
-        // Sort by balance in descending order
-        if (a.balance > b.balance) return -1;
-        if (a.balance < b.balance) return 1;
-        return 0;
-      });
+    // Use the enhanced discovery method
+    return await discoverAllUserTokens(address, chainId, publicClient);
   } catch (error) {
     console.error("[tokenBalances] Error fetching token balances:", error);
     return [];

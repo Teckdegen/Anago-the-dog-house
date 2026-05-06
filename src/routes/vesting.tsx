@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState, useEffect } from "react";
 import { Search, Timer } from "lucide-react";
-import { useAccount, useReadContracts, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useAccount, useReadContracts, useWriteContract, useWaitForTransactionReceipt, usePublicClient } from "wagmi";
 import { AppShell } from "@/components/AppShell";
 import { useToast } from "@/components/Toast";
 import { CreateVestingDialog } from "@/components/CreateVestingDialog";
@@ -11,6 +11,7 @@ import { useUserVestings, useContractAddresses, type VestingView } from "@/lib/w
 import { VESTING_NFT_ABI } from "@/lib/web3/contracts";
 import { ERC20_ABI } from "@/lib/web3/tokens";
 import { formatAmount } from "@/lib/web3/format";
+import { prepareTransactionWithGas } from "@/lib/web3/gasUtils";
 
 export const Route = createFileRoute("/vesting")({
   component: VestingPage,
@@ -36,8 +37,10 @@ function VestingRow({
   onClaimed: () => void;
 }) {
   const { vestingNFT } = useContractAddresses();
+  const { address } = useAccount();
   const { toast } = useToast();
   const [successOpen, setSuccessOpen] = useState(false);
+  const publicClient = usePublicClient();
 
   // Fetch token symbol + decimals on-chain
   const metaQ = useReadContracts({
@@ -62,13 +65,36 @@ function VestingRow({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rcpt.isSuccess]);
 
-  const doClaim = () => {
-    tx.writeContract({
-      address: vestingNFT,
-      abi: VESTING_NFT_ABI,
-      functionName: "claim",
-      args: [vesting.id],
-    });
+  const doClaim = async () => {
+    if (!publicClient) {
+      toast("error", "Connection Error", "Please check your wallet connection");
+      return;
+    }
+
+    try {
+      // Prepare claim transaction with gas estimation
+      const claimRequest = {
+        address: vestingNFT,
+        abi: VESTING_NFT_ABI,
+        functionName: "claim",
+        args: [vesting.id],
+        account: address,
+      };
+
+      const preparedClaim = await prepareTransactionWithGas(publicClient, claimRequest);
+      
+      tx.writeContract({
+        address: vestingNFT,
+        abi: VESTING_NFT_ABI,
+        functionName: "claim",
+        args: [vesting.id],
+        gas: preparedClaim.gas,
+        gasPrice: preparedClaim.gasPrice,
+      });
+    } catch (error) {
+      console.error("[VestingClaim] Claim preparation failed:", error);
+      toast("error", "Transaction Failed", "Failed to prepare claim transaction");
+    }
   };
 
   // ── Linear vesting math (mirrors contract _claimableAmount) ──────────
@@ -148,9 +174,9 @@ function VestingRow({
             </div>
             <div className="min-w-0">
               <p className="font-grotesk uppercase text-[12px] tracking-wider truncate" style={{ color: "#EDE0FF" }}>{symbol}</p>
-              <p className="font-mono text-[9px]" style={{ color: "rgba(196,168,240,0.45)" }}>
+              <p className="font-mono text-[10px]" style={{ color: "rgba(196,168,240,0.55)" }}>
                 NFT #{vesting.id.toString()}
-                {hasCliff && <span style={{ color: "rgba(196,168,240,0.35)" }}> · cliff {cliffDate}</span>}
+                {hasCliff && <span style={{ color: "rgba(196,168,240,0.45)" }}> · cliff {cliffDate}</span>}
               </p>
             </div>
           </div>
@@ -165,7 +191,7 @@ function VestingRow({
             <p className="font-grotesk text-[12px] tabular-nums" style={{ color: vesting.claimable > 0n ? "#9be8a4" : "rgba(196,168,240,0.5)" }}>
               {formatAmount(vesting.claimable, decimals)}
             </p>
-            <p className="font-mono text-[8px] mt-0.5" style={{ color: "rgba(196,168,240,0.35)" }}>claimable</p>
+            <p className="font-mono text-[9px] mt-0.5" style={{ color: "rgba(196,168,240,0.45)" }}>claimable</p>
           </div>
 
           {/* End date */}
@@ -173,7 +199,7 @@ function VestingRow({
             <p className="font-mono text-[10px]" style={{ color: fullyVested ? "rgba(100,220,100,0.8)" : "rgba(196,168,240,0.6)" }}>
               {endDate}
             </p>
-            <p className="font-mono text-[8px] mt-0.5" style={{ color: inCliff ? "rgba(255,180,50,0.7)" : "rgba(196,168,240,0.35)" }}>
+            <p className="font-mono text-[10px] mt-0.5 font-medium" style={{ color: inCliff ? "rgba(255,180,50,0.85)" : fullyVested ? "rgba(120,255,120,0.85)" : "rgba(196,168,240,0.65)" }}>
               {timeLabel}
             </p>
           </div>
@@ -181,7 +207,7 @@ function VestingRow({
           {/* Action */}
           <div className="text-right">
             {vesting.revoked ? (
-              <span className="font-mono text-[9px] uppercase" style={{ color: "rgba(255,100,100,0.5)" }}>Revoked</span>
+              <span className="font-mono text-[10px] uppercase font-medium" style={{ color: "rgba(255,100,100,0.7)" }}>Revoked</span>
             ) : vesting.claimable > 0n ? (
               <button
                 onClick={doClaim}
@@ -192,7 +218,7 @@ function VestingRow({
                 {tx.isPending || rcpt.isLoading ? "…" : "Claim"}
               </button>
             ) : (
-              <span className="font-mono text-[9px] uppercase" style={{ color: "rgba(155,127,212,0.45)" }}>
+              <span className="font-mono text-[10px] uppercase font-medium" style={{ color: "rgba(155,127,212,0.65)" }}>
                 {inCliff ? "In cliff" : fullyVested ? "Done" : "Vesting"}
               </span>
             )}
@@ -224,10 +250,10 @@ function VestingRow({
         </div>
         {/* Progress labels */}
         <div className="flex items-center justify-between mt-1">
-          <span className="font-mono text-[8px]" style={{ color: "rgba(196,168,240,0.35)" }}>
+          <span className="font-mono text-[11px] font-medium" style={{ color: "rgba(196,168,240,0.75)" }}>
             {claimedPct.toFixed(1)}% claimed · {vestedPct.toFixed(1)}% vested
           </span>
-          <span className="font-mono text-[8px]" style={{ color: "rgba(196,168,240,0.35)" }}>
+          <span className="font-mono text-[10px]" style={{ color: "rgba(196,168,240,0.55)" }}>
             {formatAmount(vesting.claimed, decimals)} / {formatAmount(vesting.totalAmount, decimals)} {symbol}
           </span>
         </div>

@@ -19,18 +19,35 @@ const NATIVE: TokenInfo = {
 };
 
 export const TOKEN_LISTS: Record<number, TokenInfo[]> = {
-  // Monad testnet — native token always included; ERC-20s are discovered live
-  10143: [NATIVE],
+  // Monad testnet — native token + some popular testnet tokens
+  10143: [
+    NATIVE,
+    // Add some common testnet tokens here - you can update these addresses
+    // with actual deployed token contracts on Monad testnet
+    {
+      address: "0x1234567890123456789012345678901234567890", // Example USDC
+      symbol: "USDC",
+      name: "USD Coin",
+      decimals: 6,
+    },
+    {
+      address: "0x2345678901234567890123456789012345678901", // Example USDT  
+      symbol: "USDT",
+      name: "Tether USD",
+      decimals: 6,
+    },
+    {
+      address: "0x3456789012345678901234567890123456789012", // Example WETH
+      symbol: "WETH",
+      name: "Wrapped Ether",
+      decimals: 18,
+    },
+  ],
 };
 
 export function getTokenList(chainId: number): TokenInfo[] {
   return TOKEN_LISTS[chainId] ?? [];
 }
-
-// ── Explorer endpoints used for token discovery ───────────────────────────
-export const EXPLORER_API: Record<number, string> = {
-  10143: "https://testnet.monadexplorer.com/api",
-};
 
 export const ERC20_ABI = [
   {
