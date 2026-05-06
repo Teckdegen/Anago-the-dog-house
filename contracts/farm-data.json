@@ -1,0 +1,74 @@
+{
+  "network": "Monad Testnet",
+  "chainId": 10143,
+  "yieldFarmAddress": "0x59368cb7b7487a151fcCC429f5B3C2EE3414dDA4",
+  "createdAt": "2026-05-06T14:24:07.477Z",
+  "pools": [
+    {
+      "poolId": 1,
+      "stakeToken": "0x39171AC03b8e14EeE61791E06a492b98a7ec7983",
+      "tokenSymbol": "DOG",
+      "tokenName": "Dog Coin",
+      "tokenDecimals": 18,
+      "transactionHash": "0x1e350d5ecd43193246696e13dafb69e7c0fd1786aeb3f8cc97de06e7dd61ffc4"
+    },
+    {
+      "poolId": 2,
+      "stakeToken": "0xAA4162ED4120990695a6eb9A6F936F43B36b3727",
+      "tokenSymbol": "BONE",
+      "tokenName": "Bone Token",
+      "tokenDecimals": 18,
+      "transactionHash": "0x98b12b2fe0bab5f97c8ffd06d2cbcfef184575e6785ab6e6476b68aed575e728"
+    },
+    {
+      "poolId": 3,
+      "stakeToken": "0xBCF1D8725a3887443367653C11D1325d3CE6cCd2",
+      "tokenSymbol": "TREAT",
+      "tokenName": "Treat Token",
+      "tokenDecimals": 6,
+      "transactionHash": "0xe7e71230d14bfa90dc5b8b44762c78fcabcff131b2fd8f3894055a4d786fc3bc"
+    },
+    {
+      "poolId": 4,
+      "stakeToken": "0x1ef349548eb2b6dA9Feef726F76629177205480d",
+      "tokenSymbol": "PAW",
+      "tokenName": "Paw Points",
+      "tokenDecimals": 18,
+      "transactionHash": "0x7f80e3dcab0f95673bb047bda3d4056674b223546ac5715c8603a4597cdd87ce"
+    },
+    {
+      "poolId": 5,
+      "stakeToken": "0xa7378E467bf4B3d789e9f3509474D4A33390127e",
+      "tokenSymbol": "WOOF",
+      "tokenName": "Woof Rewards",
+      "tokenDecimals": 18,
+      "transactionHash": "0xbd541605247066d32606b9b573826731f1393365965dd9950ae4025d8fa4ddfa"
+    }
+  ],
+  "rewards": [
+    {
+      "poolId": 0,
+      "rewardToken": "0xAA4162ED4120990695a6eb9A6F936F43B36b3727",
+      "rewardSymbol": "BONE",
+      "rewardPerSecond": "1",
+      "duration": 30,
+      "totalSupply": "2592000"
+    },
+    {
+      "poolId": 1,
+      "rewardToken": "0x1ef349548eb2b6dA9Feef726F76629177205480d",
+      "rewardSymbol": "PAW",
+      "rewardPerSecond": "5",
+      "duration": 14,
+      "totalSupply": "6048000"
+    },
+    {
+      "poolId": 2,
+      "rewardToken": "0xa7378E467bf4B3d789e9f3509474D4A33390127e",
+      "rewardSymbol": "WOOF",
+      "rewardPerSecond": "0.5",
+      "duration": 7,
+      "totalSupply": "302400"
+    }
+  ]
+}

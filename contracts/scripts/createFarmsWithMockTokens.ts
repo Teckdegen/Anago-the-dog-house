@@ -26,7 +26,7 @@ async function main() {
   }
 
   const deployments = JSON.parse(fs.readFileSync(deploymentsPath, "utf8"));
-  const yieldFarmAddress = deployments.YieldFarmNFT;
+  const yieldFarmAddress = deployments["10143"]?.YieldFarmNFT;
 
   console.log("YieldFarm contract:", yieldFarmAddress);
   console.log("Available tokens:", tokens.length, "\n");

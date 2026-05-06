@@ -22,33 +22,40 @@ export const TOKEN_LISTS: Record<number, TokenInfo[]> = {
   // Monad testnet — native token + mock tokens for testing
   10143: [
     NATIVE,
-    // Mock tokens for farm testing - update these addresses after deployment
+    // Platform token for pool creation fees
     {
-      address: "0x1111111111111111111111111111111111111111", // DOG - Dog Coin
+      address: "0xa1D67bD149d47d17421c0A558e88E1cf3f8cf541", // HOUSE - Dog House Token
+      symbol: "HOUSE",
+      name: "Dog House Token",
+      decimals: 18,
+    },
+    // Mock tokens for farm testing - real deployed addresses
+    {
+      address: "0x39171AC03b8e14EeE61791E06a492b98a7ec7983", // DOG - Dog Coin
       symbol: "DOG",
       name: "Dog Coin",
       decimals: 18,
     },
     {
-      address: "0x2222222222222222222222222222222222222222", // BONE - Bone Token
+      address: "0xAA4162ED4120990695a6eb9A6F936F43B36b3727", // BONE - Bone Token
       symbol: "BONE", 
       name: "Bone Token",
       decimals: 18,
     },
     {
-      address: "0x3333333333333333333333333333333333333333", // TREAT - Treat Token
+      address: "0xBCF1D8725a3887443367653C11D1325d3CE6cCd2", // TREAT - Treat Token
       symbol: "TREAT",
       name: "Treat Token", 
       decimals: 6,
     },
     {
-      address: "0x4444444444444444444444444444444444444444", // PAW - Paw Points
+      address: "0x1ef349548eb2b6dA9Feef726F76629177205480d", // PAW - Paw Points
       symbol: "PAW",
       name: "Paw Points",
       decimals: 18,
     },
     {
-      address: "0x5555555555555555555555555555555555555555", // WOOF - Woof Rewards
+      address: "0xa7378E467bf4B3d789e9f3509474D4A33390127e", // WOOF - Woof Rewards
       symbol: "WOOF",
       name: "Woof Rewards", 
       decimals: 18,

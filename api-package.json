@@ -1,0 +1,19 @@
+{
+  "name": "monad-balance-api",
+  "version": "1.0.0",
+  "description": "Fast token balance API for Monad testnet",
+  "type": "module",
+  "main": "balance-api.js",
+  "scripts": {
+    "start": "node balance-api.js",
+    "dev": "node --watch balance-api.js"
+  },
+  "dependencies": {
+    "ethers": "^6.8.0",
+    "express": "^4.18.2",
+    "cors": "^2.8.5"
+  },
+  "keywords": ["monad", "blockchain", "api", "balance", "tokens"],
+  "author": "Dog House",
+  "license": "MIT"
+}

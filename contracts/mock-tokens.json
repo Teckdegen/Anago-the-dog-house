@@ -1,0 +1,43 @@
+{
+  "network": "Monad Testnet",
+  "chainId": 10143,
+  "deployer": "0xdb4034fA3829B488eFc1FC0f01F5F1Af722562Df",
+  "deployedAt": "2026-05-06T14:14:26.751Z",
+  "tokens": [
+    {
+      "name": "Dog Coin",
+      "symbol": "DOG",
+      "address": "0x39171AC03b8e14EeE61791E06a492b98a7ec7983",
+      "decimals": 18,
+      "totalSupply": "3000000000000000000000000"
+    },
+    {
+      "name": "Bone Token",
+      "symbol": "BONE",
+      "address": "0xAA4162ED4120990695a6eb9A6F936F43B36b3727",
+      "decimals": 18,
+      "totalSupply": "1500000000000000000000000"
+    },
+    {
+      "name": "Treat Token",
+      "symbol": "TREAT",
+      "address": "0xBCF1D8725a3887443367653C11D1325d3CE6cCd2",
+      "decimals": 6,
+      "totalSupply": "6000000000000"
+    },
+    {
+      "name": "Paw Points",
+      "symbol": "PAW",
+      "address": "0x1ef349548eb2b6dA9Feef726F76629177205480d",
+      "decimals": 18,
+      "totalSupply": "30000000000000000000000000"
+    },
+    {
+      "name": "Woof Rewards",
+      "symbol": "WOOF",
+      "address": "0xa7378E467bf4B3d789e9f3509474D4A33390127e",
+      "decimals": 18,
+      "totalSupply": "2250000000000000000000000"
+    }
+  ]
+}
