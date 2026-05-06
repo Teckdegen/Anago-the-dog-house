@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { Search, Sprout, Plus, Users, X, ChevronDown, ChevronUp } from "lucide-react";
+import { Search, Sprout, Plus, Users, X, ChevronDown, ChevronUp, Check } from "lucide-react";
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useChainId } from "wagmi";
 import { parseUnits, formatUnits } from "viem";
 import { AppShell } from "@/components/AppShell";
@@ -19,7 +19,7 @@ export const Route = createFileRoute("/farm")({
   }),
 });
 
-const TABS = ["All Farms", "My Farms"] as const;
+const TABS = ["All Farms", "My Farms", "My Positions"] as const;
 type Tab = typeof TABS[number];
 
 function FarmPage() {
@@ -105,6 +105,7 @@ function FarmPage() {
         {/* Content */}
         {activeTab === "All Farms" && <AllFarmsTab poolCount={poolCount} search={search} onCreateFarm={() => setShowCreateModal(true)} />}
         {activeTab === "My Farms" && <MyFarmsTab />}
+        {activeTab === "My Positions" && <MyPositionsTab />}
 
         {/* Create Farm Modal */}
         {showCreateModal && <CreateFarmModal onClose={() => setShowCreateModal(false)} />}
@@ -158,6 +159,9 @@ function AllFarmsTab({ poolCount, search, onCreateFarm }: { poolCount: number; s
 
 function FarmCard({ poolId }: { poolId: number }) {
   const [showAddReward, setShowAddReward] = useState(false);
+  const [showStakeModal, setShowStakeModal] = useState(false);
+  const [showUnstakeModal, setShowUnstakeModal] = useState(false);
+  const { address } = useAccount();
   const chainId = useChainId();
   const contracts = CONTRACTS[chainId] ?? CONTRACTS[10143];
 
@@ -186,8 +190,37 @@ function FarmCard({ poolId }: { poolId: number }) {
     query: { enabled: !!stakeToken, refetchInterval: 10_000 },
   });
 
+  // Get user's token balance
+  const userBalanceQuery = useReadContract({
+    address: stakeToken,
+    abi: ERC20_ABI,
+    functionName: "balanceOf",
+    args: address ? [address] : undefined,
+    query: { enabled: !!address && !!stakeToken, refetchInterval: 10_000 },
+  });
+
+  // Get user's staking positions
+  const userPositionsQuery = useReadContract({
+    address: contracts.yieldFarmNFT,
+    abi: YIELD_FARM_NFT_ABI,
+    functionName: "positionsOf",
+    args: address ? [address] : undefined,
+    query: { enabled: !!address, refetchInterval: 10_000 },
+  });
+
   const symbol = tokenSymbolQuery.data as string | undefined;
   const decimals = tokenDecimalsQuery.data as number | undefined;
+  const userBalance = userBalanceQuery.data as bigint | undefined;
+  const userPositions = (userPositionsQuery.data as bigint[] | undefined) ?? [];
+
+  // Filter positions for this pool
+  const poolPositions = userPositions.filter((_, index) => {
+    // We need to check which positions belong to this pool
+    // For now, we'll assume positions are ordered by pool
+    return true; // TODO: Add proper filtering
+  });
+
+  const hasStakedPosition = poolPositions.length > 0;
 
   return (
     <div className="rounded-xl p-5" style={{ border: "1px solid rgba(155,127,212,0.35)", background: "rgba(155,127,212,0.05)" }}>
@@ -213,18 +246,46 @@ function FarmCard({ poolId }: { poolId: number }) {
           </p>
         </div>
 
-        <button
-          onClick={() => setShowAddReward(!showAddReward)}
-          className="flex items-center gap-2 px-3 py-2 rounded-full font-grotesk text-[10px] uppercase tracking-wider transition hover:opacity-90"
-          style={{ background: "rgba(155,127,212,0.2)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.5)" }}
-        >
-          <Plus className="w-3.5 h-3.5" strokeWidth={1.5} />
-          Add Reward
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Stake/Unstake buttons for users */}
+          {address && (
+            <>
+              <button
+                onClick={() => setShowStakeModal(true)}
+                disabled={!userBalance || userBalance === 0n}
+                className="flex items-center gap-2 px-3 py-2 rounded-full font-grotesk text-[10px] uppercase tracking-wider transition hover:opacity-90 disabled:opacity-40"
+                style={{ background: "rgba(120,255,120,0.2)", color: "rgba(120,255,120,0.9)", border: "1px solid rgba(120,255,120,0.5)" }}
+              >
+                <Plus className="w-3.5 h-3.5" strokeWidth={1.5} />
+                Stake
+              </button>
+              
+              {hasStakedPosition && (
+                <button
+                  onClick={() => setShowUnstakeModal(true)}
+                  className="flex items-center gap-2 px-3 py-2 rounded-full font-grotesk text-[10px] uppercase tracking-wider transition hover:opacity-90"
+                  style={{ background: "rgba(255,180,50,0.2)", color: "rgba(255,180,50,0.9)", border: "1px solid rgba(255,180,50,0.5)" }}
+                >
+                  <X className="w-3.5 h-3.5" strokeWidth={1.5} />
+                  Unstake
+                </button>
+              )}
+            </>
+          )}
+
+          <button
+            onClick={() => setShowAddReward(!showAddReward)}
+            className="flex items-center gap-2 px-3 py-2 rounded-full font-grotesk text-[10px] uppercase tracking-wider transition hover:opacity-90"
+            style={{ background: "rgba(155,127,212,0.2)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.5)" }}
+          >
+            <Plus className="w-3.5 h-3.5" strokeWidth={1.5} />
+            Add Reward
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-3 mb-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         <div className="rounded-lg p-3" style={{ background: "rgba(155,127,212,0.08)", border: "1px solid rgba(155,127,212,0.2)" }}>
           <p className="font-mono text-[8px] uppercase tracking-wider mb-1" style={{ color: "rgba(196,168,240,0.5)" }}>
             Total Staked
@@ -235,24 +296,54 @@ function FarmCard({ poolId }: { poolId: number }) {
         </div>
         <div className="rounded-lg p-3" style={{ background: "rgba(155,127,212,0.08)", border: "1px solid rgba(155,127,212,0.2)" }}>
           <p className="font-mono text-[8px] uppercase tracking-wider mb-1" style={{ color: "rgba(196,168,240,0.5)" }}>
-            APR
+            Your Balance
           </p>
-          <p className="font-mono text-[13px]" style={{ color: "#9be8a4" }}>
-            TBD
+          <p className="font-mono text-[13px]" style={{ color: "#EDE0FF" }}>
+            {userBalance && decimals ? formatUnits(userBalance, decimals) : "0"}
+          </p>
+        </div>
+        <div className="rounded-lg p-3" style={{ background: "rgba(155,127,212,0.08)", border: "1px solid rgba(155,127,212,0.2)" }}>
+          <p className="font-mono text-[8px] uppercase tracking-wider mb-1" style={{ color: "rgba(196,168,240,0.5)" }}>
+            Your Staked
+          </p>
+          <p className="font-mono text-[13px]" style={{ color: "#EDE0FF" }}>
+            {hasStakedPosition ? `${poolPositions.length} NFT${poolPositions.length !== 1 ? 's' : ''}` : "0"}
           </p>
         </div>
         <div className="rounded-lg p-3" style={{ background: "rgba(155,127,212,0.08)", border: "1px solid rgba(155,127,212,0.2)" }}>
           <p className="font-mono text-[8px] uppercase tracking-wider mb-1" style={{ color: "rgba(196,168,240,0.5)" }}>
             Rewards
           </p>
-          <p className="font-mono text-[13px]" style={{ color: "#EDE0FF" }}>
-            0
+          <p className="font-mono text-[13px]" style={{ color: "#9be8a4" }}>
+            Active
           </p>
         </div>
       </div>
 
       {/* Add Reward Form */}
       {showAddReward && <AddRewardForm poolId={poolId} onClose={() => setShowAddReward(false)} />}
+      
+      {/* Stake Modal */}
+      {showStakeModal && (
+        <StakeModal 
+          poolId={poolId}
+          stakeToken={stakeToken}
+          symbol={symbol || ""}
+          decimals={decimals || 18}
+          userBalance={userBalance || 0n}
+          onClose={() => setShowStakeModal(false)}
+        />
+      )}
+      
+      {/* Unstake Modal */}
+      {showUnstakeModal && (
+        <UnstakeModal
+          poolId={poolId}
+          positions={poolPositions}
+          symbol={symbol || ""}
+          onClose={() => setShowUnstakeModal(false)}
+        />
+      )}
     </div>
   );
 }
@@ -643,3 +734,544 @@ function RewardRow({
 }
 
 // Remove old CreateFarmTab (replaced by modal above)
+
+// ── Stake Modal ───────────────────────────────────────────────────────────
+function StakeModal({
+  poolId,
+  stakeToken,
+  symbol,
+  decimals,
+  userBalance,
+  onClose,
+}: {
+  poolId: number;
+  stakeToken: `0x${string}`;
+  symbol: string;
+  decimals: number;
+  userBalance: bigint;
+  onClose: () => void;
+}) {
+  const [amount, setAmount] = useState("");
+  const { address } = useAccount();
+  const { toast } = useToast();
+  const chainId = useChainId();
+  const contracts = CONTRACTS[chainId] ?? CONTRACTS[10143];
+
+  const stakeTx = useWriteContract();
+  const stakeRcpt = useWaitForTransactionReceipt({ hash: stakeTx.data });
+
+  const parsedAmount = (() => {
+    if (!amount) return 0n;
+    try { return parseUnits(amount, decimals); } catch { return 0n; }
+  })();
+
+  const handleStake = () => {
+    if (!parsedAmount || parsedAmount === 0n) return;
+
+    stakeTx.writeContract({
+      address: contracts.yieldFarmNFT,
+      abi: YIELD_FARM_NFT_ABI,
+      functionName: "stake",
+      args: [BigInt(poolId), parsedAmount],
+    });
+  };
+
+  if (stakeRcpt.isSuccess) {
+    toast("success", "Staked successfully", `${amount} ${symbol} staked in pool ${poolId}`);
+    onClose();
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(6,4,15,0.85)", backdropFilter: "blur(8px)" }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div
+        className="w-full max-w-md rounded-2xl overflow-hidden"
+        style={{ background: "#0D0B18", border: "1px solid rgba(155,127,212,0.35)" }}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: "1px solid rgba(155,127,212,0.2)" }}>
+          <div>
+            <p className="font-grotesk uppercase text-[15px] tracking-wider" style={{ color: "#EDE0FF" }}>
+              Stake {symbol}
+            </p>
+            <p className="font-mono text-[9px] mt-0.5" style={{ color: "rgba(196,168,240,0.5)" }}>
+              Pool #{poolId} · Earn rewards by staking
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-full flex items-center justify-center transition hover:bg-[rgba(155,127,212,0.15)]"
+            style={{ color: "rgba(196,168,240,0.6)" }}
+          >
+            <X className="w-4 h-4" strokeWidth={2} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="px-6 py-5 space-y-4">
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="font-mono text-[9px] uppercase tracking-wider" style={{ color: "rgba(196,168,240,0.55)" }}>
+                Amount to Stake
+              </label>
+              <button
+                onClick={() => setAmount(formatUnits(userBalance, decimals))}
+                className="font-mono text-[9px] uppercase tracking-wider transition hover:opacity-80"
+                style={{ color: "rgba(196,168,240,0.55)" }}
+              >
+                Max: {formatUnits(userBalance, decimals)}
+              </button>
+            </div>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))}
+              placeholder="0.0"
+              className="w-full bg-transparent rounded-xl px-4 py-3 font-grotesk text-[20px] outline-none transition placeholder:text-[rgba(155,127,212,0.3)]"
+              style={{
+                color: "#EDE0FF",
+                border: "1px solid rgba(155,127,212,0.3)",
+                background: "rgba(155,127,212,0.06)",
+              }}
+            />
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              onClick={onClose}
+              className="flex-1 rounded-xl py-3 font-grotesk text-[12px] uppercase tracking-wider transition hover:opacity-80"
+              style={{ background: "rgba(155,127,212,0.1)", color: "rgba(196,168,240,0.7)", border: "1px solid rgba(155,127,212,0.3)" }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleStake}
+              disabled={!parsedAmount || parsedAmount === 0n || parsedAmount > userBalance || stakeTx.isPending}
+              className="flex-1 rounded-xl py-3 font-grotesk text-[12px] uppercase tracking-wider transition disabled:opacity-40 active:scale-[0.99]"
+              style={{ background: "rgba(120,255,120,0.2)", color: "rgba(120,255,120,0.9)", border: "1px solid rgba(120,255,120,0.5)" }}
+            >
+              {stakeTx.isPending ? "Staking..." : "Stake"}
+            </button>
+          </div>
+
+          {stakeTx.error && (
+            <p className="font-mono text-[10px] break-words" style={{ color: "rgba(255,100,100,0.9)" }}>
+              {(stakeTx.error as any)?.shortMessage ?? stakeTx.error.message}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Unstake Modal ─────────────────────────────────────────────────────────
+function UnstakeModal({
+  poolId,
+  positions,
+  symbol,
+  onClose,
+}: {
+  poolId: number;
+  positions: bigint[];
+  symbol: string;
+  onClose: () => void;
+}) {
+  const [selectedPosition, setSelectedPosition] = useState<bigint | null>(null);
+  const { toast } = useToast();
+  const chainId = useChainId();
+  const contracts = CONTRACTS[chainId] ?? CONTRACTS[10143];
+
+  const unstakeTx = useWriteContract();
+  const unstakeRcpt = useWaitForTransactionReceipt({ hash: unstakeTx.data });
+  const claimTx = useWriteContract();
+  const claimRcpt = useWaitForTransactionReceipt({ hash: claimTx.data });
+
+  const handleUnstake = () => {
+    if (!selectedPosition) return;
+
+    unstakeTx.writeContract({
+      address: contracts.yieldFarmNFT,
+      abi: YIELD_FARM_NFT_ABI,
+      functionName: "unstake",
+      args: [selectedPosition],
+    });
+  };
+
+  const handleClaimRewards = () => {
+    if (!selectedPosition) return;
+
+    claimTx.writeContract({
+      address: contracts.yieldFarmNFT,
+      abi: YIELD_FARM_NFT_ABI,
+      functionName: "claimAllRewards",
+      args: [selectedPosition],
+    });
+  };
+
+  if (unstakeRcpt.isSuccess) {
+    toast("success", "Unstaked successfully", `Position #${selectedPosition} unstaked from pool ${poolId}`);
+    onClose();
+  }
+
+  if (claimRcpt.isSuccess) {
+    toast("success", "Rewards claimed", `Rewards claimed from position #${selectedPosition}`);
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(6,4,15,0.85)", backdropFilter: "blur(8px)" }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div
+        className="w-full max-w-md rounded-2xl overflow-hidden"
+        style={{ background: "#0D0B18", border: "1px solid rgba(155,127,212,0.35)" }}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: "1px solid rgba(155,127,212,0.2)" }}>
+          <div>
+            <p className="font-grotesk uppercase text-[15px] tracking-wider" style={{ color: "#EDE0FF" }}>
+              Manage Position
+            </p>
+            <p className="font-mono text-[9px] mt-0.5" style={{ color: "rgba(196,168,240,0.5)" }}>
+              Pool #{poolId} · {positions.length} position{positions.length !== 1 ? 's' : ''}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-full flex items-center justify-center transition hover:bg-[rgba(155,127,212,0.15)]"
+            style={{ color: "rgba(196,168,240,0.6)" }}
+          >
+            <X className="w-4 h-4" strokeWidth={2} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="px-6 py-5 space-y-4">
+          <div>
+            <label className="font-mono text-[9px] uppercase tracking-wider mb-2 block" style={{ color: "rgba(196,168,240,0.55)" }}>
+              Select Position
+            </label>
+            <div className="space-y-2">
+              {positions.map((positionId) => (
+                <button
+                  key={positionId.toString()}
+                  onClick={() => setSelectedPosition(positionId)}
+                  className="w-full text-left p-3 rounded-xl transition hover:bg-[rgba(155,127,212,0.08)]"
+                  style={{
+                    background: selectedPosition === positionId ? "rgba(155,127,212,0.12)" : "rgba(155,127,212,0.05)",
+                    border: `1px solid ${selectedPosition === positionId ? "rgba(155,127,212,0.45)" : "rgba(155,127,212,0.25)"}`,
+                  }}
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-grotesk text-[12px] uppercase tracking-wider" style={{ color: "#EDE0FF" }}>
+                        Position #{positionId.toString()}
+                      </p>
+                      <p className="font-mono text-[9px]" style={{ color: "rgba(196,168,240,0.5)" }}>
+                        {symbol} Staking NFT
+                      </p>
+                    </div>
+                    {selectedPosition === positionId && (
+                      <div
+                        className="w-4 h-4 rounded-full flex items-center justify-center"
+                        style={{ background: "#9B7FD4", color: "#0D0B14" }}
+                      >
+                        <Check className="w-2.5 h-2.5" strokeWidth={3} />
+                      </div>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              onClick={handleClaimRewards}
+              disabled={!selectedPosition || claimTx.isPending}
+              className="flex-1 rounded-xl py-3 font-grotesk text-[12px] uppercase tracking-wider transition disabled:opacity-40 active:scale-[0.99]"
+              style={{ background: "rgba(255,180,50,0.2)", color: "rgba(255,180,50,0.9)", border: "1px solid rgba(255,180,50,0.5)" }}
+            >
+              {claimTx.isPending ? "Claiming..." : "Claim Rewards"}
+            </button>
+            <button
+              onClick={handleUnstake}
+              disabled={!selectedPosition || unstakeTx.isPending}
+              className="flex-1 rounded-xl py-3 font-grotesk text-[12px] uppercase tracking-wider transition disabled:opacity-40 active:scale-[0.99]"
+              style={{ background: "rgba(255,100,100,0.2)", color: "rgba(255,100,100,0.9)", border: "1px solid rgba(255,100,100,0.5)" }}
+            >
+              {unstakeTx.isPending ? "Unstaking..." : "Unstake"}
+            </button>
+          </div>
+
+          {(unstakeTx.error || claimTx.error) && (
+            <p className="font-mono text-[10px] break-words" style={{ color: "rgba(255,100,100,0.9)" }}>
+              {((unstakeTx.error || claimTx.error) as any)?.shortMessage ?? (unstakeTx.error || claimTx.error)?.message}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+// ── My Positions Tab ──────────────────────────────────────────────────────
+function MyPositionsTab() {
+  const { address } = useAccount();
+  const chainId = useChainId();
+  const contracts = CONTRACTS[chainId] ?? CONTRACTS[10143];
+
+  // Get user's staking positions
+  const userPositionsQuery = useReadContract({
+    address: contracts.yieldFarmNFT,
+    abi: YIELD_FARM_NFT_ABI,
+    functionName: "positionsOf",
+    args: address ? [address] : undefined,
+    query: { enabled: !!address, refetchInterval: 10_000 },
+  });
+
+  const positions = (userPositionsQuery.data as bigint[] | undefined) ?? [];
+
+  if (!address) {
+    return (
+      <div className="text-center py-12">
+        <div
+          className="w-16 h-16 rounded-xl flex items-center justify-center mx-auto mb-4"
+          style={{ background: "rgba(155,127,212,0.12)", border: "1px solid rgba(155,127,212,0.3)" }}
+        >
+          <Users className="w-8 h-8" style={{ color: "rgba(196,168,240,0.6)" }} strokeWidth={1.5} />
+        </div>
+        <p className="font-grotesk uppercase text-[16px] tracking-wider mb-2" style={{ color: "#EDE0FF" }}>
+          Connect Wallet
+        </p>
+        <p className="font-mono text-[11px] max-w-[300px] mx-auto" style={{ color: "rgba(196,168,240,0.55)" }}>
+          Connect your wallet to view your staking positions and manage rewards.
+        </p>
+      </div>
+    );
+  }
+
+  if (userPositionsQuery.isLoading) {
+    return (
+      <div className="text-center py-12">
+        <div
+          className="w-6 h-6 rounded-full border-2 animate-spin mx-auto mb-4"
+          style={{ borderColor: "rgba(155,127,212,0.2)", borderTopColor: "rgba(155,127,212,0.8)" }}
+        />
+        <p className="font-mono text-[11px]" style={{ color: "rgba(196,168,240,0.6)" }}>
+          Loading your positions...
+        </p>
+      </div>
+    );
+  }
+
+  if (positions.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <div
+          className="w-16 h-16 rounded-xl flex items-center justify-center mx-auto mb-4"
+          style={{ background: "rgba(155,127,212,0.12)", border: "1px solid rgba(155,127,212,0.3)" }}
+        >
+          <Sprout className="w-8 h-8" style={{ color: "rgba(196,168,240,0.6)" }} strokeWidth={1.5} />
+        </div>
+        <p className="font-grotesk uppercase text-[16px] tracking-wider mb-2" style={{ color: "#EDE0FF" }}>
+          No Positions Yet
+        </p>
+        <p className="font-mono text-[11px] max-w-[300px] mx-auto" style={{ color: "rgba(196,168,240,0.55)" }}>
+          Start staking in farms to earn rewards. Your positions will appear here.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="font-mono text-[11px]" style={{ color: "rgba(196,168,240,0.6)" }}>
+          {positions.length} position{positions.length !== 1 ? 's' : ''} found
+        </p>
+      </div>
+
+      <div className="grid gap-4">
+        {positions.map((positionId) => (
+          <PositionCard key={positionId.toString()} positionId={positionId} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Position Card ─────────────────────────────────────────────────────────
+function PositionCard({ positionId }: { positionId: bigint }) {
+  const chainId = useChainId();
+  const contracts = CONTRACTS[chainId] ?? CONTRACTS[10143];
+  const { toast } = useToast();
+
+  // Get position details
+  const positionQuery = useReadContract({
+    address: contracts.yieldFarmNFT,
+    abi: YIELD_FARM_NFT_ABI,
+    functionName: "getPosition",
+    args: [positionId],
+    query: { refetchInterval: 10_000 },
+  });
+
+  const claimTx = useWriteContract();
+  const claimRcpt = useWaitForTransactionReceipt({ hash: claimTx.data });
+  const unstakeTx = useWriteContract();
+  const unstakeRcpt = useWaitForTransactionReceipt({ hash: unstakeTx.data });
+
+  const positionData = positionQuery.data as any;
+  const [poolId, amount, stakedAt, boost] = positionData ?? [];
+
+  // Get pool info
+  const poolInfoQuery = useReadContract({
+    address: contracts.yieldFarmNFT,
+    abi: YIELD_FARM_NFT_ABI,
+    functionName: "getPoolInfo",
+    args: poolId ? [poolId] : undefined,
+    query: { enabled: !!poolId, refetchInterval: 10_000 },
+  });
+
+  const [stakeToken] = poolInfoQuery.data ?? [];
+
+  // Get token symbol
+  const tokenSymbolQuery = useReadContract({
+    address: stakeToken,
+    abi: ERC20_ABI,
+    functionName: "symbol",
+    query: { enabled: !!stakeToken, refetchInterval: 10_000 },
+  });
+
+  const tokenDecimalsQuery = useReadContract({
+    address: stakeToken,
+    abi: ERC20_ABI,
+    functionName: "decimals",
+    query: { enabled: !!stakeToken, refetchInterval: 10_000 },
+  });
+
+  const symbol = tokenSymbolQuery.data as string | undefined;
+  const decimals = tokenDecimalsQuery.data as number | undefined;
+
+  const handleClaimRewards = () => {
+    claimTx.writeContract({
+      address: contracts.yieldFarmNFT,
+      abi: YIELD_FARM_NFT_ABI,
+      functionName: "claimAllRewards",
+      args: [positionId],
+    });
+  };
+
+  const handleUnstake = () => {
+    unstakeTx.writeContract({
+      address: contracts.yieldFarmNFT,
+      abi: YIELD_FARM_NFT_ABI,
+      functionName: "unstake",
+      args: [positionId],
+    });
+  };
+
+  if (claimRcpt.isSuccess) {
+    toast("success", "Rewards claimed", `Rewards claimed from position #${positionId}`);
+  }
+
+  if (unstakeRcpt.isSuccess) {
+    toast("success", "Unstaked successfully", `Position #${positionId} unstaked`);
+  }
+
+  if (positionQuery.isLoading) {
+    return (
+      <div className="rounded-xl p-5 animate-pulse" style={{ border: "1px solid rgba(155,127,212,0.35)", background: "rgba(155,127,212,0.05)" }}>
+        <div className="h-4 bg-gray-700 rounded mb-2"></div>
+        <div className="h-3 bg-gray-700 rounded w-1/2"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl p-5" style={{ border: "1px solid rgba(155,127,212,0.35)", background: "rgba(155,127,212,0.05)" }}>
+      <div className="flex items-start justify-between gap-4 mb-4">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-2">
+            <p className="font-grotesk uppercase text-[16px] tracking-wider" style={{ color: "#EDE0FF" }}>
+              Position #{positionId.toString()}
+            </p>
+            <span
+              className="px-2 py-0.5 rounded-full font-mono text-[8px] uppercase tracking-wider"
+              style={{ 
+                background: "rgba(120,255,120,0.2)", 
+                color: "rgba(120,255,120,0.9)",
+                border: "1px solid rgba(120,255,120,0.4)"
+              }}
+            >
+              Active
+            </span>
+          </div>
+          <p className="font-mono text-[10px]" style={{ color: "rgba(196,168,240,0.55)" }}>
+            Pool #{poolId?.toString()} · {symbol || "Loading..."} Farm
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleClaimRewards}
+            disabled={claimTx.isPending}
+            className="flex items-center gap-2 px-3 py-2 rounded-full font-grotesk text-[10px] uppercase tracking-wider transition hover:opacity-90 disabled:opacity-50"
+            style={{ background: "rgba(255,180,50,0.2)", color: "rgba(255,180,50,0.9)", border: "1px solid rgba(255,180,50,0.5)" }}
+          >
+            {claimTx.isPending ? "..." : "Claim"}
+          </button>
+          <button
+            onClick={handleUnstake}
+            disabled={unstakeTx.isPending}
+            className="flex items-center gap-2 px-3 py-2 rounded-full font-grotesk text-[10px] uppercase tracking-wider transition hover:opacity-90 disabled:opacity-50"
+            style={{ background: "rgba(255,100,100,0.2)", color: "rgba(255,100,100,0.9)", border: "1px solid rgba(255,100,100,0.5)" }}
+          >
+            {unstakeTx.isPending ? "..." : "Unstake"}
+          </button>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="rounded-lg p-3" style={{ background: "rgba(155,127,212,0.08)", border: "1px solid rgba(155,127,212,0.2)" }}>
+          <p className="font-mono text-[8px] uppercase tracking-wider mb-1" style={{ color: "rgba(196,168,240,0.5)" }}>
+            Staked Amount
+          </p>
+          <p className="font-mono text-[13px]" style={{ color: "#EDE0FF" }}>
+            {amount && decimals ? formatUnits(amount, decimals) : "0"}
+          </p>
+        </div>
+        <div className="rounded-lg p-3" style={{ background: "rgba(155,127,212,0.08)", border: "1px solid rgba(155,127,212,0.2)" }}>
+          <p className="font-mono text-[8px] uppercase tracking-wider mb-1" style={{ color: "rgba(196,168,240,0.5)" }}>
+            Boost
+          </p>
+          <p className="font-mono text-[13px]" style={{ color: "#9be8a4" }}>
+            {boost ? `${boost}x` : "1x"}
+          </p>
+        </div>
+        <div className="rounded-lg p-3" style={{ background: "rgba(155,127,212,0.08)", border: "1px solid rgba(155,127,212,0.2)" }}>
+          <p className="font-mono text-[8px] uppercase tracking-wider mb-1" style={{ color: "rgba(196,168,240,0.5)" }}>
+            Rewards
+          </p>
+          <p className="font-mono text-[13px]" style={{ color: "#EDE0FF" }}>
+            Pending
+          </p>
+        </div>
+      </div>
+
+      {(claimTx.error || unstakeTx.error) && (
+        <div className="mt-4">
+          <p className="font-mono text-[10px] break-words" style={{ color: "rgba(255,100,100,0.9)" }}>
+            {((claimTx.error || unstakeTx.error) as any)?.shortMessage ?? (claimTx.error || unstakeTx.error)?.message}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}

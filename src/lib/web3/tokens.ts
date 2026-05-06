@@ -19,27 +19,38 @@ const NATIVE: TokenInfo = {
 };
 
 export const TOKEN_LISTS: Record<number, TokenInfo[]> = {
-  // Monad testnet — native token + some popular testnet tokens
+  // Monad testnet — native token + mock tokens for testing
   10143: [
     NATIVE,
-    // Add some common testnet tokens here - you can update these addresses
-    // with actual deployed token contracts on Monad testnet
+    // Mock tokens for farm testing - update these addresses after deployment
     {
-      address: "0x1234567890123456789012345678901234567890", // Example USDC
-      symbol: "USDC",
-      name: "USD Coin",
+      address: "0x1111111111111111111111111111111111111111", // DOG - Dog Coin
+      symbol: "DOG",
+      name: "Dog Coin",
+      decimals: 18,
+    },
+    {
+      address: "0x2222222222222222222222222222222222222222", // BONE - Bone Token
+      symbol: "BONE", 
+      name: "Bone Token",
+      decimals: 18,
+    },
+    {
+      address: "0x3333333333333333333333333333333333333333", // TREAT - Treat Token
+      symbol: "TREAT",
+      name: "Treat Token", 
       decimals: 6,
     },
     {
-      address: "0x2345678901234567890123456789012345678901", // Example USDT  
-      symbol: "USDT",
-      name: "Tether USD",
-      decimals: 6,
+      address: "0x4444444444444444444444444444444444444444", // PAW - Paw Points
+      symbol: "PAW",
+      name: "Paw Points",
+      decimals: 18,
     },
     {
-      address: "0x3456789012345678901234567890123456789012", // Example WETH
-      symbol: "WETH",
-      name: "Wrapped Ether",
+      address: "0x5555555555555555555555555555555555555555", // WOOF - Woof Rewards
+      symbol: "WOOF",
+      name: "Woof Rewards", 
       decimals: 18,
     },
   ],
