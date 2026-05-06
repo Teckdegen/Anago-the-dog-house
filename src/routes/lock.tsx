@@ -395,7 +395,12 @@ function LockPage() {
   const unlockingSoon = useMemo(() => {
     const now = Math.floor(Date.now() / 1000);
     return locks.filter(
-      (l) => !l.withdrawn && Number(l.unlockAt) - now <= THREE_DAYS && Number(l.unlockAt) > now,
+      (l) => !l.withdrawn && (
+        // Tokens unlocking within 72 hours
+        (Number(l.unlockAt) - now <= THREE_DAYS && Number(l.unlockAt) > now) ||
+        // Tokens already unlocked but not withdrawn
+        Number(l.unlockAt) <= now
+      ),
     );
   }, [locks]);
 
@@ -515,12 +520,12 @@ function LockPage() {
                   <Empty
                     title={
                       activeTab === "Unlocking Soon"
-                        ? "Nothing unlocking in the next 3 days"
+                        ? "Nothing to unlock"
                         : "No locks yet"
                     }
                     sub={
                       activeTab === "Unlocking Soon"
-                        ? "Locks unlocking within 72 hours show up here."
+                        ? "Tokens unlocking within 72 hours or already unlocked show here."
                         : "Hit + New to create your first lock."
                     }
                   />

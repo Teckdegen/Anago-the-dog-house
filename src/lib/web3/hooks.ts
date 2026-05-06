@@ -13,6 +13,78 @@ const ZERO = "0x0000000000000000000000000000000000000000" as const;
 /** 10-second poll interval used on all contract reads */
 const POLL = 10_000 as const;
 
+// ──────────────────────────────────────────────────────────────────────────
+//                           PERSISTENT DATA CACHE
+// ──────────────────────────────────────────────────────────────────────────
+
+type CacheKey = string;
+type CacheEntry<T> = {
+  data: T;
+  timestamp: number;
+  chainId: number;
+};
+
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+function getCacheKey(key: string, address?: string, chainId?: number): CacheKey {
+  return `locks_cache_${key}_${address || 'global'}_${chainId || 'unknown'}`;
+}
+
+function getCachedData<T>(key: CacheKey): T | null {
+  try {
+    const cached = localStorage.getItem(key);
+    if (!cached) return null;
+    
+    const entry: CacheEntry<T> = JSON.parse(cached);
+    const now = Date.now();
+    
+    // Return cached data even if expired - we prefer stale data over no data
+    return entry.data;
+  } catch {
+    return null;
+  }
+}
+
+function setCachedData<T>(key: CacheKey, data: T, chainId: number): void {
+  try {
+    const entry: CacheEntry<T> = {
+      data,
+      timestamp: Date.now(),
+      chainId,
+    };
+    localStorage.setItem(key, JSON.stringify(entry));
+  } catch {
+    // Ignore localStorage errors
+  }
+}
+
+function usePersistentData<T>(
+  key: string,
+  data: T | undefined,
+  isLoading: boolean,
+  address?: string,
+  chainId?: number
+): { data: T | undefined; isLoading: boolean } {
+  const cacheKey = getCacheKey(key, address, chainId);
+  const [persistentData, setPersistentData] = useState<T | undefined>(() => {
+    return getCachedData<T>(cacheKey) || undefined;
+  });
+
+  useEffect(() => {
+    if (data && !isLoading && chainId) {
+      // Update cache with fresh data
+      setCachedData(cacheKey, data, chainId);
+      setPersistentData(data);
+    }
+  }, [data, isLoading, cacheKey, chainId]);
+
+  // Return cached data if we have it, even if currently loading
+  return {
+    data: data || persistentData,
+    isLoading: isLoading && !persistentData, // Don't show loading if we have cached data
+  };
+}
+
 export function useContractAddresses() {
   const chainId = useChainId();
   return CONTRACTS[chainId] ?? CONTRACTS[10143];
@@ -117,6 +189,7 @@ export type LockView = {
 
 export function useUserLocks(): { locks: LockView[]; isLoading: boolean } {
   const { address } = useAccount();
+  const chainId = useChainId();
   const { tokenLock } = useContractAddresses();
 
   const idsQ = useReadContract({
@@ -151,10 +224,20 @@ export function useUserLocks(): { locks: LockView[]; isLoading: boolean } {
     }).filter(Boolean) as LockView[];
   }, [detailsQ.data, ids]);
 
-  return { locks, isLoading: idsQ.isLoading || detailsQ.isLoading };
+  // Use persistent data to avoid empty states on RPC failures
+  const persistent = usePersistentData(
+    'user_locks',
+    locks.length > 0 ? locks : undefined,
+    idsQ.isLoading || detailsQ.isLoading,
+    address,
+    chainId
+  );
+
+  return { locks: persistent.data || [], isLoading: persistent.isLoading };
 }
 
 export function useAllLocks(limit = 100): { locks: LockView[]; isLoading: boolean } {
+  const chainId = useChainId();
   const { tokenLock } = useContractAddresses();
 
   // Try locksLength() first (new contract), fall back to totalLocks() (old contract)
@@ -213,7 +296,16 @@ export function useAllLocks(limit = 100): { locks: LockView[]; isLoading: boolea
     }).filter(Boolean) as LockView[];
   }, [detailsQ.data, ids]);
 
-  return { locks, isLoading: lengthQ.isLoading || detailsQ.isLoading };
+  // Use persistent data to avoid empty states on RPC failures
+  const persistent = usePersistentData(
+    'all_locks',
+    locks.length > 0 ? locks : undefined,
+    lengthQ.isLoading || detailsQ.isLoading,
+    undefined,
+    chainId
+  );
+
+  return { locks: persistent.data || [], isLoading: persistent.isLoading };
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -224,6 +316,7 @@ export function useAllLocks(limit = 100): { locks: LockView[]; isLoading: boolea
  * data. No extra contract functions needed — just iterates the fetched locks.
  */
 export function useLockLeaderboards(limit = 50) {
+  const chainId = useChainId();
   const { locks, isLoading } = useAllLocks(500);
 
   const { tokens, users } = useMemo(() => {
@@ -254,7 +347,28 @@ export function useLockLeaderboards(limit = 50) {
     return { tokens, users };
   }, [locks, limit]);
 
-  return { tokens, users, isLoading };
+  // Use persistent data for leaderboards
+  const persistentTokens = usePersistentData(
+    'token_leaderboard',
+    tokens.length > 0 ? tokens : undefined,
+    isLoading,
+    undefined,
+    chainId
+  );
+
+  const persistentUsers = usePersistentData(
+    'user_leaderboard',
+    users.length > 0 ? users : undefined,
+    isLoading,
+    undefined,
+    chainId
+  );
+
+  return { 
+    tokens: persistentTokens.data || [], 
+    users: persistentUsers.data || [], 
+    isLoading: persistentTokens.isLoading || persistentUsers.isLoading 
+  };
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -311,6 +425,7 @@ export function useUserVestings(): {
   isLoading: boolean;
 } {
   const { address } = useAccount();
+  const chainId = useChainId();
   const { vestingNFT } = useContractAddresses();
 
   const idsQ = useReadContract({
@@ -346,7 +461,16 @@ export function useUserVestings(): {
     }).filter(Boolean) as VestingView[];
   }, [detailsQ.data, ids]);
 
-  return { vestings, isLoading: idsQ.isLoading || detailsQ.isLoading };
+  // Use persistent data for vestings
+  const persistent = usePersistentData(
+    'user_vestings',
+    vestings.length > 0 ? vestings : undefined,
+    idsQ.isLoading || detailsQ.isLoading,
+    address,
+    chainId
+  );
+
+  return { vestings: persistent.data || [], isLoading: persistent.isLoading };
 }
 
 // ──────────────────────────────────────────────────────────────────────────
