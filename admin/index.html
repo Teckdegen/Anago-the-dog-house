@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin — Stream Farm</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.8.0/dist/ethers.umd.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+    body { font-family: 'Space Grotesk', sans-serif; background: #06040F; color: #EDE0FF; }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    .card { background: rgba(155,127,212,0.05); border: 1px solid rgba(155,127,212,0.35); border-radius: 16px; }
+    .btn { background: rgba(155,127,212,0.2); color: #EDE0FF; border: 1px solid rgba(155,127,212,0.5); border-radius: 12px; padding: 10px 20px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; cursor: pointer; transition: opacity 0.2s; }
+    .btn:hover { opacity: 0.85; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-danger { background: rgba(255,100,100,0.15); border-color: rgba(255,100,100,0.4); color: rgba(255,100,100,0.9); }
+    .input { background: rgba(155,127,212,0.06); border: 1px solid rgba(155,127,212,0.3); border-radius: 12px; padding: 10px 16px; color: #EDE0FF; outline: none; width: 100%; font-size: 13px; }
+    .input::placeholder { color: rgba(155,127,212,0.3); }
+    .label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.2em; color: rgba(196,168,240,0.55); margin-bottom: 6px; display: block; }
+    .divider { height: 1px; background: rgba(155,127,212,0.15); margin: 24px 0; }
+    .status { font-size: 10px; padding: 3px 8px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.1em; }
+    .status-live { background: rgba(155,232,164,0.15); color: #9be8a4; border: 1px solid rgba(155,232,164,0.3); }
+    .status-paused { background: rgba(255,120,120,0.15); color: rgba(255,120,120,0.9); border: 1px solid rgba(255,120,120,0.3); }
+    #app { max-width: 900px; margin: 0 auto; padding: 32px 20px 80px; }
+    .toast { position: fixed; bottom: 24px; right: 24px; padding: 12px 20px; border-radius: 12px; background: rgba(155,127,212,0.9); color: #0D0B14; font-size: 12px; z-index: 100; animation: slideIn 0.3s; }
+    @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .denied { text-align: center; padding: 100px 20px; }
+    .denied h1 { font-size: 24px; margin-bottom: 12px; }
+    .denied p { color: rgba(196,168,240,0.55); font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:32px;">
+      <div>
+        <h1 style="font-size:24px;font-weight:600;letter-spacing:-0.02em;">Stream Farm Admin</h1>
+        <p class="mono" style="font-size:10px;color:rgba(196,168,240,0.55);margin-top:4px;">Manage farms · Add rewards · Control admins</p>
+      </div>
+      <button id="connectBtn" class="btn">Connect Wallet</button>
+    </div>
+    <div id="content"></div>
+  </div>
+
+  <script>
+    const STREAM_FARM = "0x8cdaB2A0c70B27E0f6B4eE0540bBC50395978EC1";
+    const ABI = [
+      "function farmCount() view returns (uint256)",
+      "function owner() view returns (address)",
+      "function admins(address) view returns (bool)",
+      "function isAdmin(address) view returns (bool)",
+      "function getFarm(uint256) view returns (address stakeToken, uint256 totalShares, uint256 totalStaked, bool active, uint256 lockDuration, uint256 earlyWithdrawBps, uint256 rewardStreamCount)",
+      "function getRewardStream(uint256 farmId, uint256 rewardIdx) view returns (address token, uint256 rewardRate, uint256 startTime, uint256 endTime, uint256 totalBudget, uint256 totalDistributed, uint256 accRewardPerShare)",
+      "function createFarm(address stakeToken, uint256 lockDuration, uint256 earlyWithdrawBps) returns (uint256)",
+      "function addRewardStream(uint256 farmId, address rewardToken, uint256 totalBudget, uint256 startTime, uint256 endTime)",
+      "function setFarmActive(uint256 farmId, bool active)",
+      "function setBoostTiers(uint256[] durations, uint256[] multipliers)",
+      "function recoverTokens(address token, uint256 amount)",
+      "function addAdmin(address admin)",
+      "function removeAdmin(address admin)",
+      "event FarmCreated(uint256 indexed farmId, address indexed creator, address stakeToken)",
+      "event AdminAdded(address indexed admin)",
+      "event AdminRemoved(address indexed admin)"
+    ];
+    const ERC20_ABI = [
+      "function symbol() view returns (string)",
+      "function decimals() view returns (uint8)",
+      "function name() view returns (string)",
+      "function balanceOf(address) view returns (uint256)",
+      "function approve(address spender, uint256 amount) returns (bool)",
+      "function allowance(address owner, address spender) view returns (uint256)"
+    ];
+
+    let provider, signer, contract, userAddress;
+
+    function toast(msg) {
+      const el = document.createElement('div');
+      el.className = 'toast';
+      el.textContent = msg;
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 4000);
+    }
+
+    async function connect() {
+      if (!window.ethereum) { alert("Install MetaMask"); return; }
+      provider = new ethers.BrowserProvider(window.ethereum);
+      signer = await provider.getSigner();
+      userAddress = await signer.getAddress();
+      contract = new ethers.Contract(STREAM_FARM, ABI, signer);
+
+      document.getElementById('connectBtn').textContent = userAddress.slice(0,6) + '...' + userAddress.slice(-4);
+
+      // Check if admin
+      const isAdminResult = await contract.isAdmin(userAddress);
+      if (!isAdminResult) {
+        document.getElementById('content').innerHTML = `
+          <div class="denied">
+            <h1>Access Denied</h1>
+            <p>Wallet ${userAddress.slice(0,6)}...${userAddress.slice(-4)} is not an admin.</p>
+            <p style="margin-top:8px;">Only authorized admins can access this dashboard.</p>
+          </div>`;
+        return;
+      }
+
+      renderDashboard();
+    }
+
+    async function renderDashboard() {
+      const farmCount = Number(await contract.farmCount());
+      const owner = await contract.owner();
+      const isOwner = userAddress.toLowerCase() === owner.toLowerCase();
+
+      let html = `
+        <div class="card" style="padding:20px;margin-bottom:24px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <p style="font-size:14px;font-weight:600;">Dashboard</p>
+              <p class="mono" style="font-size:10px;color:rgba(196,168,240,0.55);">${farmCount} farms · Owner: ${owner.slice(0,6)}...${owner.slice(-4)} ${isOwner ? '(you)' : ''}</p>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn" onclick="showCreateFarm()">+ Create Farm</button>
+            </div>
+          </div>
+        </div>`;
+
+      // Admin Management (owner only)
+      if (isOwner) {
+        html += `
+        <div class="card" style="padding:20px;margin-bottom:24px;">
+          <p style="font-size:13px;font-weight:600;margin-bottom:12px;">Admin Management</p>
+          <div style="display:flex;gap:8px;margin-bottom:12px;">
+            <input id="adminAddr" class="input" placeholder="0x... wallet address" style="flex:1;" />
+            <button class="btn" onclick="addAdmin()">Add Admin</button>
+            <button class="btn btn-danger" onclick="removeAdmin()">Remove</button>
+          </div>
+          <p class="mono" style="font-size:9px;color:rgba(196,168,240,0.4);">Only the contract owner can add/remove admins</p>
+        </div>`;
+      }
+
+      // Farms list
+      html += `<p class="mono" style="font-size:10px;color:rgba(196,168,240,0.5);margin-bottom:12px;text-transform:uppercase;letter-spacing:0.2em;">Farms</p>`;
+
+      for (let i = 0; i < farmCount; i++) {
+        const farm = await contract.getFarm(i);
+        let sym = "???";
+        try {
+          const token = new ethers.Contract(farm.stakeToken, ERC20_ABI, provider);
+          sym = await token.symbol();
+        } catch {}
+        const tvl = ethers.formatEther(farm.totalStaked);
+        const streams = Number(farm.rewardStreamCount);
+        const lockDays = Number(farm.lockDuration) / 86400;
+        const penalty = Number(farm.earlyWithdrawBps) / 100;
+
+        html += `
+        <div class="card" style="padding:16px;margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span style="font-size:14px;font-weight:600;">#${i} · ${sym}</span>
+                <span class="status ${farm.active ? 'status-live' : 'status-paused'}">${farm.active ? 'Live' : 'Paused'}</span>
+              </div>
+              <p class="mono" style="font-size:9px;color:rgba(196,168,240,0.45);margin-top:4px;">
+                TVL: ${Number(tvl).toLocaleString()} ${sym} · ${streams} streams · Lock: ${lockDays}d · Penalty: ${penalty}%
+              </p>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn" onclick="showAddReward(${i})">+ Reward</button>
+              <button class="btn ${farm.active ? 'btn-danger' : ''}" onclick="toggleFarm(${i}, ${!farm.active})">${farm.active ? 'Pause' : 'Activate'}</button>
+            </div>
+          </div>
+        </div>`;
+      }
+
+      if (farmCount === 0) {
+        html += `<div class="card" style="padding:40px;text-align:center;"><p style="color:rgba(196,168,240,0.5);">No farms yet. Create one above.</p></div>`;
+      }
+
+      // Boost Tiers
+      html += `
+      <div class="divider"></div>
+      <div class="card" style="padding:20px;margin-bottom:24px;">
+        <p style="font-size:13px;font-weight:600;margin-bottom:12px;">Boost Tiers</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+          <div><span class="label">Durations (days, comma sep)</span><input id="boostDurations" class="input" placeholder="7,30,90" /></div>
+          <div><span class="label">Multipliers (x, comma sep)</span><input id="boostMultipliers" class="input" placeholder="1.2,1.5,2.0" /></div>
+        </div>
+        <button class="btn" onclick="setBoostTiers()">Update Boost Tiers</button>
+      </div>`;
+
+      // Recover Tokens
+      html += `
+      <div class="card" style="padding:20px;">
+        <p style="font-size:13px;font-weight:600;margin-bottom:12px;">Recover Tokens</p>
+        <div style="display:grid;grid-template-columns:2fr 1fr;gap:8px;margin-bottom:12px;">
+          <div><span class="label">Token Address</span><input id="recoverToken" class="input" placeholder="0x..." /></div>
+          <div><span class="label">Amount (raw)</span><input id="recoverAmount" class="input" placeholder="1000000000000000000" /></div>
+        </div>
+        <button class="btn" onclick="recoverTokens()">Recover</button>
+      </div>`;
+
+      document.getElementById('content').innerHTML = html;
+    }
+
+    // ── Actions ──
+
+    async function showCreateFarm() {
+      const stakeToken = prompt("Stake token address (0x...):");
+      if (!stakeToken || !ethers.isAddress(stakeToken)) { alert("Invalid address"); return; }
+      const lockDays = prompt("Lock duration in days (0 for no lock):", "0");
+      const penalty = prompt("Early withdrawal penalty % (0-50):", "0");
+
+      try {
+        const lockSec = parseInt(lockDays) * 86400;
+        const bps = Math.round(parseFloat(penalty) * 100);
+        const tx = await contract.createFarm(stakeToken, lockSec, bps);
+        toast("Creating farm...");
+        await tx.wait();
+        toast("Farm created!");
+        renderDashboard();
+      } catch (e) { alert("Error: " + (e.shortMessage || e.message)); }
+    }
+
+    async function showAddReward(farmId) {
+      const rewardToken = prompt("Reward token address (0x...):");
+      if (!rewardToken || !ethers.isAddress(rewardToken)) { alert("Invalid address"); return; }
+      const budget = prompt("Total budget (in token units, e.g. 10000):");
+      const days = prompt("Duration in days:", "30");
+      const delayHours = prompt("Start delay in hours (0 = now):", "0");
+
+      try {
+        const token = new ethers.Contract(rewardToken, ERC20_ABI, signer);
+        const decimals = await token.decimals();
+        const budgetWei = ethers.parseUnits(budget, decimals);
+
+        // Check allowance
+        const allowance = await token.allowance(userAddress, STREAM_FARM);
+        if (allowance < budgetWei) {
+          toast("Approving tokens...");
+          const approveTx = await token.approve(STREAM_FARM, budgetWei);
+          await approveTx.wait();
+          toast("Approved!");
+        }
+
+        const now = Math.floor(Date.now() / 1000);
+        const start = now + parseInt(delayHours) * 3600;
+        const end = start + parseInt(days) * 86400;
+
+        toast("Adding reward stream...");
+        const tx = await contract.addRewardStream(farmId, rewardToken, budgetWei, start, end);
+        await tx.wait();
+        toast("Reward stream added!");
+        renderDashboard();
+      } catch (e) { alert("Error: " + (e.shortMessage || e.message)); }
+    }
+
+    async function toggleFarm(farmId, active) {
+      try {
+        const tx = await contract.setFarmActive(farmId, active);
+        toast(active ? "Activating..." : "Pausing...");
+        await tx.wait();
+        toast(active ? "Farm activated!" : "Farm paused!");
+        renderDashboard();
+      } catch (e) { alert("Error: " + (e.shortMessage || e.message)); }
+    }
+
+    async function addAdmin() {
+      const addr = document.getElementById('adminAddr').value.trim();
+      if (!ethers.isAddress(addr)) { alert("Invalid address"); return; }
+      try {
+        const tx = await contract.addAdmin(addr);
+        toast("Adding admin...");
+        await tx.wait();
+        toast("Admin added!");
+        document.getElementById('adminAddr').value = '';
+      } catch (e) { alert("Error: " + (e.shortMessage || e.message)); }
+    }
+
+    async function removeAdmin() {
+      const addr = document.getElementById('adminAddr').value.trim();
+      if (!ethers.isAddress(addr)) { alert("Invalid address"); return; }
+      try {
+        const tx = await contract.removeAdmin(addr);
+        toast("Removing admin...");
+        await tx.wait();
+        toast("Admin removed!");
+        document.getElementById('adminAddr').value = '';
+      } catch (e) { alert("Error: " + (e.shortMessage || e.message)); }
+    }
+
+    async function setBoostTiers() {
+      const dStr = document.getElementById('boostDurations').value.trim();
+      const mStr = document.getElementById('boostMultipliers').value.trim();
+      if (!dStr || !mStr) { alert("Fill both fields"); return; }
+
+      const durations = dStr.split(',').map(d => parseInt(d.trim()) * 86400);
+      const multipliers = mStr.split(',').map(m => ethers.parseEther(m.trim()));
+
+      try {
+        const tx = await contract.setBoostTiers(durations, multipliers);
+        toast("Updating boost tiers...");
+        await tx.wait();
+        toast("Boost tiers updated!");
+      } catch (e) { alert("Error: " + (e.shortMessage || e.message)); }
+    }
+
+    async function recoverTokens() {
+      const token = document.getElementById('recoverToken').value.trim();
+      const amount = document.getElementById('recoverAmount').value.trim();
+      if (!ethers.isAddress(token) || !amount) { alert("Fill both fields"); return; }
+
+      try {
+        const tx = await contract.recoverTokens(token, amount);
+        toast("Recovering tokens...");
+        await tx.wait();
+        toast("Tokens recovered!");
+      } catch (e) { alert("Error: " + (e.shortMessage || e.message)); }
+    }
+
+    // Auto-connect if already connected
+    document.getElementById('connectBtn').addEventListener('click', connect);
+    if (window.ethereum?.selectedAddress) connect();
+  </script>
+</body>
+</html>

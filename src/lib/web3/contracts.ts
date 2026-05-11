@@ -11,7 +11,7 @@ export const CONTRACTS: Record<
     vestingFactory: "0x83Cfd62A53210139f52DB6451bD0aaBDC71De283", // legacy — kept for reference
     tokenLock:      "0xe6A045525C053259e096d2c48973856D9f06143f", // TokenLockNFT
     vestingNFT:     "0x2f0326D9eDDB98da0d05CfD7e7C94cbAEdacB206", // VestingNFT
-    streamFarm:     "0x3ca147c8f183468EFC6b67A783A71d2c12f094d3", // StreamFarm
+    streamFarm:     "0x8cdaB2A0c70B27E0f6B4eE0540bBC50395978EC1", // StreamFarm
   },
 };
 
