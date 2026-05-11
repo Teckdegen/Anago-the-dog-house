@@ -35,8 +35,13 @@ function getCachedData<T>(key: CacheKey): T | null {
     const cached = localStorage.getItem(key);
     if (!cached) return null;
     
-    const entry: CacheEntry<T> = JSON.parse(cached);
-    const now = Date.now();
+    const entry: CacheEntry<T> = JSON.parse(cached, (_key, value) => {
+      // Restore BigInts from serialized format
+      if (typeof value === 'string' && value.startsWith('__bigint__:')) {
+        return BigInt(value.slice(11));
+      }
+      return value;
+    });
     
     // Return cached data even if expired - we prefer stale data over no data
     return entry.data;
@@ -52,7 +57,13 @@ function setCachedData<T>(key: CacheKey, data: T, chainId: number): void {
       timestamp: Date.now(),
       chainId,
     };
-    localStorage.setItem(key, JSON.stringify(entry));
+    localStorage.setItem(key, JSON.stringify(entry, (_key, value) => {
+      // Serialize BigInts to a recoverable format
+      if (typeof value === 'bigint') {
+        return `__bigint__:${value.toString()}`;
+      }
+      return value;
+    }));
   } catch {
     // Ignore localStorage errors
   }

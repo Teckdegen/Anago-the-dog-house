@@ -1,7 +1,8 @@
 import { formatUnits } from "viem";
 
-export function formatAmount(value: bigint, decimals: number, maxFrac = 4) {
-  const s = formatUnits(value, decimals);
+export function formatAmount(value: bigint | string | number, decimals: number, maxFrac = 4) {
+  const bigVal = typeof value === 'bigint' ? value : BigInt(value || 0);
+  const s = formatUnits(bigVal, decimals);
   const [int, frac = ""] = s.split(".");
   const trimmed = frac.slice(0, maxFrac).replace(/0+$/, "");
   return trimmed ? `${int}.${trimmed}` : int;

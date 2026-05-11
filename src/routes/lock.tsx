@@ -225,7 +225,7 @@ function TokenLeaderboard({
           const dec = staticMeta?.decimals ?? (reads.data?.[o + 1]?.result as number | undefined) ?? 18;
           const supply = reads.data?.[o + 2]?.result as bigint | undefined;
           const pct = supply && supply > 0n
-            ? Number((row.amount * 100_000n) / supply) / 1000
+            ? Number((BigInt(row.amount) * 100_000n) / BigInt(supply)) / 1000
             : null;
 
           return (
