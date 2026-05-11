@@ -283,7 +283,7 @@ function VestingRowUI({ symbol, decimals, vesting, vestedPct, claimedPct, inClif
         </div>
       )}
     </div>
-  );  );
+  );
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────
