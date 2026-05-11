@@ -471,20 +471,20 @@ function PositionCardInner({ tokenId, farmId, amount, boost, locked, lockExpiry,
         <div>
           <div className="flex items-center gap-2 mb-1">
             <p className="font-grotesk uppercase text-[14px] tracking-wider" style={{ color: "#EDE0FF" }}>Position #{tokenId.toString()}</p>
-            {locked && <span className="px-2 py-0.5 rounded-full font-mono text-[8px] uppercase" style={{ background: "rgba(255,180,50,0.12)", color: "rgba(255,180,50,0.9)", border: "1px solid rgba(255,180,50,0.3)" }}>Locked {lockDaysLeft}d</span>}
-            {boost > 1 && <span className="px-2 py-0.5 rounded-full font-mono text-[8px] uppercase" style={{ background: "rgba(120,255,120,0.12)", color: "rgba(120,255,120,0.9)", border: "1px solid rgba(120,255,120,0.3)" }}>{boost}x boost</span>}
+            {locked && <span className="px-2 py-0.5 rounded-full font-mono text-[8px] uppercase" style={{ background: "rgba(155,127,212,0.12)", color: "#C4A8F0", border: "1px solid rgba(155,127,212,0.3)" }}>Locked {lockDaysLeft}d</span>}
+            {boost > 1 && <span className="px-2 py-0.5 rounded-full font-mono text-[8px] uppercase" style={{ background: "rgba(155,127,212,0.12)", color: "#C4A8F0", border: "1px solid rgba(155,127,212,0.3)" }}>{boost}x boost</span>}
           </div>
           <p className="font-mono text-[10px]" style={{ color: "rgba(196,168,240,0.55)" }}>Farm #{farmId?.toString()} · {symbol}</p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={onClaim} disabled={claimPending || !hasPending}
             className="px-3 py-2 rounded-full font-grotesk text-[10px] uppercase tracking-wider transition hover:opacity-90 disabled:opacity-40"
-            style={{ background: "rgba(255,180,50,0.2)", color: "rgba(255,180,50,0.9)", border: "1px solid rgba(255,180,50,0.5)" }}>
+            style={{ background: "rgba(155,127,212,0.2)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.5)" }}>
             {claimPending ? "..." : "Claim"}
           </button>
           <button onClick={onWithdraw} disabled={withdrawPending}
             className="px-3 py-2 rounded-full font-grotesk text-[10px] uppercase tracking-wider transition hover:opacity-90 disabled:opacity-40"
-            style={{ background: "rgba(255,100,100,0.15)", color: "rgba(255,100,100,0.9)", border: "1px solid rgba(255,100,100,0.4)" }}>
+            style={{ background: "rgba(155,127,212,0.12)", color: "#C4A8F0", border: "1px solid rgba(155,127,212,0.4)" }}>
             {withdrawPending ? "..." : "Withdraw"}
           </button>
         </div>
