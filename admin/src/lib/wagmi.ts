@@ -12,7 +12,7 @@ export const monadTestnet = defineChain({
 
 export const config = getDefaultConfig({
   appName: "Stream Farm Admin",
-  projectId: "d1a5a2b3c4e5f6a7b8c9d0e1f2a3b4c5", // WalletConnect project ID
+  projectId: "d1a5a2b3c4e5f6a7b8c9d0e1f2a3b4c5",
   chains: [monadTestnet],
-  ssr: true,
+  ssr: false,
 });
