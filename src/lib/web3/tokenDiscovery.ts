@@ -9,80 +9,89 @@ import type { TokenBalance } from "./tokenBalances";
 
 const ZERO = "0x0000000000000000000000000000000000000000" as `0x${string}`;
 
+// Cache discovered tokens in localStorage to avoid re-scanning
+const DISCOVERY_CACHE_KEY = "token_discovery_cache";
+const DISCOVERY_CACHE_TTL = 60 * 60 * 1000; // 1 hour
+
+function getCachedDiscovery(address: string, chainId: number): `0x${string}`[] | null {
+  try {
+    const raw = localStorage.getItem(`${DISCOVERY_CACHE_KEY}_${address}_${chainId}`);
+    if (!raw) return null;
+    const { tokens, timestamp } = JSON.parse(raw);
+    if (Date.now() - timestamp > DISCOVERY_CACHE_TTL) return null;
+    return tokens;
+  } catch { return null; }
+}
+
+function setCachedDiscovery(address: string, chainId: number, tokens: `0x${string}`[]): void {
+  try {
+    localStorage.setItem(`${DISCOVERY_CACHE_KEY}_${address}_${chainId}`, JSON.stringify({ tokens, timestamp: Date.now() }));
+  } catch {}
+}
+
 /**
- * Discover tokens by scanning recent Transfer events in chunks
- * This is more reliable and efficient than relying on explorer APIs
+ * Discover tokens by scanning recent Transfer events in chunks.
+ * Uses aggressive caching and smaller scan windows for reliability.
  */
 export async function discoverTokensFromLogs(
   address: `0x${string}`,
   publicClient: PublicClient,
-  blocksToScan = 50000n,
+  blocksToScan = 200000n,
 ): Promise<`0x${string}`[]> {
   try {
     const latestBlock = await publicClient.getBlockNumber();
     const fromBlock = latestBlock > blocksToScan ? latestBlock - blocksToScan : 0n;
     
-    // ERC-20 Transfer event signature
-    const transferTopic = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+    const transferTopic = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef' as `0x${string}`;
+    const paddedAddress = `0x${address.slice(2).padStart(64, '0')}` as `0x${string}`;
     
-    // Pad address to 32 bytes for topic matching
-    const paddedAddress = `0x${address.slice(2).padStart(64, '0')}`;
+    console.log(`[tokenDiscovery] Scanning blocks ${fromBlock} to ${latestBlock}...`);
     
-    console.log(`[tokenDiscovery] Scanning ${blocksToScan} blocks for token transfers...`);
-    
-    // Get logs in chunks to avoid RPC limits
-    const chunkSize = 10000n;
-    let allLogs: any[] = [];
+    const chunkSize = 50000n;
+    const tokenAddresses = new Set<`0x${string}`>();
     
     for (let start = fromBlock; start <= latestBlock; start += chunkSize) {
       const end = start + chunkSize - 1n > latestBlock ? latestBlock : start + chunkSize - 1n;
       
       try {
-        // Get logs where user is sender or receiver
         const [sentLogs, receivedLogs] = await Promise.all([
           publicClient.getLogs({
             fromBlock: start,
             toBlock: end,
             topics: [transferTopic, paddedAddress, null],
-          }).catch(() => []), // Graceful fallback
+          }).catch(() => []),
           publicClient.getLogs({
             fromBlock: start,
             toBlock: end,
             topics: [transferTopic, null, paddedAddress],
-          }).catch(() => []), // Graceful fallback
+          }).catch(() => []),
         ]);
         
-        allLogs = [...allLogs, ...sentLogs, ...receivedLogs];
-        
-        // Add small delay to avoid rate limiting
-        if (end < latestBlock) {
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
+        [...sentLogs, ...receivedLogs].forEach(log => {
+          if (log.address && log.address !== ZERO) {
+            tokenAddresses.add(log.address.toLowerCase() as `0x${string}`);
+          }
+        });
       } catch (error) {
-        console.warn(`[tokenDiscovery] Failed to get logs for blocks ${start}-${end}:`, error);
+        console.warn(`[tokenDiscovery] Chunk ${start}-${end} failed, skipping`);
         continue;
       }
+      
+      // Small delay between chunks
+      await new Promise(resolve => setTimeout(resolve, 50));
     }
-
-    // Extract unique contract addresses
-    const tokenAddresses = new Set<`0x${string}`>();
-    allLogs.forEach(log => {
-      if (log.address && log.address !== ZERO) {
-        tokenAddresses.add(log.address.toLowerCase() as `0x${string}`);
-      }
-    });
 
     console.log(`[tokenDiscovery] Found ${tokenAddresses.size} unique token contracts`);
     return Array.from(tokenAddresses);
     
   } catch (error) {
-    console.warn("[tokenDiscovery] Failed to scan logs:", error);
+    console.warn("[tokenDiscovery] Log scan failed:", error);
     return [];
   }
 }
 
 /**
- * Batch fetch token metadata and balances with better error handling
+ * Batch fetch token metadata and balances
  */
 export async function batchFetchTokenData(
   tokenAddresses: `0x${string}`[],
@@ -91,113 +100,63 @@ export async function batchFetchTokenData(
 ): Promise<TokenBalance[]> {
   if (tokenAddresses.length === 0) return [];
 
-  console.log(`[tokenDiscovery] Fetching data for ${tokenAddresses.length} tokens...`);
-
   const tokens: TokenBalance[] = [];
+  const batchSize = 5; // Smaller batches for reliability
   
-  // Process tokens in smaller batches to avoid RPC limits
-  const batchSize = 10;
   for (let i = 0; i < tokenAddresses.length; i += batchSize) {
     const batch = tokenAddresses.slice(i, i + batchSize);
     
     const batchPromises = batch.map(async (address) => {
       try {
-        // Fetch token metadata with fallbacks
         const [symbol, name, decimals, balance] = await Promise.all([
-          publicClient.readContract({
-            address,
-            abi: ERC20_ABI,
-            functionName: 'symbol',
-          }).catch(() => '???'),
-          publicClient.readContract({
-            address,
-            abi: ERC20_ABI,
-            functionName: 'name',
-          }).catch(() => 'Unknown Token'),
-          publicClient.readContract({
-            address,
-            abi: ERC20_ABI,
-            functionName: 'decimals',
-          }).catch(() => 18), // Default to 18 decimals
-          publicClient.readContract({
-            address,
-            abi: ERC20_ABI,
-            functionName: 'balanceOf',
-            args: [userAddress],
-          }).catch(() => 0n),
+          publicClient.readContract({ address, abi: ERC20_ABI, functionName: 'symbol' }).catch(() => '???'),
+          publicClient.readContract({ address, abi: ERC20_ABI, functionName: 'name' }).catch(() => 'Unknown Token'),
+          publicClient.readContract({ address, abi: ERC20_ABI, functionName: 'decimals' }).catch(() => 18),
+          publicClient.readContract({ address, abi: ERC20_ABI, functionName: 'balanceOf', args: [userAddress] }).catch(() => 0n),
         ]);
 
-        // Only include tokens with non-zero balance
-        if (balance > 0n) {
+        if ((balance as bigint) > 0n) {
           return {
             address,
             symbol: String(symbol),
             name: String(name),
             decimals: Number(decimals),
-            balance: BigInt(balance),
-            balanceFormatted: formatTokenBalance(BigInt(balance), Number(decimals)),
+            balance: BigInt(balance as bigint),
+            balanceFormatted: formatTokenBalance(BigInt(balance as bigint), Number(decimals)),
           };
         }
         return null;
-      } catch (error) {
-        console.warn(`[tokenDiscovery] Failed to fetch data for token ${address}:`, error);
+      } catch {
         return null;
       }
     });
 
     const batchResults = await Promise.all(batchPromises);
-    const validTokens = batchResults.filter((token): token is TokenBalance => token !== null);
-    tokens.push(...validTokens);
+    tokens.push(...batchResults.filter((t): t is TokenBalance => t !== null));
     
-    // Small delay between batches to avoid rate limiting
     if (i + batchSize < tokenAddresses.length) {
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
   }
 
-  console.log(`[tokenDiscovery] Successfully loaded ${tokens.length} tokens with balances`);
   return tokens.sort((a, b) => a.balance > b.balance ? -1 : 1);
 }
 
-/**
- * Format token balance for display - handles all decimal places (6, 18, etc.)
- */
 function formatTokenBalance(balance: bigint, decimals: number): string {
   if (balance === 0n) return "0";
-  
   const divisor = 10n ** BigInt(decimals);
   const whole = balance / divisor;
   const remainder = balance % divisor;
-  
-  if (remainder === 0n) {
-    return whole.toString();
-  }
-  
-  // Convert remainder to string and pad with leading zeros
+  if (remainder === 0n) return whole.toString();
   const remainderStr = remainder.toString().padStart(decimals, "0");
-  
-  // For display, show appropriate decimal places based on token decimals
-  let decimalPlaces = 6; // Default to 6 decimal places
-  if (decimals <= 6) {
-    decimalPlaces = decimals; // Show all decimals for tokens with 6 or fewer
-  } else if (decimals === 18) {
-    decimalPlaces = 6; // Show 6 decimals for 18-decimal tokens
-  } else {
-    decimalPlaces = Math.min(6, decimals); // Show up to 6 decimals for others
-  }
-  
-  // Take only the needed decimal places and remove trailing zeros
+  const decimalPlaces = Math.min(6, decimals);
   const decimalPart = remainderStr.slice(0, decimalPlaces).replace(/0+$/, "");
-  
-  if (decimalPart === "") {
-    return whole.toString();
-  }
-  
+  if (decimalPart === "") return whole.toString();
   return `${whole}.${decimalPart}`;
 }
 
 /**
- * Enhanced token discovery that combines multiple methods
+ * Enhanced token discovery that combines cached results + known tokens + log scanning
  */
 export async function discoverAllUserTokens(
   address: `0x${string}`,
@@ -205,24 +164,38 @@ export async function discoverAllUserTokens(
   publicClient: PublicClient,
 ): Promise<TokenBalance[]> {
   try {
-    // Start with curated + custom token list
+    // 1. Start with curated + custom token list (instant)
     const curatedTokens = getTokenList(chainId).filter(t => t.address !== ZERO);
     const allKnownTokens = getAllTokens(chainId, curatedTokens);
     const knownAddresses = allKnownTokens.map(t => t.address.toLowerCase() as `0x${string}`);
     
-    // Discover additional tokens from logs
-    const discoveredAddresses = await discoverTokensFromLogs(address, publicClient);
+    // 2. Check cache for previously discovered tokens
+    const cached = getCachedDiscovery(address, chainId) ?? [];
     
-    // Combine and deduplicate
-    const allAddresses = Array.from(new Set([
-      ...knownAddresses,
-      ...discoveredAddresses,
-    ]));
+    // 3. Combine known + cached immediately for fast first render
+    const immediateAddresses = Array.from(new Set([...knownAddresses, ...cached]));
     
-    console.log(`[tokenDiscovery] Checking balances for ${allAddresses.length} tokens...`);
+    // 4. Fetch balances for known tokens first (fast path)
+    let tokens = await batchFetchTokenData(immediateAddresses, address, publicClient);
     
-    // Batch fetch all token data
-    const tokens = await batchFetchTokenData(allAddresses, address, publicClient);
+    // 5. Background: discover new tokens from logs
+    try {
+      const discoveredAddresses = await discoverTokensFromLogs(address, publicClient);
+      
+      // Find new tokens not already checked
+      const newAddresses = discoveredAddresses.filter(a => !immediateAddresses.includes(a));
+      
+      if (newAddresses.length > 0) {
+        const newTokens = await batchFetchTokenData(newAddresses, address, publicClient);
+        tokens = [...tokens, ...newTokens];
+      }
+      
+      // Update cache with all discovered addresses
+      const allDiscovered = Array.from(new Set([...cached, ...discoveredAddresses]));
+      setCachedDiscovery(address, chainId, allDiscovered);
+    } catch (error) {
+      console.warn("[tokenDiscovery] Background scan failed, using cached results");
+    }
     
     return tokens;
     

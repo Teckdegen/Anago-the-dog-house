@@ -484,7 +484,7 @@ import type { TokenInfo as CustomTokenInfo } from "./tokens";
 /**
  * Hook to fetch all token balances for the connected wallet
  * Automatically discovers tokens from RPC logs + includes custom tokens
- * No need to manually enter token addresses!
+ * Caches results in localStorage so data persists across failures
  */
 export function useAllTokenBalances(): {
   balances: TokenBalance[];
@@ -497,7 +497,19 @@ export function useAllTokenBalances(): {
   const chainId = useChainId();
   const publicClient = usePublicClient();
   
-  const [balances, setBalances] = useState<TokenBalance[]>([]);
+  const [balances, setBalances] = useState<TokenBalance[]>(() => {
+    // Initialize from cache
+    if (!address) return [];
+    try {
+      const cached = localStorage.getItem(`token_balances_${address}_${chainId}`);
+      if (cached) {
+        const { data } = JSON.parse(cached);
+        // Restore bigints
+        return data.map((t: any) => ({ ...t, balance: BigInt(t.balance) }));
+      }
+    } catch {}
+    return [];
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -514,15 +526,23 @@ export function useAllTokenBalances(): {
 
     fetchAllBalances(address, chainId, publicClient)
       .then((results) => {
-        if (!cancelled) {
+        if (!cancelled && results.length > 0) {
           setBalances(results);
+          setIsLoading(false);
+          // Cache results (serialize bigints as strings)
+          try {
+            const serializable = results.map(t => ({ ...t, balance: t.balance.toString() }));
+            localStorage.setItem(`token_balances_${address}_${chainId}`, JSON.stringify({ data: serializable, timestamp: Date.now() }));
+          } catch {}
+        } else if (!cancelled) {
+          // Don't clear existing data on empty results (RPC failure)
           setIsLoading(false);
         }
       })
       .catch((err) => {
         if (!cancelled) {
           setError(err instanceof Error ? err : new Error(String(err)));
-          setBalances([]);
+          // Keep existing cached data on error
           setIsLoading(false);
         }
       });
@@ -536,8 +556,8 @@ export function useAllTokenBalances(): {
   
   const addToken = (token: CustomTokenInfo) => {
     addCustomToken(chainId, token);
-    refetch(); // Refresh to include the new token
+    refetch();
   };
 
-  return { balances, isLoading, error, refetch, addToken };
+  return { balances, isLoading: isLoading && balances.length === 0, error, refetch, addToken };
 }

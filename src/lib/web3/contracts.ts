@@ -4,14 +4,14 @@
  */
 export const CONTRACTS: Record<
   number,
-  { vestingFactory: `0x${string}`; tokenLock: `0x${string}`; yieldFarmNFT: `0x${string}`; vestingNFT: `0x${string}` }
+  { vestingFactory: `0x${string}`; tokenLock: `0x${string}`; streamFarm: `0x${string}`; vestingNFT: `0x${string}` }
 > = {
   // Monad testnet (chainId 10143)
   10143: {
     vestingFactory: "0x83Cfd62A53210139f52DB6451bD0aaBDC71De283", // legacy — kept for reference
     tokenLock:      "0xe6A045525C053259e096d2c48973856D9f06143f", // TokenLockNFT
     vestingNFT:     "0x2f0326D9eDDB98da0d05CfD7e7C94cbAEdacB206", // VestingNFT
-    yieldFarmNFT:   "0xbE63a640395295b3A49228d5920796fB94690E8E", // YieldFarmNFT
+    streamFarm:     "0x3ca147c8f183468EFC6b67A783A71d2c12f094d3", // StreamFarm
   },
 };
 
@@ -395,182 +395,108 @@ export const VESTING_NFT_ABI = [
 // ── ERC20_ABI re-export — some routes import it from here ─────────────────
 export { ERC20_ABI } from "./tokens";
 
-// ── YIELD_FARM_NFT_ABI ────────────────────────────────────────────────────
-export const YIELD_FARM_NFT_ABI = [
+// ── STREAM_FARM_ABI ────────────────────────────────────────────────────────
+export const STREAM_FARM_ABI = [
   // ── Read ───────────────────────────────────────────────────────────────
+  { type: "function", name: "farmCount", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "owner", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
   {
-    type: "function",
-    name: "poolLength",
-    stateMutability: "view",
-    inputs: [],
-    outputs: [{ type: "uint256" }],
-  },
-  {
-    type: "function",
-    name: "getPoolInfo",
-    stateMutability: "view",
-    inputs: [{ name: "poolId", type: "uint256" }],
+    type: "function", name: "getFarm", stateMutability: "view",
+    inputs: [{ name: "farmId", type: "uint256" }],
     outputs: [
-      {
-        type: "tuple",
-        components: [
-          { name: "stakeToken",   type: "address" },
-          { name: "creator",      type: "address" },
-          { name: "totalStaked",  type: "uint256" },
-          { name: "createdAt",    type: "uint256" },
-          { name: "verified",     type: "bool"    },
-          { name: "active",       type: "bool"    },
-        ],
-      },
+      { name: "stakeToken", type: "address" },
+      { name: "totalShares", type: "uint256" },
+      { name: "totalStaked", type: "uint256" },
+      { name: "active", type: "bool" },
+      { name: "lockDuration", type: "uint256" },
+      { name: "earlyWithdrawBps", type: "uint256" },
+      { name: "rewardStreamCount", type: "uint256" },
     ],
   },
   {
-    type: "function",
-    name: "poolRewardLength",
-    stateMutability: "view",
-    inputs: [{ name: "poolId", type: "uint256" }],
-    outputs: [{ type: "uint256" }],
+    type: "function", name: "getRewardStream", stateMutability: "view",
+    inputs: [{ name: "farmId", type: "uint256" }, { name: "rewardIdx", type: "uint256" }],
+    outputs: [
+      { name: "token", type: "address" },
+      { name: "rewardRate", type: "uint256" },
+      { name: "startTime", type: "uint256" },
+      { name: "endTime", type: "uint256" },
+      { name: "totalBudget", type: "uint256" },
+      { name: "totalDistributed", type: "uint256" },
+      { name: "accRewardPerShare", type: "uint256" },
+    ],
   },
   {
-    type: "function",
-    name: "pendingAllRewards",
-    stateMutability: "view",
+    type: "function", name: "getPosition", stateMutability: "view",
     inputs: [{ name: "tokenId", type: "uint256" }],
     outputs: [
-      { name: "tokens",   type: "address[]" },
-      { name: "amounts",  type: "uint256[]" },
+      { name: "farmId", type: "uint256" },
+      { name: "amount", type: "uint256" },
+      { name: "shares", type: "uint256" },
+      { name: "depositTime", type: "uint256" },
+      { name: "lockExpiry", type: "uint256" },
+      { name: "boostMultiplier", type: "uint256" },
     ],
   },
   {
-    type: "function",
-    name: "getPosition",
-    stateMutability: "view",
+    type: "function", name: "pendingRewards", stateMutability: "view",
     inputs: [{ name: "tokenId", type: "uint256" }],
     outputs: [
-      { name: "poolId",   type: "uint256" },
-      { name: "amount",   type: "uint256" },
-      { name: "stakedAt", type: "uint256" },
-      { name: "boost",    type: "uint256" },
+      { name: "tokens", type: "address[]" },
+      { name: "amounts", type: "uint256[]" },
     ],
   },
   {
-    type: "function",
-    name: "positionsOf",
-    stateMutability: "view",
+    type: "function", name: "positionsOf", stateMutability: "view",
     inputs: [{ name: "owner", type: "address" }],
     outputs: [{ type: "uint256[]" }],
   },
   {
-    type: "function",
-    name: "ownerOf",
-    stateMutability: "view",
-    inputs: [{ name: "tokenId", type: "uint256" }],
-    outputs: [{ type: "address" }],
-  },
-  {
-    type: "function",
-    name: "transferFrom",
-    stateMutability: "nonpayable",
-    inputs: [
-      { name: "from",    type: "address" },
-      { name: "to",      type: "address" },
-      { name: "tokenId", type: "uint256" },
+    type: "function", name: "getBoostTiers", stateMutability: "view",
+    inputs: [],
+    outputs: [
+      { name: "durations", type: "uint256[]" },
+      { name: "multipliers", type: "uint256[]" },
     ],
-    outputs: [],
   },
-  {
-    type: "function",
-    name: "safeTransferFrom",
-    stateMutability: "nonpayable",
-    inputs: [
-      { name: "from",    type: "address" },
-      { name: "to",      type: "address" },
-      { name: "tokenId", type: "uint256" },
-    ],
-    outputs: [],
-  },
+  { type: "function", name: "ownerOf", stateMutability: "view", inputs: [{ name: "tokenId", type: "uint256" }], outputs: [{ type: "address" }] },
   // ── Write ──────────────────────────────────────────────────────────────
   {
-    type: "function",
-    name: "createPool",
-    stateMutability: "nonpayable",
-    inputs: [{ name: "stakeToken", type: "address" }],
-    outputs: [{ name: "poolId", type: "uint256" }],
+    type: "function", name: "createFarm", stateMutability: "nonpayable",
+    inputs: [
+      { name: "stakeToken", type: "address" },
+      { name: "lockDuration", type: "uint256" },
+      { name: "earlyWithdrawBps", type: "uint256" },
+    ],
+    outputs: [{ name: "farmId", type: "uint256" }],
   },
   {
-    type: "function",
-    name: "addReward",
-    stateMutability: "nonpayable",
+    type: "function", name: "addRewardStream", stateMutability: "nonpayable",
     inputs: [
-      { name: "poolId",        type: "uint256" },
-      { name: "rewardToken",   type: "address" },
-      { name: "rewardPerSecond", type: "uint256" },
-      { name: "duration",      type: "uint256" },
-      { name: "totalSupply",   type: "uint256" },
+      { name: "farmId", type: "uint256" },
+      { name: "rewardToken", type: "address" },
+      { name: "totalBudget", type: "uint256" },
+      { name: "startTime", type: "uint256" },
+      { name: "endTime", type: "uint256" },
     ],
     outputs: [],
   },
   {
-    type: "function",
-    name: "stake",
-    stateMutability: "nonpayable",
+    type: "function", name: "deposit", stateMutability: "nonpayable",
     inputs: [
-      { name: "poolId", type: "uint256" },
+      { name: "farmId", type: "uint256" },
       { name: "amount", type: "uint256" },
+      { name: "lockTier", type: "uint256" },
     ],
     outputs: [{ name: "tokenId", type: "uint256" }],
   },
-  {
-    type: "function",
-    name: "unstake",
-    stateMutability: "nonpayable",
-    inputs: [{ name: "tokenId", type: "uint256" }],
-    outputs: [],
-  },
-  {
-    type: "function",
-    name: "claimAllRewards",
-    stateMutability: "nonpayable",
-    inputs: [{ name: "tokenId", type: "uint256" }],
-    outputs: [],
-  },
+  { type: "function", name: "withdraw", stateMutability: "nonpayable", inputs: [{ name: "tokenId", type: "uint256" }], outputs: [] },
+  { type: "function", name: "claim", stateMutability: "nonpayable", inputs: [{ name: "tokenId", type: "uint256" }], outputs: [] },
+  { type: "function", name: "setFarmActive", stateMutability: "nonpayable", inputs: [{ name: "farmId", type: "uint256" }, { name: "active", type: "bool" }], outputs: [] },
   // ── Events ─────────────────────────────────────────────────────────────
-  {
-    type: "event",
-    name: "PoolCreated",
-    inputs: [
-      { name: "poolId",     type: "uint256", indexed: true  },
-      { name: "creator",    type: "address", indexed: true  },
-      { name: "stakeToken", type: "address", indexed: false },
-    ],
-  },
-  {
-    type: "event",
-    name: "RewardAdded",
-    inputs: [
-      { name: "poolId",      type: "uint256", indexed: true  },
-      { name: "rewardId",    type: "uint256", indexed: true  },
-      { name: "rewardToken", type: "address", indexed: false },
-      { name: "totalSupply", type: "uint256", indexed: false },
-    ],
-  },
-  {
-    type: "event",
-    name: "Staked",
-    inputs: [
-      { name: "tokenId", type: "uint256", indexed: true  },
-      { name: "user",    type: "address", indexed: true  },
-      { name: "poolId",  type: "uint256", indexed: false },
-      { name: "amount",  type: "uint256", indexed: false },
-    ],
-  },
-  {
-    type: "event",
-    name: "Unstaked",
-    inputs: [
-      { name: "tokenId", type: "uint256", indexed: true  },
-      { name: "user",    type: "address", indexed: true  },
-      { name: "amount",  type: "uint256", indexed: false },
-    ],
-  },
+  { type: "event", name: "FarmCreated", inputs: [{ name: "farmId", type: "uint256", indexed: true }, { name: "creator", type: "address", indexed: true }, { name: "stakeToken", type: "address", indexed: false }] },
+  { type: "event", name: "RewardStreamAdded", inputs: [{ name: "farmId", type: "uint256", indexed: true }, { name: "rewardIdx", type: "uint256", indexed: false }, { name: "token", type: "address", indexed: false }, { name: "rewardRate", type: "uint256", indexed: false }, { name: "startTime", type: "uint256", indexed: false }, { name: "endTime", type: "uint256", indexed: false }] },
+  { type: "event", name: "Deposited", inputs: [{ name: "tokenId", type: "uint256", indexed: true }, { name: "farmId", type: "uint256", indexed: true }, { name: "user", type: "address", indexed: true }, { name: "amount", type: "uint256", indexed: false }, { name: "shares", type: "uint256", indexed: false }] },
+  { type: "event", name: "Withdrawn", inputs: [{ name: "tokenId", type: "uint256", indexed: true }, { name: "farmId", type: "uint256", indexed: true }, { name: "user", type: "address", indexed: true }, { name: "amount", type: "uint256", indexed: false }, { name: "penalty", type: "uint256", indexed: false }] },
+  { type: "event", name: "RewardsClaimed", inputs: [{ name: "tokenId", type: "uint256", indexed: true }, { name: "user", type: "address", indexed: true }, { name: "rewardToken", type: "address", indexed: false }, { name: "amount", type: "uint256", indexed: false }] },
 ] as const;

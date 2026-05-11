@@ -12,7 +12,7 @@ import { useToast } from "@/components/Toast";
 import {
   TOKEN_LOCK_NFT_ABI,
   VESTING_NFT_ABI,
-  YIELD_FARM_NFT_ABI,
+  STREAM_FARM_ABI,
 } from "@/lib/web3/contracts";
 import { useContractAddresses } from "@/lib/web3/hooks";
 import { ERC20_ABI } from "@/lib/web3/tokens";
@@ -81,13 +81,13 @@ function TransferPage() {
     ? contracts.tokenLock
     : isVesting
     ? contracts.vestingNFT
-    : contracts.yieldFarmNFT;
+    : contracts.streamFarm;
 
   const abi = isLock
     ? TOKEN_LOCK_NFT_ABI
     : isVesting
     ? VESTING_NFT_ABI
-    : YIELD_FARM_NFT_ABI;
+    : STREAM_FARM_ABI;
 
   const listFn   = isLock ? "locksOf"   : isVesting ? "vestingsOf"  : "positionsOf";
   const detailFn = isLock ? "getLock"   : isVesting ? "getVesting"  : "getPosition";
