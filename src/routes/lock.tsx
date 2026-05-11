@@ -168,7 +168,7 @@ function LockRow({
       </div>
       <div className="text-right">
         {localWithdrawn ? (
-          <span className="font-mono text-[9px] uppercase" style={{ color: "rgba(155,127,212,0.45)" }}>Withdrawn</span>
+          <span className="font-mono text-[9px] uppercase" style={{ color: "#9be8a4" }}>Unlocked ✓</span>
         ) : unlocked && isOwner ? (
           <button
             onClick={doWithdraw}

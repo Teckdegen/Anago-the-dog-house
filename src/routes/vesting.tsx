@@ -56,9 +56,11 @@ function VestingRow({
 
   const tx   = useWriteContract();
   const rcpt = useWaitForTransactionReceipt({ hash: tx.data });
+  const [justClaimed, setJustClaimed] = useState(false);
 
   useEffect(() => {
     if (rcpt.isSuccess) {
+      setJustClaimed(true);
       setSuccessOpen(true);
       onClaimed();
     }
@@ -208,6 +210,8 @@ function VestingRow({
           <div className="text-right">
             {vesting.revoked ? (
               <span className="font-mono text-[10px] uppercase font-medium" style={{ color: "rgba(255,100,100,0.7)" }}>Revoked</span>
+            ) : justClaimed ? (
+              <span className="font-mono text-[10px] uppercase font-medium" style={{ color: "#9be8a4" }}>Claimed ✓</span>
             ) : vesting.claimable > 0n ? (
               <button
                 onClick={doClaim}
@@ -219,7 +223,7 @@ function VestingRow({
               </button>
             ) : (
               <span className="font-mono text-[10px] uppercase font-medium" style={{ color: "rgba(155,127,212,0.65)" }}>
-                {inCliff ? "In cliff" : fullyVested ? "Done" : "Vesting"}
+                {inCliff ? "In cliff" : fullyVested ? "Fully claimed ✓" : "Vesting"}
               </span>
             )}
           </div>
