@@ -4,15 +4,12 @@ import { RainbowKitProvider, darkTheme } from "@rainbow-me/rainbowkit";
 import { WagmiProvider } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { config } from "@/lib/wagmi";
+import AdminDashboard from "./AdminDashboard";
 import "@rainbow-me/rainbowkit/styles.css";
-import { useState, useEffect, type ReactNode } from "react";
 
 const queryClient = new QueryClient();
 
-export function Providers({ children }: { children: ReactNode }) {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-
+export default function App() {
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
@@ -23,7 +20,7 @@ export function Providers({ children }: { children: ReactNode }) {
             borderRadius: "medium",
           })}
         >
-          {mounted ? children : null}
+          <AdminDashboard />
         </RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>

@@ -2,8 +2,9 @@
 
 import dynamic from "next/dynamic";
 
-const AdminDashboard = dynamic(() => import("@/components/AdminDashboard"), { ssr: false });
+// Load EVERYTHING client-side only - no SSR at all
+const App = dynamic(() => import("@/components/App"), { ssr: false });
 
 export default function Page() {
-  return <AdminDashboard />;
+  return <App />;
 }
