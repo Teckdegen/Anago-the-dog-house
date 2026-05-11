@@ -68,6 +68,9 @@ contract StreamFarm is ERC721, Ownable, ReentrancyGuard {
     uint256 public constant BASIS_POINTS = 10000;
     uint256 public constant PRECISION = 1e36;
 
+    // Multi-admin support
+    mapping(address => bool) public admins;
+
     // Boost tiers: lock duration => multiplier (1e18 scaled)
     uint256[] public boostDurations;   // e.g. [7 days, 30 days, 90 days]
     uint256[] public boostMultipliers; // e.g. [1.2e18, 1.5e18, 2.0e18]
@@ -82,12 +85,24 @@ contract StreamFarm is ERC721, Ownable, ReentrancyGuard {
     event Withdrawn(uint256 indexed tokenId, uint256 indexed farmId, address indexed user, uint256 amount, uint256 penalty);
     event RewardsClaimed(uint256 indexed tokenId, address indexed user, address rewardToken, uint256 amount);
     event FarmActiveToggled(uint256 indexed farmId, bool active);
+    event AdminAdded(address indexed admin);
+    event AdminRemoved(address indexed admin);
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //                          MODIFIERS
+    // ═══════════════════════════════════════════════════════════════════════
+
+    modifier onlyAdmin() {
+        require(admins[msg.sender] || msg.sender == owner(), "Not admin");
+        _;
+    }
 
     // ═══════════════════════════════════════════════════════════════════════
     //                          CONSTRUCTOR
     // ═══════════════════════════════════════════════════════════════════════
 
     constructor() ERC721("Stream Farm Position", "sFARM") Ownable(msg.sender) {
+        admins[msg.sender] = true;
         // Default boost tiers
         boostDurations.push(7 days);
         boostDurations.push(30 days);
@@ -95,6 +110,26 @@ contract StreamFarm is ERC721, Ownable, ReentrancyGuard {
         boostMultipliers.push(1.2e18);
         boostMultipliers.push(1.5e18);
         boostMultipliers.push(2.0e18);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //                      ADMIN MANAGEMENT
+    // ═══════════════════════════════════════════════════════════════════════
+
+    function addAdmin(address admin) external onlyOwner {
+        require(admin != address(0), "Invalid address");
+        admins[admin] = true;
+        emit AdminAdded(admin);
+    }
+
+    function removeAdmin(address admin) external onlyOwner {
+        require(admin != owner(), "Cannot remove owner");
+        admins[admin] = false;
+        emit AdminRemoved(admin);
+    }
+
+    function isAdmin(address account) external view returns (bool) {
+        return admins[account] || account == owner();
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -111,7 +146,7 @@ contract StreamFarm is ERC721, Ownable, ReentrancyGuard {
         IERC20 stakeToken,
         uint256 lockDuration,
         uint256 earlyWithdrawBps
-    ) external onlyOwner returns (uint256 farmId) {
+    ) external onlyAdmin returns (uint256 farmId) {
         require(address(stakeToken) != address(0), "Invalid stake token");
         require(earlyWithdrawBps <= 5000, "Max 50% penalty");
 
@@ -143,7 +178,7 @@ contract StreamFarm is ERC721, Ownable, ReentrancyGuard {
         uint256 totalBudget,
         uint256 startTime,
         uint256 endTime
-    ) external onlyOwner nonReentrant {
+    ) external onlyAdmin nonReentrant {
         require(farmId < farms.length, "Invalid farm");
         require(address(rewardToken) != address(0), "Invalid reward token");
         require(endTime > startTime, "End must be after start");
@@ -173,7 +208,7 @@ contract StreamFarm is ERC721, Ownable, ReentrancyGuard {
     /**
      * @notice Toggle farm active status
      */
-    function setFarmActive(uint256 farmId, bool active) external onlyOwner {
+    function setFarmActive(uint256 farmId, bool active) external onlyAdmin {
         require(farmId < farms.length, "Invalid farm");
         farms[farmId].active = active;
         emit FarmActiveToggled(farmId, active);
@@ -182,7 +217,7 @@ contract StreamFarm is ERC721, Ownable, ReentrancyGuard {
     /**
      * @notice Update boost tiers
      */
-    function setBoostTiers(uint256[] calldata durations, uint256[] calldata multipliers) external onlyOwner {
+    function setBoostTiers(uint256[] calldata durations, uint256[] calldata multipliers) external onlyAdmin {
         require(durations.length == multipliers.length, "Length mismatch");
         delete boostDurations;
         delete boostMultipliers;
@@ -435,7 +470,7 @@ contract StreamFarm is ERC721, Ownable, ReentrancyGuard {
     /**
      * @notice Recover penalty tokens or accidentally sent tokens.
      */
-    function recoverTokens(IERC20 token, uint256 amount) external onlyOwner {
+    function recoverTokens(IERC20 token, uint256 amount) external onlyAdmin {
         token.safeTransfer(owner(), amount);
     }
 

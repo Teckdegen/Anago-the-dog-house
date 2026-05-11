@@ -400,6 +400,8 @@ export const STREAM_FARM_ABI = [
   // ── Read ───────────────────────────────────────────────────────────────
   { type: "function", name: "farmCount", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
   { type: "function", name: "owner", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
+  { type: "function", name: "admins", stateMutability: "view", inputs: [{ name: "account", type: "address" }], outputs: [{ type: "bool" }] },
+  { type: "function", name: "isAdmin", stateMutability: "view", inputs: [{ name: "account", type: "address" }], outputs: [{ type: "bool" }] },
   {
     type: "function", name: "getFarm", stateMutability: "view",
     inputs: [{ name: "farmId", type: "uint256" }],
@@ -493,6 +495,10 @@ export const STREAM_FARM_ABI = [
   { type: "function", name: "withdraw", stateMutability: "nonpayable", inputs: [{ name: "tokenId", type: "uint256" }], outputs: [] },
   { type: "function", name: "claim", stateMutability: "nonpayable", inputs: [{ name: "tokenId", type: "uint256" }], outputs: [] },
   { type: "function", name: "setFarmActive", stateMutability: "nonpayable", inputs: [{ name: "farmId", type: "uint256" }, { name: "active", type: "bool" }], outputs: [] },
+  { type: "function", name: "addAdmin", stateMutability: "nonpayable", inputs: [{ name: "admin", type: "address" }], outputs: [] },
+  { type: "function", name: "removeAdmin", stateMutability: "nonpayable", inputs: [{ name: "admin", type: "address" }], outputs: [] },
+  { type: "function", name: "setBoostTiers", stateMutability: "nonpayable", inputs: [{ name: "durations", type: "uint256[]" }, { name: "multipliers", type: "uint256[]" }], outputs: [] },
+  { type: "function", name: "recoverTokens", stateMutability: "nonpayable", inputs: [{ name: "token", type: "address" }, { name: "amount", type: "uint256" }], outputs: [] },
   // ── Events ─────────────────────────────────────────────────────────────
   { type: "event", name: "FarmCreated", inputs: [{ name: "farmId", type: "uint256", indexed: true }, { name: "creator", type: "address", indexed: true }, { name: "stakeToken", type: "address", indexed: false }] },
   { type: "event", name: "RewardStreamAdded", inputs: [{ name: "farmId", type: "uint256", indexed: true }, { name: "rewardIdx", type: "uint256", indexed: false }, { name: "token", type: "address", indexed: false }, { name: "rewardRate", type: "uint256", indexed: false }, { name: "startTime", type: "uint256", indexed: false }, { name: "endTime", type: "uint256", indexed: false }] },

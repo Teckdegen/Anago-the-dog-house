@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { Search, Sprout, Plus, X, Zap, Clock, Shield, TrendingUp, Wallet } from "lucide-react";
+import { Search, Sprout, Plus, X, Zap, Clock, Wallet } from "lucide-react";
 import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt, useChainId } from "wagmi";
 import { parseUnits, formatUnits } from "viem";
 import { AppShell } from "@/components/AppShell";
@@ -14,7 +14,7 @@ export const Route = createFileRoute("/farm")({
   head: () => ({ meta: [{ title: "Stream Farms — The Dog House" }, { name: "description", content: "Streaming reward farms on Monad." }] }),
 });
 
-const TABS = ["All Farms", "My Positions", "Admin"] as const;
+const TABS = ["All Farms", "My Positions"] as const;
 type Tab = (typeof TABS)[number];
 
 function useContracts() {
@@ -27,9 +27,6 @@ function FarmPage() {
   const [search, setSearch] = useState("");
   const { address } = useAccount();
   const contracts = useContracts();
-
-  const ownerQ = useReadContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "owner" });
-  const isAdmin = !!address && (ownerQ.data as string)?.toLowerCase() === address.toLowerCase();
 
   const farmCountQ = useReadContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "farmCount", query: { refetchInterval: 10_000 } });
   const farmCount = Number(farmCountQ.data ?? 0);
@@ -48,7 +45,7 @@ function FarmPage() {
 
         <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
           <div className="flex items-center gap-0.5 p-1 rounded-full" style={{ background: "rgba(155,127,212,0.08)", border: "1px solid rgba(155,127,212,0.25)" }}>
-            {TABS.filter(t => t !== "Admin" || isAdmin).map((t) => (
+            {TABS.map((t) => (
               <button key={t} onClick={() => setActiveTab(t)}
                 className="px-4 py-1.5 rounded-full font-grotesk text-[11px] uppercase tracking-wider transition whitespace-nowrap"
                 style={activeTab === t ? { background: "rgba(155,127,212,0.35)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.6)" } : { color: "rgba(196,168,240,0.5)" }}>
@@ -67,7 +64,6 @@ function FarmPage() {
 
         {activeTab === "All Farms" && <AllFarmsTab farmCount={farmCount} />}
         {activeTab === "My Positions" && <MyPositionsTab />}
-        {activeTab === "Admin" && isAdmin && <AdminTab />}
       </div>
     </AppShell>
   );
@@ -160,7 +156,7 @@ function FarmCardInner({ farmId, stakeToken, totalStaked, active, lockDays, pena
         {address && active && (
           <button onClick={() => setShowDeposit(true)}
             className="flex items-center gap-2 px-4 py-2 rounded-xl font-grotesk text-[11px] uppercase tracking-wider transition hover:opacity-90 active:scale-[0.98]"
-            style={{ background: "rgba(120,255,120,0.15)", color: "rgba(120,255,120,0.9)", border: "1px solid rgba(120,255,120,0.4)" }}>
+            style={{ background: "rgba(155,127,212,0.2)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.5)" }}>
             <Plus className="w-3.5 h-3.5" strokeWidth={2} /> Deposit
           </button>
         )}
@@ -342,13 +338,13 @@ function DepositModal({ farmId, stakeToken, symbol, decimals, userBalance, onClo
             {needsApproval ? (
               <button onClick={handleApprove} disabled={approveTx.isPending || approveRcpt.isLoading}
                 className="flex-1 rounded-xl py-3 font-grotesk text-[12px] uppercase tracking-wider transition disabled:opacity-40 active:scale-[0.99]"
-                style={{ background: "rgba(255,180,50,0.2)", color: "rgba(255,180,50,0.9)", border: "1px solid rgba(255,180,50,0.5)" }}>
+                style={{ background: "rgba(155,127,212,0.2)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.5)" }}>
                 {approveTx.isPending || approveRcpt.isLoading ? "Approving..." : "Approve"}
               </button>
             ) : (
               <button onClick={handleDeposit} disabled={!parsedAmount || parsedAmount === 0n || parsedAmount > userBalance || depositTx.isPending || depositRcpt.isLoading}
                 className="flex-1 rounded-xl py-3 font-grotesk text-[12px] uppercase tracking-wider transition disabled:opacity-40 active:scale-[0.99]"
-                style={{ background: "rgba(120,255,120,0.2)", color: "rgba(120,255,120,0.9)", border: "1px solid rgba(120,255,120,0.5)" }}>
+                style={{ background: "rgba(155,127,212,0.25)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.55)" }}>
                 {depositTx.isPending || depositRcpt.isLoading ? "Depositing..." : "Deposit"}
               </button>
             )}
@@ -523,13 +519,6 @@ function PendingRewardLine({ token, amount }: { token: string; amount: bigint })
   return <p className="font-mono text-[12px]" style={{ color: "#9be8a4" }}>{Number(formatUnits(amount, dec)).toLocaleString(undefined, { maximumFractionDigits: 6 })} {sym}</p>;
 }
 
-
-// ═══════════════════════════════════════════════════════════════════════════
-//                              ADMIN TAB
-// ═══════════════════════════════════════════════════════════════════════════
-
-function AdminTab() {
-  const [showCreateFarm, setShowCreateFarm] = useState(false);
   const [showAddReward, setShowAddReward] = useState<number | null>(null);
   const contracts = useContracts();
 
