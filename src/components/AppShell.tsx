@@ -52,7 +52,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* ── HEADER ── */}
       <header
         className="relative z-20 flex items-center justify-between px-5 sm:px-8 lg:px-14 pt-5 pb-4 gap-3"
-        style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}
+        style={{ borderBottom: "1px solid rgba(155,127,212,0.15)" }}
       >
         {/* logo */}
         <Link to="/" className="flex items-center gap-2.5 shrink-0">
@@ -67,8 +67,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           <ul
             className="flex items-center gap-0.5 px-4 py-2.5 rounded-full"
             style={{
-              background: "rgba(255,255,255,0.04)",
-              border: "1px solid rgba(255,255,255,0.08)",
+              background: "rgba(155,127,212,0.06)",
+              border: "1px solid rgba(155,127,212,0.25)",
               backdropFilter: "blur(20px)",
               WebkitBackdropFilter: "blur(20px)",
             }}
@@ -78,8 +78,8 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <Link
                   to={l.href}
                   className="font-grotesk text-[11px] uppercase tracking-[0.1em] px-4 py-1.5 rounded-full transition-colors duration-200 block whitespace-nowrap"
-                  style={{ color: "rgba(255,255,255,0.55)" }}
-                  activeProps={{ style: { color: "#fff", background: "rgba(255,255,255,0.1)" } }}
+                  style={{ color: "rgba(196,168,240,0.55)" }}
+                  activeProps={{ style: { color: "#EDE0FF", background: "rgba(155,127,212,0.25)", border: "1px solid rgba(155,127,212,0.5)" } }}
                 >
                   {l.label}
                 </Link>
@@ -116,7 +116,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         className="lg:hidden fixed bottom-0 left-0 right-0 z-30 flex items-stretch"
         style={{
           background: "rgba(6,4,15,0.96)",
-          borderTop: "1px solid rgba(255,255,255,0.08)",
+          borderTop: "1px solid rgba(155,127,212,0.2)",
           backdropFilter: "blur(24px)",
           WebkitBackdropFilter: "blur(24px)",
         }}
@@ -126,8 +126,8 @@ export function AppShell({ children }: { children: ReactNode }) {
             key={label}
             to={href}
             className="flex flex-1 flex-col items-center justify-center gap-1 py-3 transition-colors"
-            style={{ color: "rgba(255,255,255,0.35)" }}
-            activeProps={{ style: { color: "#ffffff" } }}
+            style={{ color: "rgba(196,168,240,0.35)" }}
+            activeProps={{ style: { color: "#EDE0FF" } }}
           >
             <Icon className="w-5 h-5" strokeWidth={1.5} />
             <span className="font-grotesk text-[9px] uppercase tracking-wider">{label}</span>

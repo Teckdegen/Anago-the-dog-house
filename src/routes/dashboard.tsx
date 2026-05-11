@@ -147,6 +147,13 @@ function DashboardPage() {
     (l) => Number(l.unlockAt) <= Math.floor(Date.now() / 1000),
   ).length;
 
+  // Only show vestings that still have tokens to claim (not fully claimed)
+  const activeVestings = vestings.filter((v) => {
+    const totalAmount = Number(v.totalAmount);
+    const claimed = Number(v.claimed);
+    return totalAmount > 0 && claimed < totalAmount && !v.revoked;
+  });
+
   const POSITIONS = [
     {
       label: "Token Locks",
@@ -158,16 +165,16 @@ function DashboardPage() {
     },
     {
       label: "Vesting",
-      value: `${vestings.length} schedules`,
-      sub: `${vestings.length} schedules`,
+      value: `${activeVestings.length} active`,
+      sub: activeVestings.length > 0 ? `${activeVestings.length} yet to be claimed` : "no active vestings",
       color: "#9B7FD4",
       icon: Timer,
       href: "/vesting",
     },
     {
-      label: "Yield Farms",
+      label: "Stream Farms",
       value: "—",
-      sub: "stake to earn",
+      sub: "deposit to earn",
       color: "#6B4FA8",
       icon: Sprout,
       href: "/farm",
@@ -225,7 +232,7 @@ function DashboardPage() {
         </div>
 
         {/* ── BREAKDOWN BAR ── */}
-        <div className="flex w-full h-2.5 rounded-full overflow-hidden gap-px mb-6">
+        <div className="flex w-full h-2.5 rounded-full overflow-hidden gap-px mb-6" style={{ background: "rgba(155,127,212,0.1)" }}>
           {POSITIONS.map((p) => (
             <div
               key={p.label}
@@ -238,7 +245,7 @@ function DashboardPage() {
         {/* ── VALUE ROWS ── */}
         <div
           className="rounded-xl overflow-hidden"
-          style={{ border: "1px solid rgba(155,127,212,0.4)" }}
+          style={{ border: "1px solid rgba(155,127,212,0.35)", background: "rgba(155,127,212,0.03)" }}
         >
           {POSITIONS.map((p, i) => {
             const Icon = p.icon;
@@ -248,7 +255,7 @@ function DashboardPage() {
                 to={p.href}
                 className="flex items-center justify-between px-6 py-5 hover:bg-[rgba(155,127,212,0.06)] transition-colors"
                 style={{
-                  borderBottom: i < POSITIONS.length - 1 ? "1px solid rgba(155,127,212,0.2)" : "none",
+                  borderBottom: i < POSITIONS.length - 1 ? "1px solid rgba(155,127,212,0.15)" : "none",
                   display: "flex",
                 }}
               >
@@ -259,18 +266,18 @@ function DashboardPage() {
                   />
                   <Icon className="w-4 h-4" style={{ color: p.color }} strokeWidth={1.5} />
                   <div>
-                    <p className="font-grotesk uppercase text-cream text-[13px] tracking-wider">
+                    <p className="font-grotesk uppercase text-[13px] tracking-wider" style={{ color: "#EDE0FF" }}>
                       {p.label}
                     </p>
-                    <p className="font-mono text-[11px] mt-0.5" style={{ color: "rgba(196,168,240,0.75)" }}>
+                    <p className="font-mono text-[11px] mt-0.5" style={{ color: "rgba(196,168,240,0.65)" }}>
                       {p.sub}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
                   <p
-                    className="font-grotesk text-cream text-[18px] leading-none tabular-nums"
-                    style={{ opacity: isConnected ? 1 : 0.55 }}
+                    className="font-grotesk text-[18px] leading-none tabular-nums"
+                    style={{ color: "#EDE0FF", opacity: isConnected ? 1 : 0.55 }}
                   >
                     {p.value}
                   </p>
