@@ -139,12 +139,12 @@ function FarmCardInner({ farmId, stakeToken, totalStaked, active, lockDays, pena
           <div className="flex items-center gap-2 mb-1">
             <p className="font-grotesk uppercase text-[16px] tracking-wider" style={{ color: "#EDE0FF" }}>{symbol} Farm</p>
             <span className="px-2 py-0.5 rounded-full font-mono text-[9px] uppercase tracking-wider"
-              style={{ background: active ? "rgba(155,232,164,0.15)" : "rgba(255,120,120,0.15)", color: active ? "#9be8a4" : "rgba(255,120,120,0.9)", border: `1px solid ${active ? "rgba(155,232,164,0.3)" : "rgba(255,120,120,0.3)"}` }}>
+              style={{ background: active ? "rgba(155,127,212,0.2)" : "rgba(255,120,120,0.15)", color: active ? "#C4A8F0" : "rgba(255,120,120,0.9)", border: `1px solid ${active ? "rgba(155,127,212,0.4)" : "rgba(255,120,120,0.3)"}` }}>
               {active ? "Live" : "Paused"}
             </span>
             {lockDays > 0 && (
               <span className="px-2 py-0.5 rounded-full font-mono text-[9px] uppercase tracking-wider flex items-center gap-1"
-                style={{ background: "rgba(255,180,50,0.12)", color: "rgba(255,180,50,0.9)", border: "1px solid rgba(255,180,50,0.3)" }}>
+                style={{ background: "rgba(155,127,212,0.12)", color: "#C4A8F0", border: "1px solid rgba(155,127,212,0.3)" }}>
                 <Clock className="w-2.5 h-2.5" /> {lockDays}d lock
               </span>
             )}

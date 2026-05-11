@@ -1,60 +1,46 @@
 "use client";
 
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
-import { useState } from "react";
+import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useState, useEffect } from "react";
 import { parseUnits, formatUnits } from "viem";
 import { STREAM_FARM_ADDRESS, STREAM_FARM_ABI, ERC20_ABI } from "@/lib/contracts";
 
 export default function AdminPage() {
   const { address, isConnected } = useAccount();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   const isAdminQ = useReadContract({
     address: STREAM_FARM_ADDRESS,
     abi: STREAM_FARM_ABI,
     functionName: "isAdmin",
     args: address ? [address] : undefined,
-    query: { enabled: !!address },
+    query: { enabled: !!address && mounted },
   });
 
   const isAdmin = isAdminQ.data as boolean | undefined;
 
+  if (!mounted) return null;
+
   return (
     <div className="max-w-[900px] mx-auto px-5 py-8">
-      {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="font-grotesk text-[24px] font-semibold tracking-tight">Stream Farm Admin</h1>
-          <p className="font-mono text-[10px] mt-1" style={{ color: "rgba(196,168,240,0.55)" }}>
-            Manage farms · Add rewards · Control admins
-          </p>
+          <p className="font-mono text-[10px] mt-1" style={{ color: "rgba(196,168,240,0.55)" }}>Manage farms · Add rewards · Control admins</p>
         </div>
         <ConnectButton />
       </div>
 
-      {/* Content */}
       {!isConnected ? (
-        <div className="text-center py-20">
-          <p className="text-[16px] font-grotesk mb-2">Connect Wallet</p>
-          <p className="font-mono text-[11px]" style={{ color: "rgba(196,168,240,0.55)" }}>
-            Connect an admin wallet to access the dashboard.
-          </p>
-        </div>
+        <EmptyState title="Connect Wallet" sub="Connect an admin wallet to access the dashboard." />
       ) : isAdminQ.isLoading ? (
         <div className="text-center py-20">
           <div className="w-6 h-6 rounded-full border-2 animate-spin mx-auto" style={{ borderColor: "rgba(155,127,212,0.2)", borderTopColor: "rgba(155,127,212,0.8)" }} />
-          <p className="font-mono text-[11px] mt-4" style={{ color: "rgba(196,168,240,0.55)" }}>Checking admin status...</p>
         </div>
       ) : !isAdmin ? (
-        <div className="text-center py-20">
-          <p className="text-[18px] font-grotesk mb-2" style={{ color: "rgba(255,100,100,0.9)" }}>Access Denied</p>
-          <p className="font-mono text-[11px]" style={{ color: "rgba(196,168,240,0.55)" }}>
-            Wallet {address?.slice(0, 6)}...{address?.slice(-4)} is not an admin.
-          </p>
-          <p className="font-mono text-[10px] mt-2" style={{ color: "rgba(196,168,240,0.4)" }}>
-            Only authorized admin wallets can access this dashboard.
-          </p>
-        </div>
+        <EmptyState title="Access Denied" sub={`Wallet ${address?.slice(0, 6)}...${address?.slice(-4)} is not an admin.`} />
       ) : (
         <Dashboard />
       )}
@@ -62,9 +48,18 @@ export default function AdminPage() {
   );
 }
 
+function EmptyState({ title, sub }: { title: string; sub: string }) {
+  return (
+    <div className="text-center py-20">
+      <p className="text-[18px] font-grotesk mb-2">{title}</p>
+      <p className="font-mono text-[11px]" style={{ color: "rgba(196,168,240,0.55)" }}>{sub}</p>
+    </div>
+  );
+}
+
 function Dashboard() {
   const { address } = useAccount();
-  const [activeSection, setActiveSection] = useState<string>("farms");
+  const [section, setSection] = useState("farms");
 
   const farmCountQ = useReadContract({ address: STREAM_FARM_ADDRESS, abi: STREAM_FARM_ABI, functionName: "farmCount", query: { refetchInterval: 10_000 } });
   const ownerQ = useReadContract({ address: STREAM_FARM_ADDRESS, abi: STREAM_FARM_ABI, functionName: "owner" });
@@ -83,8 +78,7 @@ function Dashboard() {
 
   return (
     <div>
-      {/* Stats */}
-      <div className="rounded-2xl p-5 mb-6" style={{ background: "rgba(155,127,212,0.05)", border: "1px solid rgba(155,127,212,0.35)" }}>
+      <Card>
         <div className="flex items-center justify-between">
           <div>
             <p className="font-mono text-[10px] uppercase tracking-wider" style={{ color: "rgba(196,168,240,0.5)" }}>Overview</p>
@@ -95,33 +89,31 @@ function Dashboard() {
             <p className="font-mono text-[11px]">{owner?.slice(0, 6)}...{owner?.slice(-4)} {isOwner && "(you)"}</p>
           </div>
         </div>
-      </div>
+      </Card>
 
-      {/* Nav */}
-      <div className="flex gap-1 p-1 rounded-full mb-6" style={{ background: "rgba(155,127,212,0.08)", border: "1px solid rgba(155,127,212,0.25)" }}>
+      <div className="flex flex-wrap gap-1 p-1 rounded-full my-6" style={{ background: "rgba(155,127,212,0.08)", border: "1px solid rgba(155,127,212,0.25)" }}>
         {sections.map((s) => (
-          <button key={s.key} onClick={() => setActiveSection(s.key)}
+          <button key={s.key} onClick={() => setSection(s.key)}
             className="px-4 py-1.5 rounded-full font-grotesk text-[11px] uppercase tracking-wider transition"
-            style={activeSection === s.key ? { background: "rgba(155,127,212,0.35)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.6)" } : { color: "rgba(196,168,240,0.5)" }}>
+            style={section === s.key ? { background: "rgba(155,127,212,0.35)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.6)" } : { color: "rgba(196,168,240,0.5)" }}>
             {s.label}
           </button>
         ))}
       </div>
 
-      {/* Sections */}
-      {activeSection === "farms" && <FarmsSection farmCount={farmCount} />}
-      {activeSection === "create" && <CreateFarmSection />}
-      {activeSection === "rewards" && <AddRewardSection farmCount={farmCount} />}
-      {activeSection === "boosts" && <BoostTiersSection />}
-      {activeSection === "recover" && <RecoverSection />}
-      {activeSection === "admins" && isOwner && <AdminsSection />}
+      {section === "farms" && <FarmsSection farmCount={farmCount} />}
+      {section === "create" && <CreateFarmSection />}
+      {section === "rewards" && <AddRewardSection farmCount={farmCount} />}
+      {section === "boosts" && <BoostTiersSection />}
+      {section === "recover" && <RecoverSection />}
+      {section === "admins" && isOwner && <AdminsSection />}
     </div>
   );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 function FarmsSection({ farmCount }: { farmCount: number }) {
-  if (farmCount === 0) return <Card><p className="text-center py-8 font-mono text-[11px]" style={{ color: "rgba(196,168,240,0.5)" }}>No farms yet</p></Card>;
+  if (farmCount === 0) return <Card><p className="text-center py-8 font-mono text-[11px]" style={{ color: "rgba(196,168,240,0.5)" }}>No farms yet. Go to "Create Farm" to make one.</p></Card>;
   return (
     <div className="space-y-3">
       {Array.from({ length: farmCount }, (_, i) => <FarmRow key={i} farmId={i} />)}
@@ -153,17 +145,18 @@ function FarmRow({ farmId }: { farmId: number }) {
         <div>
           <div className="flex items-center gap-2">
             <span className="font-grotesk text-[14px] font-semibold">#{farmId} · {symbol}</span>
-            <span className={`text-[9px] px-2 py-0.5 rounded-full uppercase tracking-wider ${active ? "bg-green-500/15 text-green-400 border border-green-500/30" : "bg-red-500/15 text-red-400 border border-red-500/30"}`}>
+            <span className="text-[9px] px-2 py-0.5 rounded-full uppercase tracking-wider"
+              style={{ background: active ? "rgba(155,127,212,0.2)" : "rgba(255,100,100,0.15)", color: active ? "#C4A8F0" : "rgba(255,100,100,0.9)", border: `1px solid ${active ? "rgba(155,127,212,0.4)" : "rgba(255,100,100,0.3)"}` }}>
               {active ? "Live" : "Paused"}
             </span>
           </div>
           <p className="font-mono text-[9px] mt-1" style={{ color: "rgba(196,168,240,0.45)" }}>
-            TVL: {Number(formatUnits(totalStaked ?? 0n, decimals)).toLocaleString()} {symbol} · {Number(rewardStreamCount)} streams · Lock: {Number(lockDuration) / 86400}d · Penalty: {Number(earlyWithdrawBps) / 100}%
+            TVL: {Number(formatUnits(totalStaked ?? BigInt(0), decimals)).toLocaleString()} {symbol} · {Number(rewardStreamCount)} streams · Lock: {Number(lockDuration) / 86400}d · Penalty: {Number(earlyWithdrawBps) / 100}%
           </p>
         </div>
-        <button onClick={handleToggle} disabled={toggleTx.isPending || toggleRcpt.isLoading} className="btn text-[10px]">
+        <Btn onClick={handleToggle} disabled={toggleTx.isPending || toggleRcpt.isLoading}>
           {toggleTx.isPending ? "..." : active ? "Pause" : "Activate"}
-        </button>
+        </Btn>
       </div>
     </Card>
   );
@@ -194,11 +187,11 @@ function CreateFarmSection() {
           <Field label="Lock Duration (days)" value={lockDays} onChange={setLockDays} placeholder="0" />
           <Field label="Early Exit Penalty (%)" value={penalty} onChange={setPenalty} placeholder="0" />
         </div>
-        <button onClick={handleCreate} disabled={!stakeToken || tx.isPending || rcpt.isLoading} className="btn w-full">
+        <Btn onClick={handleCreate} disabled={!stakeToken || tx.isPending || rcpt.isLoading} full>
           {tx.isPending || rcpt.isLoading ? "Creating..." : "Create Farm"}
-        </button>
-        {rcpt.isSuccess && <p className="font-mono text-[10px] text-green-400">Farm created!</p>}
-        {tx.error && <p className="font-mono text-[10px] text-red-400">{(tx.error as any)?.shortMessage || tx.error.message}</p>}
+        </Btn>
+        {rcpt.isSuccess && <p className="font-mono text-[10px]" style={{ color: "#C4A8F0" }}>✓ Farm created!</p>}
+        {tx.error && <Err error={tx.error} />}
       </div>
     </Card>
   );
@@ -207,7 +200,7 @@ function CreateFarmSection() {
 // ═══════════════════════════════════════════════════════════════════════════
 function AddRewardSection({ farmCount }: { farmCount: number }) {
   const { address } = useAccount();
-  const [farmId, setFarmId] = useState("");
+  const [farmId, setFarmId] = useState("0");
   const [rewardToken, setRewardToken] = useState("");
   const [budget, setBudget] = useState("");
   const [days, setDays] = useState("30");
@@ -222,9 +215,9 @@ function AddRewardSection({ farmCount }: { farmCount: number }) {
   const allowanceQ = useReadContract({ address: rewardToken as `0x${string}`, abi: ERC20_ABI, functionName: "allowance", args: address ? [address, STREAM_FARM_ADDRESS] : undefined, query: { enabled: !!address && !!rewardToken && rewardToken.length === 42, refetchInterval: 5_000 } });
 
   const decimals = (decimalsQ.data as number) ?? 18;
-  const parsedBudget = (() => { try { return budget ? parseUnits(budget, decimals) : 0n; } catch { return 0n; } })();
-  const allowance = (allowanceQ.data as bigint) ?? 0n;
-  const needsApproval = parsedBudget > 0n && allowance < parsedBudget;
+  const parsedBudget = (() => { try { return budget ? parseUnits(budget, decimals) : BigInt(0); } catch { return BigInt(0); } })();
+  const allowance = (allowanceQ.data as bigint) ?? BigInt(0);
+  const needsApproval = parsedBudget > BigInt(0) && allowance < parsedBudget;
 
   const handleApprove = () => {
     approveTx.writeContract({ address: rewardToken as `0x${string}`, abi: ERC20_ABI, functionName: "approve", args: [STREAM_FARM_ADDRESS, parsedBudget] });
@@ -241,24 +234,39 @@ function AddRewardSection({ farmCount }: { farmCount: number }) {
     <Card>
       <h3 className="font-grotesk text-[14px] font-semibold mb-4">Add Reward Stream</h3>
       <div className="space-y-4">
-        <Field label="Farm ID" value={farmId} onChange={setFarmId} placeholder="0" />
+        {/* Farm selector */}
+        <div>
+          <label className="font-mono text-[9px] uppercase tracking-wider mb-1.5 block" style={{ color: "rgba(196,168,240,0.55)" }}>Select Farm</label>
+          <div className="flex flex-wrap gap-2">
+            {Array.from({ length: farmCount }, (_, i) => (
+              <button key={i} onClick={() => setFarmId(String(i))}
+                className="px-3 py-1.5 rounded-lg font-mono text-[11px] transition"
+                style={{ background: farmId === String(i) ? "rgba(155,127,212,0.3)" : "rgba(155,127,212,0.08)", border: `1px solid ${farmId === String(i) ? "rgba(155,127,212,0.6)" : "rgba(155,127,212,0.2)"}`, color: farmId === String(i) ? "#EDE0FF" : "rgba(196,168,240,0.5)" }}>
+                Farm #{i}
+              </button>
+            ))}
+          </div>
+          {farmCount === 0 && <p className="font-mono text-[9px] mt-1" style={{ color: "rgba(196,168,240,0.4)" }}>No farms yet. Create one first.</p>}
+        </div>
+
         <Field label="Reward Token Address" value={rewardToken} onChange={setRewardToken} placeholder="0x..." />
         <Field label="Total Budget (token units)" value={budget} onChange={setBudget} placeholder="10000" />
         <div className="grid grid-cols-2 gap-4">
           <Field label="Duration (days)" value={days} onChange={setDays} placeholder="30" />
           <Field label="Start Delay (hours)" value={delay} onChange={setDelay} placeholder="0" />
         </div>
+
         {needsApproval ? (
-          <button onClick={handleApprove} disabled={approveTx.isPending || approveRcpt.isLoading} className="btn w-full">
+          <Btn onClick={handleApprove} disabled={approveTx.isPending || approveRcpt.isLoading} full>
             {approveTx.isPending || approveRcpt.isLoading ? "Approving..." : "Approve Tokens"}
-          </button>
+          </Btn>
         ) : (
-          <button onClick={handleAdd} disabled={!farmId || !rewardToken || !parsedBudget || addTx.isPending || addRcpt.isLoading} className="btn w-full">
+          <Btn onClick={handleAdd} disabled={!farmId || !rewardToken || !parsedBudget || addTx.isPending || addRcpt.isLoading} full>
             {addTx.isPending || addRcpt.isLoading ? "Adding..." : "Add Reward Stream"}
-          </button>
+          </Btn>
         )}
-        {addRcpt.isSuccess && <p className="font-mono text-[10px] text-green-400">Reward stream added!</p>}
-        {(addTx.error || approveTx.error) && <p className="font-mono text-[10px] text-red-400">{((addTx.error || approveTx.error) as any)?.shortMessage || (addTx.error || approveTx.error)?.message}</p>}
+        {addRcpt.isSuccess && <p className="font-mono text-[10px]" style={{ color: "#C4A8F0" }}>✓ Reward stream added!</p>}
+        {(addTx.error || approveTx.error) && <Err error={addTx.error || approveTx.error} />}
       </div>
     </Card>
   );
@@ -283,11 +291,11 @@ function BoostTiersSection() {
       <div className="space-y-4">
         <Field label="Durations (days, comma separated)" value={durations} onChange={setDurations} placeholder="7,30,90" />
         <Field label="Multipliers (x, comma separated)" value={multipliers} onChange={setMultipliers} placeholder="1.2,1.5,2.0" />
-        <button onClick={handleUpdate} disabled={tx.isPending || rcpt.isLoading} className="btn w-full">
+        <Btn onClick={handleUpdate} disabled={tx.isPending || rcpt.isLoading} full>
           {tx.isPending || rcpt.isLoading ? "Updating..." : "Update Boost Tiers"}
-        </button>
-        {rcpt.isSuccess && <p className="font-mono text-[10px] text-green-400">Boost tiers updated!</p>}
-        {tx.error && <p className="font-mono text-[10px] text-red-400">{(tx.error as any)?.shortMessage || tx.error.message}</p>}
+        </Btn>
+        {rcpt.isSuccess && <p className="font-mono text-[10px]" style={{ color: "#C4A8F0" }}>✓ Updated!</p>}
+        {tx.error && <Err error={tx.error} />}
       </div>
     </Card>
   );
@@ -314,11 +322,11 @@ function RecoverSection() {
       <div className="space-y-4">
         <Field label="Token Address" value={token} onChange={setToken} placeholder="0x..." />
         <Field label="Amount (token units)" value={amount} onChange={setAmount} placeholder="1000" />
-        <button onClick={handleRecover} disabled={!token || !amount || tx.isPending || rcpt.isLoading} className="btn w-full">
+        <Btn onClick={handleRecover} disabled={!token || !amount || tx.isPending || rcpt.isLoading} full>
           {tx.isPending || rcpt.isLoading ? "Recovering..." : "Recover Tokens"}
-        </button>
-        {rcpt.isSuccess && <p className="font-mono text-[10px] text-green-400">Tokens recovered!</p>}
-        {tx.error && <p className="font-mono text-[10px] text-red-400">{(tx.error as any)?.shortMessage || tx.error.message}</p>}
+        </Btn>
+        {rcpt.isSuccess && <p className="font-mono text-[10px]" style={{ color: "#C4A8F0" }}>✓ Recovered!</p>}
+        {tx.error && <Err error={tx.error} />}
       </div>
     </Card>
   );
@@ -332,15 +340,8 @@ function AdminsSection() {
   const removeTx = useWriteContract();
   const removeRcpt = useWaitForTransactionReceipt({ hash: removeTx.data });
 
-  const handleAdd = () => {
-    if (!adminAddr) return;
-    addTx.writeContract({ address: STREAM_FARM_ADDRESS, abi: STREAM_FARM_ABI, functionName: "addAdmin", args: [adminAddr as `0x${string}`] });
-  };
-
-  const handleRemove = () => {
-    if (!adminAddr) return;
-    removeTx.writeContract({ address: STREAM_FARM_ADDRESS, abi: STREAM_FARM_ABI, functionName: "removeAdmin", args: [adminAddr as `0x${string}`] });
-  };
+  const handleAdd = () => { if (adminAddr) addTx.writeContract({ address: STREAM_FARM_ADDRESS, abi: STREAM_FARM_ABI, functionName: "addAdmin", args: [adminAddr as `0x${string}`] }); };
+  const handleRemove = () => { if (adminAddr) removeTx.writeContract({ address: STREAM_FARM_ADDRESS, abi: STREAM_FARM_ABI, functionName: "removeAdmin", args: [adminAddr as `0x${string}`] }); };
 
   return (
     <Card>
@@ -349,31 +350,26 @@ function AdminsSection() {
       <div className="space-y-4">
         <Field label="Wallet Address" value={adminAddr} onChange={setAdminAddr} placeholder="0x..." />
         <div className="flex gap-3">
-          <button onClick={handleAdd} disabled={!adminAddr || addTx.isPending || addRcpt.isLoading} className="btn flex-1">
+          <Btn onClick={handleAdd} disabled={!adminAddr || addTx.isPending || addRcpt.isLoading} full>
             {addTx.isPending || addRcpt.isLoading ? "Adding..." : "Add Admin"}
-          </button>
-          <button onClick={handleRemove} disabled={!adminAddr || removeTx.isPending || removeRcpt.isLoading} className="btn flex-1" style={{ background: "rgba(255,100,100,0.15)", borderColor: "rgba(255,100,100,0.4)", color: "rgba(255,100,100,0.9)" }}>
-            {removeTx.isPending || removeRcpt.isLoading ? "Removing..." : "Remove Admin"}
+          </Btn>
+          <button onClick={handleRemove} disabled={!adminAddr || removeTx.isPending || removeRcpt.isLoading}
+            className="flex-1 rounded-xl py-2.5 font-grotesk text-[11px] uppercase tracking-wider transition disabled:opacity-40"
+            style={{ background: "rgba(255,100,100,0.12)", color: "rgba(255,100,100,0.9)", border: "1px solid rgba(255,100,100,0.3)" }}>
+            {removeTx.isPending || removeRcpt.isLoading ? "..." : "Remove Admin"}
           </button>
         </div>
-        {addRcpt.isSuccess && <p className="font-mono text-[10px] text-green-400">Admin added!</p>}
-        {removeRcpt.isSuccess && <p className="font-mono text-[10px] text-green-400">Admin removed!</p>}
-        {(addTx.error || removeTx.error) && <p className="font-mono text-[10px] text-red-400">{((addTx.error || removeTx.error) as any)?.shortMessage || (addTx.error || removeTx.error)?.message}</p>}
+        {addRcpt.isSuccess && <p className="font-mono text-[10px]" style={{ color: "#C4A8F0" }}>✓ Admin added!</p>}
+        {removeRcpt.isSuccess && <p className="font-mono text-[10px]" style={{ color: "#C4A8F0" }}>✓ Admin removed!</p>}
+        {(addTx.error || removeTx.error) && <Err error={addTx.error || removeTx.error} />}
       </div>
     </Card>
   );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-//                              SHARED COMPONENTS
-// ═══════════════════════════════════════════════════════════════════════════
-
 function Card({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="rounded-2xl p-5" style={{ background: "rgba(155,127,212,0.05)", border: "1px solid rgba(155,127,212,0.35)" }}>
-      {children}
-    </div>
-  );
+  return <div className="rounded-2xl p-5 mb-4" style={{ background: "rgba(155,127,212,0.05)", border: "1px solid rgba(155,127,212,0.35)" }}>{children}</div>;
 }
 
 function Field({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder: string }) {
@@ -385,4 +381,19 @@ function Field({ label, value, onChange, placeholder }: { label: string; value: 
         style={{ background: "rgba(155,127,212,0.06)", border: "1px solid rgba(155,127,212,0.3)", color: "#EDE0FF" }} />
     </div>
   );
+}
+
+function Btn({ children, onClick, disabled, full }: { children: React.ReactNode; onClick: () => void; disabled?: boolean; full?: boolean }) {
+  return (
+    <button onClick={onClick} disabled={disabled}
+      className={`${full ? "w-full" : ""} rounded-xl py-2.5 px-4 font-grotesk text-[11px] uppercase tracking-wider transition disabled:opacity-40`}
+      style={{ background: "rgba(155,127,212,0.2)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.5)" }}>
+      {children}
+    </button>
+  );
+}
+
+function Err({ error }: { error: any }) {
+  if (!error) return null;
+  return <p className="font-mono text-[10px]" style={{ color: "rgba(255,100,100,0.9)" }}>{error?.shortMessage || error?.message}</p>;
 }
