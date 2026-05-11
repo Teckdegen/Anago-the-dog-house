@@ -108,22 +108,27 @@ function VestingRow({
   const cliffTime   = startTime + cliff;
   const hasCliff    = cliff > 0;
 
+  // Ensure BigInt values (may come from cache as strings)
+  const totalAmount = BigInt(vesting.totalAmount || 0);
+  const claimed = BigInt(vesting.claimed || 0);
+  const claimable = BigInt(vesting.claimable || 0);
+
   // How much has linearly vested so far (before subtracting claimed)
   const vestedSoFar: bigint = (() => {
-    if (nowSec < cliffTime) return 0n; // cliff not passed
-    if (nowSec >= endTime)  return vesting.totalAmount; // fully vested
+    if (nowSec < cliffTime) return 0n;
+    if (nowSec >= endTime)  return totalAmount;
     const elapsed = BigInt(nowSec - startTime);
-    return (vesting.totalAmount * elapsed) / BigInt(duration);
+    return duration > 0 ? (totalAmount * elapsed) / BigInt(duration) : 0n;
   })();
 
-  // Progress = vested so far / total (shows how far along the schedule is)
-  const vestedPct = vesting.totalAmount > 0n
-    ? Number((vestedSoFar * 10000n) / vesting.totalAmount) / 100
+  // Progress = vested so far / total
+  const vestedPct = totalAmount > 0n
+    ? Number((vestedSoFar * 10000n) / totalAmount) / 100
     : 0;
 
-  // Claimed pct (separate indicator)
-  const claimedPct = vesting.totalAmount > 0n
-    ? Number((vesting.claimed * 10000n) / vesting.totalAmount) / 100
+  // Claimed pct
+  const claimedPct = totalAmount > 0n
+    ? Number((claimed * 10000n) / totalAmount) / 100
     : 0;
 
   const inCliff    = hasCliff && nowSec < cliffTime;
@@ -155,7 +160,7 @@ function VestingRow({
         subtext="Your vested tokens have been released."
         rows={[
           { label: "Token",  value: symbol },
-          { label: "Amount", value: `${formatAmount(vesting.claimable, decimals)} ${symbol}` },
+          { label: "Amount", value: `${formatAmount(claimable, decimals)} ${symbol}` },
           { label: "NFT ID", value: `#${vesting.id.toString()}` },
         ]}
       />
@@ -164,6 +169,9 @@ function VestingRow({
         symbol={symbol}
         decimals={decimals}
         vesting={vesting}
+        totalAmount={totalAmount}
+        claimed={claimed}
+        claimable={claimable}
         vestedPct={vestedPct}
         claimedPct={claimedPct}
         inCliff={inCliff}
@@ -183,7 +191,7 @@ function VestingRow({
   );
 }
 
-function VestingRowUI({ symbol, decimals, vesting, vestedPct, claimedPct, inCliff, fullyVested, hasCliff, cliff, duration, endDate, cliffDate, timeLabel, justClaimed, doClaim, txPending, isLast }: any) {
+function VestingRowUI({ symbol, decimals, vesting, totalAmount, claimed, claimable, vestedPct, claimedPct, inCliff, fullyVested, hasCliff, cliff, duration, endDate, cliffDate, timeLabel, justClaimed, doClaim, txPending, isLast }: any) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -222,8 +230,8 @@ function VestingRowUI({ symbol, decimals, vesting, vestedPct, claimedPct, inClif
           {vesting.revoked ? (
             <span className="font-mono text-[9px] uppercase" style={{ color: "rgba(255,100,100,0.7)" }}>Revoked</span>
           ) : justClaimed ? (
-            <span className="font-mono text-[9px] uppercase" style={{ color: "#9be8a4" }}>Claimed ✓</span>
-          ) : vesting.claimable > 0n ? (
+            <span className="font-mono text-[9px] uppercase" style={{ color: "#C4A8F0" }}>Claimed ✓</span>
+          ) : claimable > 0n ? (
             <button
               onClick={doClaim}
               disabled={txPending}
@@ -233,7 +241,7 @@ function VestingRowUI({ symbol, decimals, vesting, vestedPct, claimedPct, inClif
               {txPending ? "…" : "Claim"}
             </button>
           ) : (
-            <span className="font-mono text-[9px] uppercase" style={{ color: fullyVested ? "#9be8a4" : "rgba(155,127,212,0.55)" }}>
+            <span className="font-mono text-[9px] uppercase" style={{ color: fullyVested ? "#C4A8F0" : "rgba(155,127,212,0.55)" }}>
               {inCliff ? "In cliff" : fullyVested ? "Done ✓" : "Vesting"}
             </span>
           )}
@@ -257,26 +265,26 @@ function VestingRowUI({ symbol, decimals, vesting, vestedPct, claimedPct, inClif
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-2">
             <div>
               <p className="font-mono text-[8px] uppercase tracking-wider" style={{ color: "rgba(196,168,240,0.4)" }}>Total</p>
-              <p className="font-mono text-[11px] mt-0.5" style={{ color: "#EDE0FF" }}>{formatAmount(vesting.totalAmount, decimals)} {symbol}</p>
+              <p className="font-mono text-[11px] mt-0.5" style={{ color: "#EDE0FF" }}>{formatAmount(totalAmount, decimals)} {symbol}</p>
             </div>
             <div>
               <p className="font-mono text-[8px] uppercase tracking-wider" style={{ color: "rgba(196,168,240,0.4)" }}>Claimed</p>
-              <p className="font-mono text-[11px] mt-0.5" style={{ color: "#EDE0FF" }}>{formatAmount(vesting.claimed, decimals)} {symbol}</p>
+              <p className="font-mono text-[11px] mt-0.5" style={{ color: "#EDE0FF" }}>{formatAmount(claimed, decimals)} {symbol}</p>
             </div>
             <div>
               <p className="font-mono text-[8px] uppercase tracking-wider" style={{ color: "rgba(196,168,240,0.4)" }}>Claimable</p>
-              <p className="font-mono text-[11px] mt-0.5" style={{ color: vesting.claimable > 0n ? "#9be8a4" : "rgba(196,168,240,0.6)" }}>{formatAmount(vesting.claimable, decimals)} {symbol}</p>
+              <p className="font-mono text-[11px] mt-0.5" style={{ color: claimable > 0n ? "#C4A8F0" : "rgba(196,168,240,0.6)" }}>{formatAmount(claimable, decimals)} {symbol}</p>
             </div>
             <div>
               <p className="font-mono text-[8px] uppercase tracking-wider" style={{ color: "rgba(196,168,240,0.4)" }}>End Date</p>
-              <p className="font-mono text-[11px] mt-0.5" style={{ color: fullyVested ? "#9be8a4" : "rgba(196,168,240,0.6)" }}>{endDate}</p>
+              <p className="font-mono text-[11px] mt-0.5" style={{ color: fullyVested ? "#C4A8F0" : "rgba(196,168,240,0.6)" }}>{endDate}</p>
             </div>
           </div>
           <div className="flex items-center justify-between">
             <span className="font-mono text-[10px]" style={{ color: "rgba(196,168,240,0.6)" }}>
               {claimedPct.toFixed(1)}% claimed · {vestedPct.toFixed(1)}% vested
             </span>
-            <span className="font-mono text-[9px]" style={{ color: inCliff ? "rgba(255,180,50,0.85)" : fullyVested ? "#9be8a4" : "rgba(196,168,240,0.5)" }}>
+            <span className="font-mono text-[9px]" style={{ color: inCliff ? "rgba(255,180,50,0.85)" : fullyVested ? "#C4A8F0" : "rgba(196,168,240,0.5)" }}>
               {timeLabel}{hasCliff && cliffDate ? ` · cliff ${cliffDate}` : ""}
             </span>
           </div>
@@ -311,7 +319,7 @@ function VestingPage() {
 
   const filtered = useMemo(() => {
     let list = vestings;
-    if (activeTab === "Claimable") list = list.filter((v) => v.claimable > 0n);
+    if (activeTab === "Claimable") list = list.filter((v) => BigInt(v.claimable || 0) > 0n);
     if (search) {
       const s = search.toLowerCase();
       list = list.filter((v) =>
