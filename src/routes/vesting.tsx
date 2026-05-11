@@ -160,110 +160,130 @@ function VestingRow({
         ]}
       />
 
-      <div
-        className="px-5 py-4 hover:bg-[rgba(155,127,212,0.03)] transition-colors"
-        style={{ borderBottom: isLast ? "none" : "1px solid rgba(155,127,212,0.15)" }}
-      >
-        {/* Top row */}
-        <div className="grid sm:grid-cols-[2fr_1fr_1fr_1fr_100px] grid-cols-[2fr_1fr_100px] gap-2 items-center mb-3">
-          {/* Token + ID */}
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div
-              className="w-7 h-7 rounded-full flex items-center justify-center font-grotesk text-[10px] shrink-0"
-              style={{ background: "rgba(155,127,212,0.15)", border: "1px solid rgba(155,127,212,0.35)", color: "rgba(196,168,240,0.85)" }}
-            >
-              {symbol[0]}
-            </div>
-            <div className="min-w-0">
-              <p className="font-grotesk uppercase text-[12px] tracking-wider truncate" style={{ color: "#EDE0FF" }}>{symbol}</p>
-              <p className="font-mono text-[10px]" style={{ color: "rgba(196,168,240,0.55)" }}>
-                NFT #{vesting.id.toString()}
-                {hasCliff && <span style={{ color: "rgba(196,168,240,0.45)" }}> · cliff {cliffDate}</span>}
-              </p>
-            </div>
-          </div>
-
-          {/* Total */}
-          <div className="hidden sm:block text-right font-grotesk text-[12px] tabular-nums" style={{ color: "rgba(237,224,255,0.9)" }}>
-            {formatAmount(vesting.totalAmount, decimals)}
-          </div>
-
-          {/* Claimable now */}
-          <div className="text-right">
-            <p className="font-grotesk text-[12px] tabular-nums" style={{ color: vesting.claimable > 0n ? "#9be8a4" : "rgba(196,168,240,0.5)" }}>
-              {formatAmount(vesting.claimable, decimals)}
-            </p>
-            <p className="font-mono text-[9px] mt-0.5" style={{ color: "rgba(196,168,240,0.45)" }}>claimable</p>
-          </div>
-
-          {/* End date */}
-          <div className="hidden sm:block text-right">
-            <p className="font-mono text-[10px]" style={{ color: fullyVested ? "rgba(100,220,100,0.8)" : "rgba(196,168,240,0.6)" }}>
-              {endDate}
-            </p>
-            <p className="font-mono text-[10px] mt-0.5 font-medium" style={{ color: inCliff ? "rgba(255,180,50,0.85)" : fullyVested ? "rgba(120,255,120,0.85)" : "rgba(196,168,240,0.65)" }}>
-              {timeLabel}
-            </p>
-          </div>
-
-          {/* Action */}
-          <div className="text-right">
-            {vesting.revoked ? (
-              <span className="font-mono text-[10px] uppercase font-medium" style={{ color: "rgba(255,100,100,0.7)" }}>Revoked</span>
-            ) : justClaimed ? (
-              <span className="font-mono text-[10px] uppercase font-medium" style={{ color: "#9be8a4" }}>Claimed ✓</span>
-            ) : vesting.claimable > 0n ? (
-              <button
-                onClick={doClaim}
-                disabled={tx.isPending || rcpt.isLoading}
-                className="px-3 py-1 rounded-full font-grotesk text-[10px] uppercase tracking-wider disabled:opacity-50 transition"
-                style={{ background: "rgba(155,127,212,0.25)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.6)" }}
-              >
-                {tx.isPending || rcpt.isLoading ? "…" : "Claim"}
-              </button>
-            ) : (
-              <span className="font-mono text-[10px] uppercase font-medium" style={{ color: "rgba(155,127,212,0.65)" }}>
-                {inCliff ? "In cliff" : fullyVested ? "Fully claimed ✓" : "Vesting"}
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Progress bar — shows vested so far vs claimed */}
-        <div className="relative w-full h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(155,127,212,0.12)" }}>
-          {/* Vested (but not yet claimed) — lighter purple */}
-          <div
-            className="absolute left-0 top-0 h-full rounded-full transition-all duration-500"
-            style={{ width: `${Math.min(vestedPct, 100)}%`, background: "rgba(155,127,212,0.45)" }}
-          />
-          {/* Claimed — solid purple */}
-          <div
-            className="absolute left-0 top-0 h-full rounded-full transition-all duration-500"
-            style={{ width: `${Math.min(claimedPct, 100)}%`, background: "#9B7FD4" }}
-          />
-          {/* Cliff marker */}
-          {hasCliff && duration > 0 && (
-            <div
-              className="absolute top-0 h-full w-px"
-              style={{
-                left: `${Math.min((cliff / duration) * 100, 100)}%`,
-                background: "rgba(255,180,50,0.7)",
-              }}
-            />
-          )}
-        </div>
-        {/* Progress labels */}
-        <div className="flex items-center justify-between mt-1">
-          <span className="font-mono text-[11px] font-medium" style={{ color: "rgba(196,168,240,0.75)" }}>
-            {claimedPct.toFixed(1)}% claimed · {vestedPct.toFixed(1)}% vested
-          </span>
-          <span className="font-mono text-[10px]" style={{ color: "rgba(196,168,240,0.55)" }}>
-            {formatAmount(vesting.claimed, decimals)} / {formatAmount(vesting.totalAmount, decimals)} {symbol}
-          </span>
-        </div>
-      </div>
+      <VestingRowUI
+        symbol={symbol}
+        decimals={decimals}
+        vesting={vesting}
+        vestedPct={vestedPct}
+        claimedPct={claimedPct}
+        inCliff={inCliff}
+        fullyVested={fullyVested}
+        hasCliff={hasCliff}
+        cliff={cliff}
+        duration={duration}
+        endDate={endDate}
+        cliffDate={cliffDate}
+        timeLabel={timeLabel}
+        justClaimed={justClaimed}
+        doClaim={doClaim}
+        txPending={tx.isPending || rcpt.isLoading}
+        isLast={isLast}
+      />
     </>
   );
+}
+
+function VestingRowUI({ symbol, decimals, vesting, vestedPct, claimedPct, inCliff, fullyVested, hasCliff, cliff, duration, endDate, cliffDate, timeLabel, justClaimed, doClaim, txPending, isLast }: any) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div
+      className="px-5 py-4 hover:bg-[rgba(155,127,212,0.03)] transition-colors"
+      style={{ borderBottom: isLast ? "none" : "1px solid rgba(155,127,212,0.15)" }}
+    >
+      {/* Compact row: token, progress bar, action */}
+      <div className="flex items-center gap-3">
+        {/* Token icon + name */}
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+          <div
+            className="w-7 h-7 rounded-full flex items-center justify-center font-grotesk text-[10px] shrink-0"
+            style={{ background: "rgba(155,127,212,0.15)", border: "1px solid rgba(155,127,212,0.35)", color: "rgba(196,168,240,0.85)" }}
+          >
+            {symbol[0]}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <p className="font-grotesk uppercase text-[12px] tracking-wider truncate" style={{ color: "#EDE0FF" }}>{symbol}</p>
+              <span className="font-mono text-[9px]" style={{ color: "rgba(196,168,240,0.4)" }}>#{vesting.id.toString()}</span>
+            </div>
+            {/* Progress bar inline */}
+            <div className="relative w-full h-1.5 rounded-full overflow-hidden mt-1.5" style={{ background: "rgba(155,127,212,0.12)" }}>
+              <div className="absolute left-0 top-0 h-full rounded-full transition-all duration-500" style={{ width: `${Math.min(vestedPct, 100)}%`, background: "rgba(155,127,212,0.45)" }} />
+              <div className="absolute left-0 top-0 h-full rounded-full transition-all duration-500" style={{ width: `${Math.min(claimedPct, 100)}%`, background: "#9B7FD4" }} />
+              {hasCliff && duration > 0 && (
+                <div className="absolute top-0 h-full w-px" style={{ left: `${Math.min((cliff / duration) * 100, 100)}%`, background: "rgba(255,180,50,0.7)" }} />
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Status + action */}
+        <div className="flex items-center gap-2 shrink-0">
+          {vesting.revoked ? (
+            <span className="font-mono text-[9px] uppercase" style={{ color: "rgba(255,100,100,0.7)" }}>Revoked</span>
+          ) : justClaimed ? (
+            <span className="font-mono text-[9px] uppercase" style={{ color: "#9be8a4" }}>Claimed ✓</span>
+          ) : vesting.claimable > 0n ? (
+            <button
+              onClick={doClaim}
+              disabled={txPending}
+              className="px-3 py-1.5 rounded-full font-grotesk text-[10px] uppercase tracking-wider disabled:opacity-50 transition"
+              style={{ background: "rgba(155,127,212,0.25)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.6)" }}
+            >
+              {txPending ? "…" : "Claim"}
+            </button>
+          ) : (
+            <span className="font-mono text-[9px] uppercase" style={{ color: fullyVested ? "#9be8a4" : "rgba(155,127,212,0.55)" }}>
+              {inCliff ? "In cliff" : fullyVested ? "Done ✓" : "Vesting"}
+            </span>
+          )}
+
+          {/* More button */}
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="w-6 h-6 rounded-full flex items-center justify-center transition hover:bg-[rgba(155,127,212,0.15)]"
+            style={{ color: "rgba(196,168,240,0.5)" }}
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ transform: expanded ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
+              <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {/* Expanded details */}
+      {expanded && (
+        <div className="mt-3 pt-3" style={{ borderTop: "1px solid rgba(155,127,212,0.1)" }}>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-2">
+            <div>
+              <p className="font-mono text-[8px] uppercase tracking-wider" style={{ color: "rgba(196,168,240,0.4)" }}>Total</p>
+              <p className="font-mono text-[11px] mt-0.5" style={{ color: "#EDE0FF" }}>{formatAmount(vesting.totalAmount, decimals)} {symbol}</p>
+            </div>
+            <div>
+              <p className="font-mono text-[8px] uppercase tracking-wider" style={{ color: "rgba(196,168,240,0.4)" }}>Claimed</p>
+              <p className="font-mono text-[11px] mt-0.5" style={{ color: "#EDE0FF" }}>{formatAmount(vesting.claimed, decimals)} {symbol}</p>
+            </div>
+            <div>
+              <p className="font-mono text-[8px] uppercase tracking-wider" style={{ color: "rgba(196,168,240,0.4)" }}>Claimable</p>
+              <p className="font-mono text-[11px] mt-0.5" style={{ color: vesting.claimable > 0n ? "#9be8a4" : "rgba(196,168,240,0.6)" }}>{formatAmount(vesting.claimable, decimals)} {symbol}</p>
+            </div>
+            <div>
+              <p className="font-mono text-[8px] uppercase tracking-wider" style={{ color: "rgba(196,168,240,0.4)" }}>End Date</p>
+              <p className="font-mono text-[11px] mt-0.5" style={{ color: fullyVested ? "#9be8a4" : "rgba(196,168,240,0.6)" }}>{endDate}</p>
+            </div>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="font-mono text-[10px]" style={{ color: "rgba(196,168,240,0.6)" }}>
+              {claimedPct.toFixed(1)}% claimed · {vestedPct.toFixed(1)}% vested
+            </span>
+            <span className="font-mono text-[9px]" style={{ color: inCliff ? "rgba(255,180,50,0.85)" : fullyVested ? "#9be8a4" : "rgba(196,168,240,0.5)" }}>
+              {timeLabel}{hasCliff && cliffDate ? ` · cliff ${cliffDate}` : ""}
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  );  );
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────
@@ -356,23 +376,6 @@ function VestingPage() {
         </div>
 
         <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(155,127,212,0.35)" }}>
-          {/* Header */}
-          <div
-            className="hidden sm:grid px-5 py-3 text-[9px] font-mono uppercase tracking-[0.2em]"
-            style={{
-              gridTemplateColumns: "2fr 1fr 1fr 1fr 100px",
-              borderBottom: "1px solid rgba(155,127,212,0.2)",
-              background: "rgba(155,127,212,0.08)",
-              color: "rgba(196,168,240,0.6)",
-            }}
-          >
-            <div>Token</div>
-            <div className="text-right">Total</div>
-            <div className="text-right">Claimable</div>
-            <div className="text-right">End Date</div>
-            <div />
-          </div>
-
           {!address ? (
             <Empty title="Wallet not connected" sub="Connect your wallet to see your schedules." />
           ) : isLoading ? (
