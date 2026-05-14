@@ -118,11 +118,12 @@ function FarmRow({ farmId }: { farmId: number }) {
   const toggleTx = useWriteContract();
   const toggleRcpt = useWaitForTransactionReceipt({ hash: toggleTx.data });
 
-  if (!data) return <Card><div className="h-12 animate-pulse" /></Card>;
-  const [stakeToken, , totalStaked, active, lockDuration, earlyWithdrawBps, rewardStreamCount] = data;
-
+  const stakeToken = data?.[0] as `0x${string}` | undefined;
   const symbolQ = useReadContract({ address: stakeToken, abi: ERC20_ABI, functionName: "symbol", query: { enabled: !!stakeToken } });
   const decimalsQ = useReadContract({ address: stakeToken, abi: ERC20_ABI, functionName: "decimals", query: { enabled: !!stakeToken } });
+
+  if (!data) return <Card><div className="h-12 animate-pulse" /></Card>;
+  const [, , totalStaked, active, lockDuration, earlyWithdrawBps, rewardStreamCount] = data;
   const symbol = (symbolQ.data as string) || "...";
   const decimals = (decimalsQ.data as number) ?? 18;
 
