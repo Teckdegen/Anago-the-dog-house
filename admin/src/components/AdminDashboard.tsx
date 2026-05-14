@@ -118,9 +118,10 @@ function FarmRow({ farmId }: { farmId: number }) {
   const toggleTx = useWriteContract();
   const toggleRcpt = useWaitForTransactionReceipt({ hash: toggleTx.data });
 
-  const stakeToken = data?.[0] as `0x${string}` | undefined;
-  const symbolQ = useReadContract({ address: stakeToken, abi: ERC20_ABI, functionName: "symbol", query: { enabled: !!stakeToken } });
-  const decimalsQ = useReadContract({ address: stakeToken, abi: ERC20_ABI, functionName: "decimals", query: { enabled: !!stakeToken } });
+  const stakeToken = (data?.[0] ?? "0x0000000000000000000000000000000000000000") as `0x${string}`;
+  const hasToken = !!data?.[0];
+  const symbolQ = useReadContract({ address: stakeToken, abi: ERC20_ABI, functionName: "symbol", query: { enabled: hasToken } });
+  const decimalsQ = useReadContract({ address: stakeToken, abi: ERC20_ABI, functionName: "decimals", query: { enabled: hasToken } });
 
   if (!data) return <Card><div className="h-12 animate-pulse" /></Card>;
   const [, , totalStaked, active, lockDuration, earlyWithdrawBps, rewardStreamCount] = data;
