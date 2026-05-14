@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { Search, Sprout, Plus, X, Zap, Clock, Wallet } from "lucide-react";
+import { Search, Sprout, Plus, X, Clock, Wallet } from "lucide-react";
 import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt, useChainId } from "wagmi";
 import { parseUnits, formatUnits } from "viem";
 import { AppShell } from "@/components/AppShell";
@@ -122,6 +122,7 @@ function FarmCard({ farmId }: { farmId: number }) {
 }
 
 function FarmCardInner({ farmId, stakeToken, totalStaked, active, lockDays, penaltyPct, rewardCount, showDeposit, setShowDeposit }: any) {
+  const [expanded, setExpanded] = useState(false);
   const { address } = useAccount();
   const contracts = useContracts();
   const symbolQ = useReadContract({ address: stakeToken, abi: ERC20_ABI, functionName: "symbol", query: { enabled: !!stakeToken } });
@@ -131,45 +132,60 @@ function FarmCardInner({ farmId, stakeToken, totalStaked, active, lockDays, pena
   const symbol = (symbolQ.data as string) || "...";
   const decimals = (decimalsQ.data as number) ?? 18;
   const userBalance = (balanceQ.data as bigint) ?? 0n;
+  const stakedFormatted = Number(formatUnits(totalStaked ?? 0n, decimals)).toLocaleString();
+  const balanceFormatted = Number(formatUnits(userBalance, decimals)).toLocaleString();
 
   return (
     <>
-      <div className="flex items-start justify-between gap-4 mb-4">
-        <div className="flex-1">
-          <div className="flex items-center gap-2 mb-1">
-            <p className="font-grotesk uppercase text-[16px] tracking-wider" style={{ color: "#EDE0FF" }}>{symbol} Farm</p>
-            <span className="px-2 py-0.5 rounded-full font-mono text-[9px] uppercase tracking-wider"
-              style={{ background: active ? "rgba(155,127,212,0.2)" : "rgba(255,120,120,0.15)", color: active ? "#C4A8F0" : "rgba(255,120,120,0.9)", border: `1px solid ${active ? "rgba(155,127,212,0.4)" : "rgba(255,120,120,0.3)"}` }}>
-              {active ? "Live" : "Paused"}
-            </span>
-            {lockDays > 0 && (
-              <span className="px-2 py-0.5 rounded-full font-mono text-[9px] uppercase tracking-wider flex items-center gap-1"
-                style={{ background: "rgba(155,127,212,0.12)", color: "#C4A8F0", border: "1px solid rgba(155,127,212,0.3)" }}>
-                <Clock className="w-2.5 h-2.5" /> {lockDays}d lock
-              </span>
-            )}
+      {/* Header row */}
+      <div className="flex items-center justify-between gap-4 mb-4">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-9 h-9 rounded-full flex items-center justify-center font-grotesk text-[12px] shrink-0"
+            style={{ background: "rgba(155,127,212,0.15)", border: "1px solid rgba(155,127,212,0.35)", color: "#C4A8F0" }}>
+            {symbol[0]}
           </div>
-          <p className="font-mono text-[10px]" style={{ color: "rgba(196,168,240,0.55)" }}>
-            Farm #{farmId} · {rewardCount} reward stream{rewardCount !== 1 ? "s" : ""} · Streaming
-          </p>
+          <div className="min-w-0">
+            <p className="font-grotesk text-[15px] font-medium tracking-tight" style={{ color: "#EDE0FF" }}>{symbol} Farm</p>
+            <p className="font-mono text-[10px]" style={{ color: "rgba(196,168,240,0.45)" }}>
+              {stakedFormatted} {symbol} staked · {rewardCount} stream{rewardCount !== 1 ? "s" : ""}
+              {lockDays > 0 && ` · ${lockDays}d lock`}
+              {penaltyPct > 0 && ` · ${penaltyPct}% exit fee`}
+            </p>
+          </div>
         </div>
-        {address && active && (
-          <button onClick={() => setShowDeposit(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl font-grotesk text-[11px] uppercase tracking-wider transition hover:opacity-90 active:scale-[0.98]"
-            style={{ background: "rgba(155,127,212,0.2)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.5)" }}>
-            <Plus className="w-3.5 h-3.5" strokeWidth={2} /> Deposit
-          </button>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {address && active && (
+            <button onClick={() => setShowDeposit(true)}
+              className="px-4 py-2 rounded-xl font-grotesk text-[10px] uppercase tracking-wider transition hover:opacity-90 active:scale-[0.98]"
+              style={{ background: "rgba(155,127,212,0.2)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.5)" }}>
+              Deposit
+            </button>
+          )}
+          {rewardCount > 0 && (
+            <button onClick={() => setExpanded(!expanded)}
+              className="w-7 h-7 rounded-full flex items-center justify-center transition hover:bg-[rgba(155,127,212,0.15)]"
+              style={{ color: "rgba(196,168,240,0.5)" }}>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ transform: expanded ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
+                <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
-        <StatBox label="Total Staked" value={`${Number(formatUnits(totalStaked ?? 0n, decimals)).toLocaleString()} ${symbol}`} />
-        <StatBox label="Your Balance" value={`${Number(formatUnits(userBalance, decimals)).toLocaleString()} ${symbol}`} />
-        <StatBox label="Reward Streams" value={`${rewardCount}`} accent />
-        <StatBox label="Early Exit Fee" value={penaltyPct > 0 ? `${penaltyPct}%` : "None"} />
+      {/* Stats row */}
+      <div className="flex items-center gap-6 font-mono text-[11px]" style={{ color: "rgba(196,168,240,0.7)" }}>
+        <span>TVL <span style={{ color: "#EDE0FF" }}>{stakedFormatted}</span></span>
+        <span>Balance <span style={{ color: "#EDE0FF" }}>{balanceFormatted}</span></span>
+        {!active && <span style={{ color: "rgba(255,100,100,0.8)" }}>Paused</span>}
       </div>
 
-      {rewardCount > 0 && <RewardStreams farmId={farmId} count={rewardCount} />}
+      {/* Expanded: reward streams */}
+      {expanded && rewardCount > 0 && (
+        <div className="mt-4 pt-3" style={{ borderTop: "1px solid rgba(155,127,212,0.12)" }}>
+          <RewardStreams farmId={farmId} count={rewardCount} />
+        </div>
+      )}
 
       {showDeposit && (
         <DepositModal farmId={farmId} stakeToken={stakeToken} symbol={symbol} decimals={decimals} userBalance={userBalance} onClose={() => setShowDeposit(false)} />
@@ -182,7 +198,7 @@ function StatBox({ label, value, accent }: { label: string; value: string; accen
   return (
     <div className="rounded-lg p-3" style={{ background: "rgba(155,127,212,0.08)", border: "1px solid rgba(155,127,212,0.2)" }}>
       <p className="font-mono text-[9px] uppercase tracking-wider mb-1" style={{ color: "rgba(196,168,240,0.5)" }}>{label}</p>
-      <p className="font-mono text-[13px]" style={{ color: accent ? "#9be8a4" : "#EDE0FF" }}>{value}</p>
+      <p className="font-mono text-[13px]" style={{ color: accent ? "#C4A8F0" : "#EDE0FF" }}>{value}</p>
     </div>
   );
 }
@@ -221,20 +237,19 @@ function RewardStreamRow({ token, rewardRate, startTime, endTime, totalBudget, t
   const ratePerDay = Number(formatUnits(BigInt(rewardRate) * 86400n / BigInt(1e18), dec));
 
   return (
-    <div className="rounded-lg p-3 flex items-center justify-between gap-3" style={{ background: "rgba(155,127,212,0.04)", border: "1px solid rgba(155,127,212,0.15)" }}>
-      <div className="flex items-center gap-2 min-w-0">
-        <Zap className="w-3.5 h-3.5 shrink-0" style={{ color: isActive ? "#9be8a4" : "rgba(196,168,240,0.4)" }} strokeWidth={1.5} />
+    <div className="flex items-center justify-between gap-3 py-2">
+      <div className="flex items-center gap-2 min-w-0 flex-1">
         <div className="min-w-0">
-          <p className="font-mono text-[11px] truncate" style={{ color: "#EDE0FF" }}>{sym} · <span style={{ color: "rgba(196,168,240,0.6)" }}>{ratePerDay.toFixed(2)}/day</span></p>
+          <p className="font-mono text-[11px]" style={{ color: "#EDE0FF" }}>{sym} <span style={{ color: "rgba(196,168,240,0.5)" }}>· {ratePerDay.toFixed(2)}/day</span></p>
           <div className="flex items-center gap-2 mt-1">
-            <div className="w-20 h-1 rounded-full overflow-hidden" style={{ background: "rgba(155,127,212,0.2)" }}>
-              <div className="h-full rounded-full transition-all" style={{ width: `${progress}%`, background: isEnded ? "rgba(196,168,240,0.4)" : "#9be8a4" }} />
+            <div className="w-24 h-1 rounded-full overflow-hidden" style={{ background: "rgba(155,127,212,0.15)" }}>
+              <div className="h-full rounded-full transition-all" style={{ width: `${progress}%`, background: "#9B7FD4" }} />
             </div>
-            <span className="font-mono text-[8px]" style={{ color: "rgba(196,168,240,0.5)" }}>{isEnded ? "Ended" : isActive ? "Streaming" : "Pending"}</span>
+            <span className="font-mono text-[8px]" style={{ color: "rgba(196,168,240,0.4)" }}>{isEnded ? "Ended" : isActive ? "Active" : "Pending"}</span>
           </div>
         </div>
       </div>
-      <p className="font-mono text-[10px] shrink-0" style={{ color: "rgba(196,168,240,0.6)" }}>
+      <p className="font-mono text-[10px] shrink-0" style={{ color: "rgba(196,168,240,0.5)" }}>
         {Number(formatUnits(totalDistributed, dec)).toLocaleString()} / {Number(formatUnits(totalBudget, dec)).toLocaleString()} {sym}
       </p>
     </div>
@@ -448,13 +463,14 @@ function PositionCard({ tokenId }: { tokenId: bigint }) {
 }
 
 function PositionCardInner({ tokenId, farmId, amount, boost, locked, lockExpiry, pendingData, onClaim, onWithdraw, claimPending, withdrawPending, error }: any) {
+  const [expanded, setExpanded] = useState(false);
   const contracts = useContracts();
   const farmQ = useReadContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "getFarm", args: [farmId], query: { refetchInterval: 30_000 } });
   const farmData = farmQ.data as any;
   const stakeToken = farmData?.[0];
 
-  const symbolQ = useReadContract({ address: stakeToken, abi: ERC20_ABI, functionName: "symbol", query: { enabled: !!stakeToken } });
-  const decimalsQ = useReadContract({ address: stakeToken, abi: ERC20_ABI, functionName: "decimals", query: { enabled: !!stakeToken } });
+  const symbolQ = useReadContract({ address: stakeToken ?? "0x0000000000000000000000000000000000000000", abi: ERC20_ABI, functionName: "symbol", query: { enabled: !!stakeToken } });
+  const decimalsQ = useReadContract({ address: stakeToken ?? "0x0000000000000000000000000000000000000000", abi: ERC20_ABI, functionName: "decimals", query: { enabled: !!stakeToken } });
   const symbol = (symbolQ.data as string) || "...";
   const decimals = (decimalsQ.data as number) ?? 18;
 
@@ -464,47 +480,70 @@ function PositionCardInner({ tokenId, farmId, amount, boost, locked, lockExpiry,
 
   const now = Math.floor(Date.now() / 1000);
   const lockDaysLeft = locked ? Math.ceil((Number(lockExpiry) - now) / 86400) : 0;
+  const stakedFormatted = Number(formatUnits(amount ?? 0n, decimals)).toLocaleString();
 
   return (
     <div className="rounded-xl p-5" style={{ border: "1px solid rgba(155,127,212,0.35)", background: "rgba(155,127,212,0.05)" }}>
-      <div className="flex items-start justify-between gap-4 mb-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <p className="font-grotesk uppercase text-[14px] tracking-wider" style={{ color: "#EDE0FF" }}>Position #{tokenId.toString()}</p>
-            {locked && <span className="px-2 py-0.5 rounded-full font-mono text-[8px] uppercase" style={{ background: "rgba(155,127,212,0.12)", color: "#C4A8F0", border: "1px solid rgba(155,127,212,0.3)" }}>Locked {lockDaysLeft}d</span>}
-            {boost > 1 && <span className="px-2 py-0.5 rounded-full font-mono text-[8px] uppercase" style={{ background: "rgba(155,127,212,0.12)", color: "#C4A8F0", border: "1px solid rgba(155,127,212,0.3)" }}>{boost}x boost</span>}
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-9 h-9 rounded-full flex items-center justify-center font-grotesk text-[12px] shrink-0"
+            style={{ background: "rgba(155,127,212,0.15)", border: "1px solid rgba(155,127,212,0.35)", color: "#C4A8F0" }}>
+            {symbol[0]}
           </div>
-          <p className="font-mono text-[10px]" style={{ color: "rgba(196,168,240,0.55)" }}>Farm #{farmId?.toString()} · {symbol}</p>
+          <div className="min-w-0">
+            <p className="font-grotesk text-[14px] font-medium tracking-tight" style={{ color: "#EDE0FF" }}>
+              {stakedFormatted} {symbol}
+            </p>
+            <p className="font-mono text-[10px]" style={{ color: "rgba(196,168,240,0.45)" }}>
+              Position #{tokenId.toString()} · Farm #{farmId?.toString()}
+              {boost > 1 && ` · ${boost}x boost`}
+              {locked && ` · ${lockDaysLeft}d locked`}
+            </p>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={onClaim} disabled={claimPending || !hasPending}
-            className="px-3 py-2 rounded-full font-grotesk text-[10px] uppercase tracking-wider transition hover:opacity-90 disabled:opacity-40"
-            style={{ background: "rgba(155,127,212,0.2)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.5)" }}>
-            {claimPending ? "..." : "Claim"}
-          </button>
+        <div className="flex items-center gap-2 shrink-0">
+          {hasPending && (
+            <button onClick={onClaim} disabled={claimPending}
+              className="px-3 py-1.5 rounded-xl font-grotesk text-[10px] uppercase tracking-wider transition hover:opacity-90 disabled:opacity-40"
+              style={{ background: "rgba(155,127,212,0.2)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.5)" }}>
+              {claimPending ? "..." : "Claim"}
+            </button>
+          )}
           <button onClick={onWithdraw} disabled={withdrawPending}
-            className="px-3 py-2 rounded-full font-grotesk text-[10px] uppercase tracking-wider transition hover:opacity-90 disabled:opacity-40"
-            style={{ background: "rgba(155,127,212,0.12)", color: "#C4A8F0", border: "1px solid rgba(155,127,212,0.4)" }}>
+            className="px-3 py-1.5 rounded-xl font-grotesk text-[10px] uppercase tracking-wider transition hover:opacity-90 disabled:opacity-40"
+            style={{ background: "rgba(155,127,212,0.1)", color: "#C4A8F0", border: "1px solid rgba(155,127,212,0.3)" }}>
             {withdrawPending ? "..." : "Withdraw"}
+          </button>
+          <button onClick={() => setExpanded(!expanded)}
+            className="w-7 h-7 rounded-full flex items-center justify-center transition hover:bg-[rgba(155,127,212,0.15)]"
+            style={{ color: "rgba(196,168,240,0.5)" }}>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ transform: expanded ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
+              <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-        <StatBox label="Staked" value={`${Number(formatUnits(amount ?? 0n, decimals)).toLocaleString()} ${symbol}`} />
-        <StatBox label="Boost" value={`${boost}x`} accent={boost > 1} />
-        <div className="rounded-lg p-3 col-span-2 lg:col-span-1" style={{ background: "rgba(155,127,212,0.08)", border: "1px solid rgba(155,127,212,0.2)" }}>
-          <p className="font-mono text-[9px] uppercase tracking-wider mb-1" style={{ color: "rgba(196,168,240,0.5)" }}>Pending Rewards</p>
-          {pendingAmounts.length === 0 ? (
-            <p className="font-mono text-[12px]" style={{ color: "rgba(196,168,240,0.4)" }}>—</p>
-          ) : (
-            <div className="space-y-0.5">
-              {pendingAmounts.map((amt: bigint, i: number) => amt > 0n ? <PendingRewardLine key={i} token={pendingTokens[i]} amount={amt} /> : null)}
-              {!hasPending && <p className="font-mono text-[12px]" style={{ color: "rgba(196,168,240,0.4)" }}>None yet</p>}
+      {/* Expanded details */}
+      {expanded && (
+        <div className="mt-4 pt-3" style={{ borderTop: "1px solid rgba(155,127,212,0.12)" }}>
+          <div className="flex items-center gap-6 font-mono text-[11px] mb-3" style={{ color: "rgba(196,168,240,0.6)" }}>
+            <span>Staked <span style={{ color: "#EDE0FF" }}>{stakedFormatted} {symbol}</span></span>
+            <span>Boost <span style={{ color: "#EDE0FF" }}>{boost}x</span></span>
+            {locked && <span>Lock <span style={{ color: "#EDE0FF" }}>{lockDaysLeft}d left</span></span>}
+          </div>
+          {pendingAmounts.length > 0 && (
+            <div>
+              <p className="font-mono text-[9px] uppercase tracking-wider mb-1.5" style={{ color: "rgba(196,168,240,0.4)" }}>Pending Rewards</p>
+              <div className="space-y-1">
+                {pendingAmounts.map((amt: bigint, i: number) => amt > 0n ? <PendingRewardLine key={i} token={pendingTokens[i]} amount={amt} /> : null)}
+                {!hasPending && <p className="font-mono text-[11px]" style={{ color: "rgba(196,168,240,0.4)" }}>None yet</p>}
+              </div>
             </div>
           )}
         </div>
-      </div>
+      )}
 
       {error && <p className="font-mono text-[10px] mt-3 break-words" style={{ color: "rgba(255,100,100,0.9)" }}>{(error as any)?.shortMessage ?? error?.message}</p>}
     </div>
@@ -516,5 +555,5 @@ function PendingRewardLine({ token, amount }: { token: string; amount: bigint })
   const decimalsQ = useReadContract({ address: token as `0x${string}`, abi: ERC20_ABI, functionName: "decimals", query: { enabled: !!token } });
   const sym = (symbolQ.data as string) || "...";
   const dec = (decimalsQ.data as number) ?? 18;
-  return <p className="font-mono text-[12px]" style={{ color: "#9be8a4" }}>{Number(formatUnits(amount, dec)).toLocaleString(undefined, { maximumFractionDigits: 6 })} {sym}</p>;
+  return <p className="font-mono text-[11px]" style={{ color: "#EDE0FF" }}>{Number(formatUnits(amount, dec)).toLocaleString(undefined, { maximumFractionDigits: 6 })} {sym}</p>;
 }
