@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, Sprout, Plus, X, Clock, Wallet } from "lucide-react";
 import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt, useChainId } from "wagmi";
 import { parseUnits, formatUnits } from "viem";
@@ -296,10 +296,12 @@ function DepositModal({ farmId, stakeToken, symbol, decimals, userBalance, onClo
     depositTx.writeContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "deposit", args: [BigInt(farmId), parsedAmount, BigInt(lockTier)] });
   };
 
-  if (depositRcpt.isSuccess) {
-    toast("success", "Deposited!", `${amount} ${symbol} deposited into farm. You received an NFT position.`);
-    onClose();
-  }
+  useEffect(() => {
+    if (depositRcpt.isSuccess) {
+      toast("success", "Deposited!", `${amount} ${symbol} deposited into farm. You received an NFT position.`);
+      onClose();
+    }
+  }, [depositRcpt.isSuccess]);
 
   const boostLabel = (tier: number) => {
     if (tier === 0) return "No lock · 1x";
@@ -448,8 +450,13 @@ function PositionCard({ tokenId }: { tokenId: bigint }) {
   const handleClaim = () => { claimTx.writeContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "claim", args: [tokenId] }); };
   const handleWithdraw = () => { withdrawTx.writeContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "withdraw", args: [tokenId] }); };
 
-  if (claimRcpt.isSuccess) toast("success", "Rewards claimed!", "Your pending rewards have been sent to your wallet.");
-  if (withdrawRcpt.isSuccess) toast("success", "Withdrawn!", "Position closed and tokens returned.");
+  useEffect(() => {
+    if (claimRcpt.isSuccess) toast("success", "Rewards claimed!", "Your pending rewards have been sent to your wallet.");
+  }, [claimRcpt.isSuccess]);
+
+  useEffect(() => {
+    if (withdrawRcpt.isSuccess) toast("success", "Withdrawn!", "Position closed and tokens returned.");
+  }, [withdrawRcpt.isSuccess]);
 
   const now = Math.floor(Date.now() / 1000);
   const locked = Number(lockExpiry) > now;
