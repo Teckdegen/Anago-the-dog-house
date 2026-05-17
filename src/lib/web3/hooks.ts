@@ -25,9 +25,10 @@ type CacheEntry<T> = {
 };
 
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const CACHE_VERSION = "v2"; // Bump this to invalidate all caches
 
 function getCacheKey(key: string, address?: string, chainId?: number): CacheKey {
-  return `locks_cache_${key}_${address || 'global'}_${chainId || 'unknown'}`;
+  return `${CACHE_VERSION}_locks_cache_${key}_${address || 'global'}_${chainId || 'unknown'}`;
 }
 
 function getCachedData<T>(key: CacheKey): T | null {
@@ -36,16 +37,16 @@ function getCachedData<T>(key: CacheKey): T | null {
     if (!cached) return null;
     
     const entry: CacheEntry<T> = JSON.parse(cached, (_key, value) => {
-      // Restore BigInts from serialized format
       if (typeof value === 'string' && value.startsWith('__bigint__:')) {
         return BigInt(value.slice(11));
       }
       return value;
     });
     
-    // Return cached data even if expired - we prefer stale data over no data
     return entry.data;
   } catch {
+    // Corrupted cache — clear it
+    try { localStorage.removeItem(key); } catch {}
     return null;
   }
 }
@@ -78,21 +79,23 @@ function usePersistentData<T>(
 ): { data: T | undefined; isLoading: boolean } {
   const cacheKey = getCacheKey(key, address, chainId);
   const [persistentData, setPersistentData] = useState<T | undefined>(() => {
-    return getCachedData<T>(cacheKey) || undefined;
+    try { return getCachedData<T>(cacheKey) || undefined; } catch { return undefined; }
   });
 
   useEffect(() => {
     if (data && !isLoading && chainId) {
-      // Update cache with fresh data
-      setCachedData(cacheKey, data, chainId);
-      setPersistentData(data);
+      try {
+        setCachedData(cacheKey, data, chainId);
+        setPersistentData(data);
+      } catch {
+        // Ignore cache write failures
+      }
     }
   }, [data, isLoading, cacheKey, chainId]);
 
-  // Return cached data if we have it, even if currently loading
   return {
     data: data || persistentData,
-    isLoading: isLoading && !persistentData, // Don't show loading if we have cached data
+    isLoading: isLoading && !persistentData,
   };
 }
 
