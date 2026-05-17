@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
-import { LayoutDashboard, Timer, LockKeyhole, Sprout, Send } from "lucide-react";
+import { LayoutDashboard, Timer, LockKeyhole, Sprout, Send, ShoppingBag } from "lucide-react";
 import { WalletStatusPill } from "./WalletStatusPill";
 
 const NAV = [
@@ -8,8 +8,8 @@ const NAV = [
   { label: "Dashboard",  href: "/dashboard" },
   { label: "Vesting",    href: "/vesting"   },
   { label: "Token Lock", href: "/lock"      },
-  { label: "CLMM",       href: "/clmm"      },
   { label: "Yield Farm", href: "/farm"      },
+  { label: "OTC",        href: "/otc"       },
   { label: "Transfer",   href: "/transfer"  },
 ] as const;
 
@@ -18,7 +18,7 @@ const BOTTOM_NAV = [
   { label: "Vest",      href: "/vesting",   icon: Timer           },
   { label: "Locks",     href: "/lock",      icon: LockKeyhole     },
   { label: "Farm",      href: "/farm",      icon: Sprout          },
-  { label: "Transfer",  href: "/transfer",  icon: Send            },
+  { label: "OTC",       href: "/otc",       icon: ShoppingBag     },
 ] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {

@@ -4,7 +4,7 @@
  */
 export const CONTRACTS: Record<
   number,
-  { vestingFactory: `0x${string}`; tokenLock: `0x${string}`; streamFarm: `0x${string}`; vestingNFT: `0x${string}` }
+  { vestingFactory: `0x${string}`; tokenLock: `0x${string}`; streamFarm: `0x${string}`; vestingNFT: `0x${string}`; otcMarket: `0x${string}` }
 > = {
   // Monad testnet (chainId 10143)
   10143: {
@@ -12,6 +12,7 @@ export const CONTRACTS: Record<
     tokenLock:      "0xe6A045525C053259e096d2c48973856D9f06143f", // TokenLockNFT
     vestingNFT:     "0x2f0326D9eDDB98da0d05CfD7e7C94cbAEdacB206", // VestingNFT
     streamFarm:     "0x8cdaB2A0c70B27E0f6B4eE0540bBC50395978EC1", // StreamFarm
+    otcMarket:      "0x2B9242272eebF49ca0c2f3fC8Bb2eCf054B14Ef6", // OTCMarket
   },
 };
 
@@ -505,4 +506,51 @@ export const STREAM_FARM_ABI = [
   { type: "event", name: "Deposited", inputs: [{ name: "tokenId", type: "uint256", indexed: true }, { name: "farmId", type: "uint256", indexed: true }, { name: "user", type: "address", indexed: true }, { name: "amount", type: "uint256", indexed: false }, { name: "shares", type: "uint256", indexed: false }] },
   { type: "event", name: "Withdrawn", inputs: [{ name: "tokenId", type: "uint256", indexed: true }, { name: "farmId", type: "uint256", indexed: true }, { name: "user", type: "address", indexed: true }, { name: "amount", type: "uint256", indexed: false }, { name: "penalty", type: "uint256", indexed: false }] },
   { type: "event", name: "RewardsClaimed", inputs: [{ name: "tokenId", type: "uint256", indexed: true }, { name: "user", type: "address", indexed: true }, { name: "rewardToken", type: "address", indexed: false }, { name: "amount", type: "uint256", indexed: false }] },
+] as const;
+
+
+// ── OTC_MARKET_ABI ────────────────────────────────────────────────────────
+export const OTC_MARKET_ABI = [
+  { type: "function", name: "listingCount", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "platformFeeBps", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+  {
+    type: "function", name: "getListing", stateMutability: "view",
+    inputs: [{ name: "listingId", type: "uint256" }],
+    outputs: [
+      { name: "seller", type: "address" },
+      { name: "nftContract", type: "address" },
+      { name: "tokenId", type: "uint256" },
+      { name: "paymentToken", type: "address" },
+      { name: "price", type: "uint256" },
+      { name: "active", type: "bool" },
+      { name: "createdAt", type: "uint256" },
+    ],
+  },
+  {
+    type: "function", name: "getActiveListings", stateMutability: "view",
+    inputs: [{ name: "offset", type: "uint256" }, { name: "limit", type: "uint256" }],
+    outputs: [{ name: "ids", type: "uint256[]" }],
+  },
+  {
+    type: "function", name: "getSellerListings", stateMutability: "view",
+    inputs: [{ name: "seller", type: "address" }],
+    outputs: [{ type: "uint256[]" }],
+  },
+  {
+    type: "function", name: "list", stateMutability: "nonpayable",
+    inputs: [{ name: "nftContract", type: "address" }, { name: "tokenId", type: "uint256" }, { name: "paymentToken", type: "address" }, { name: "price", type: "uint256" }],
+    outputs: [{ name: "listingId", type: "uint256" }],
+  },
+  { type: "function", name: "buy", stateMutability: "nonpayable", inputs: [{ name: "listingId", type: "uint256" }], outputs: [] },
+  { type: "function", name: "unlist", stateMutability: "nonpayable", inputs: [{ name: "listingId", type: "uint256" }], outputs: [] },
+  { type: "event", name: "Listed", inputs: [{ name: "listingId", type: "uint256", indexed: true }, { name: "seller", type: "address", indexed: true }, { name: "nftContract", type: "address", indexed: false }, { name: "tokenId", type: "uint256", indexed: false }, { name: "paymentToken", type: "address", indexed: false }, { name: "price", type: "uint256", indexed: false }] },
+  { type: "event", name: "Sold", inputs: [{ name: "listingId", type: "uint256", indexed: true }, { name: "buyer", type: "address", indexed: true }, { name: "seller", type: "address", indexed: true }, { name: "price", type: "uint256", indexed: false }, { name: "fee", type: "uint256", indexed: false }] },
+  { type: "event", name: "Unlisted", inputs: [{ name: "listingId", type: "uint256", indexed: true }, { name: "seller", type: "address", indexed: true }] },
+] as const;
+
+// ERC721 approve/setApprovalForAll for OTC listings
+export const ERC721_ABI = [
+  { type: "function", name: "approve", stateMutability: "nonpayable", inputs: [{ name: "to", type: "address" }, { name: "tokenId", type: "uint256" }], outputs: [] },
+  { type: "function", name: "getApproved", stateMutability: "view", inputs: [{ name: "tokenId", type: "uint256" }], outputs: [{ type: "address" }] },
+  { type: "function", name: "ownerOf", stateMutability: "view", inputs: [{ name: "tokenId", type: "uint256" }], outputs: [{ type: "address" }] },
 ] as const;
