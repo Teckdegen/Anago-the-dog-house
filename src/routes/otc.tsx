@@ -41,7 +41,7 @@ function OTCPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-0.5 p-1 rounded-full mb-6" style={{ background: "rgba(155,127,212,0.08)", border: "1px solid rgba(155,127,212,0.25)" }}>
+        <div className="inline-flex items-center gap-0.5 p-1 rounded-full mb-6" style={{ background: "rgba(155,127,212,0.08)", border: "1px solid rgba(155,127,212,0.25)" }}>
           {TABS.map((t) => (
             <button key={t} onClick={() => setActiveTab(t)}
               className="px-4 py-1.5 rounded-full font-grotesk text-[11px] uppercase tracking-wider transition whitespace-nowrap"
