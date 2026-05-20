@@ -19,15 +19,6 @@ export const Route = createFileRoute("/")({
 
 const HLS_SRC = "https://stream.mux.com/4IMYGcL01xjs7ek5ANO17JC4VQVUTsojZlnw4fXzwSxc.m3u8";
 
-const NAV = [
-  { label: "Home",       href: "/"          },
-  { label: "Dashboard",  href: "/dashboard" },
-  { label: "Vesting",    href: "/vesting"   },
-  { label: "Token Lock", href: "/lock"      },
-  { label: "CLMM",       href: "/clmm"      },
-  { label: "Yield Farm", href: "/farm"      },
-] as const;
-
 // Cycling words with their accent colors
 const CYCLE_WORDS = [
   { word: "Vesting", color: "#9B7FD4", href: "/vesting" },
@@ -82,7 +73,6 @@ function CyclingWord() {
 }
 
 function Index() {
-  const [menuOpen, setMenuOpen] = useState(false);
   const { usd: tvlUsd, isLoading: tvlLoading } = useProtocolTVL();
   const tvlDisplay = tvlLoading
     ? "…"
@@ -126,76 +116,18 @@ function Index() {
             </span>
           </Link>
 
-          {/* desktop pill nav */}
-          <nav className="hidden lg:flex flex-1 justify-center">
-            <ul className="flex items-center gap-0.5 px-4 py-2.5 rounded-full" style={{
-              background: "rgba(6,4,15,0.72)",
-              border: "1px solid rgba(155,127,212,0.18)",
-              backdropFilter: "blur(24px)",
-              WebkitBackdropFilter: "blur(24px)",
-            }}>
-              {NAV.map((l) => (
-                <li key={l.label}>
-                  <Link
-                    to={l.href}
-                    className="font-grotesk text-[11px] uppercase tracking-[0.1em] text-cream/50 hover:text-cream/90 px-4 py-1.5 rounded-full transition-colors duration-200 block whitespace-nowrap"
-                    activeProps={{ style: { color: "#F5F0FF" } }}
-                  >
-                    {l.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </nav>
-
-          <div className="flex items-center gap-2 shrink-0 py-3">
-            <a
-              href="/dashboard"
-              className="rounded-full px-4 py-2 font-grotesk text-[11px] uppercase tracking-wider transition hover:opacity-85 whitespace-nowrap"
-              style={{
-                background: "linear-gradient(135deg, #9B7FD4, #5B4FE8)",
-                color: "#F5F0FF",
-                boxShadow: "0 4px 16px rgba(91,79,232,0.4)",
-              }}
-            >
-              Launch App
-            </a>
-            <button
-              className="lg:hidden w-9 h-9 rounded-full flex items-center justify-center text-cream/60 hover:text-cream transition"
-              style={{ border: "1px solid rgba(155,127,212,0.2)", background: "rgba(6,4,15,0.6)" }}
-              onClick={() => setMenuOpen((v) => !v)}
-              aria-label="Menu"
-            >
-              {menuOpen
-                ? <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                : <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" /></svg>
-              }
-            </button>
-          </div>
+          <a
+            href="/dashboard"
+            className="rounded-full px-5 py-2.5 font-grotesk text-[11px] uppercase tracking-wider transition hover:opacity-85 whitespace-nowrap"
+            style={{
+              background: "linear-gradient(135deg, #9B7FD4, #5B4FE8)",
+              color: "#F5F0FF",
+              boxShadow: "0 4px 16px rgba(91,79,232,0.4)",
+            }}
+          >
+            Launch App
+          </a>
         </header>
-
-        {/* mobile drawer */}
-        {menuOpen && (
-          <div className="lg:hidden relative z-20 mx-4 mt-1 rounded-2xl overflow-hidden" style={{
-            background: "rgba(6,4,15,0.94)",
-            border: "1px solid rgba(155,127,212,0.14)",
-            backdropFilter: "blur(24px)",
-            WebkitBackdropFilter: "blur(24px)",
-          }}>
-            {NAV.map((l, i) => (
-              <Link
-                key={l.label}
-                to={l.href}
-                onClick={() => setMenuOpen(false)}
-                className="flex items-center px-5 py-4 font-grotesk text-[12px] uppercase tracking-[0.12em] text-cream/55 hover:text-cream hover:bg-white/[0.04] transition-all"
-                style={{ borderBottom: i < NAV.length - 1 ? "1px solid rgba(155,127,212,0.07)" : "none" }}
-                activeProps={{ style: { color: "#F5F0FF" } }}
-              >
-                {l.label}
-              </Link>
-            ))}
-          </div>
-        )}
 
         {/* ── HERO CONTENT ── */}
         {/*
