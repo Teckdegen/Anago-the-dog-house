@@ -342,25 +342,50 @@ function SellTab() {
     </>
   );
 }
+
+
 function UserPositionsList({ selected, onSelect }: { selected: any; onSelect: (s: any) => void }) {
   const { address } = useAccount();
   const contracts = useContracts();
 
-  // Fetch locks
-  const locksQ = useReadContract({ address: contracts.tokenLock, abi: [{ type: "function", name: "locksOf", stateMutability: "view", inputs: [{ name: "owner", type: "address" }], outputs: [{ type: "uint256[]" }] }] as const, functionName: "locksOf", args: address ? [address] : undefined, query: { enabled: !!address } });
+  const locksQ = useReadContract({ address: contracts.tokenLock, abi: TOKEN_LOCK_ABI, functionName: "locksOf", args: address ? [address] : undefined, query: { enabled: !!address } });
   const lockIds = (locksQ.data as bigint[]) ?? [];
 
-  // Fetch vestings
-  const vestingsQ = useReadContract({ address: contracts.vestingNFT, abi: [{ type: "function", name: "vestingsOf", stateMutability: "view", inputs: [{ name: "owner", type: "address" }], outputs: [{ type: "uint256[]" }] }] as const, functionName: "vestingsOf", args: address ? [address] : undefined, query: { enabled: !!address } });
+  const lockDetailsQ = useReadContracts({
+    allowFailure: true,
+    contracts: lockIds.map((id) => ({ address: contracts.tokenLock, abi: TOKEN_LOCK_ABI, functionName: "getLock" as const, args: [id] as const })),
+    query: { enabled: lockIds.length > 0 },
+  });
+
+  const vestingsQ = useReadContract({ address: contracts.vestingNFT, abi: VESTING_NFT_ABI, functionName: "vestingsOf", args: address ? [address] : undefined, query: { enabled: !!address } });
   const vestingIds = (vestingsQ.data as bigint[]) ?? [];
 
-  // Fetch farm positions
-  const farmsQ = useReadContract({ address: contracts.streamFarm, abi: [{ type: "function", name: "positionsOf", stateMutability: "view", inputs: [{ name: "owner", type: "address" }], outputs: [{ type: "uint256[]" }] }] as const, functionName: "positionsOf", args: address ? [address] : undefined, query: { enabled: !!address } });
+  const vestingDetailsQ = useReadContracts({
+    allowFailure: true,
+    contracts: vestingIds.map((id) => ({ address: contracts.vestingNFT, abi: VESTING_NFT_ABI, functionName: "getVesting" as const, args: [id] as const })),
+    query: { enabled: vestingIds.length > 0 },
+  });
+
+  const farmsQ = useReadContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "positionsOf", args: address ? [address] : undefined, query: { enabled: !!address } });
   const farmIds = (farmsQ.data as bigint[]) ?? [];
 
+  const now = Math.floor(Date.now() / 1000);
+  const activeLocks = lockIds.filter((_, i) => {
+    const d = lockDetailsQ.data?.[i]?.result as any;
+    if (!d) return false;
+    if (d.withdrawn) return false;
+    return Number(d.unlockTime ?? d.unlockAt ?? 0) > now;
+  });
+
+  const activeVestings = vestingIds.filter((_, i) => {
+    const d = vestingDetailsQ.data?.[i]?.result as any;
+    if (!d || d.revoked) return false;
+    return BigInt(d.claimed ?? 0) < BigInt(d.totalAmount ?? 0);
+  });
+
   const allPositions = [
-    ...lockIds.map((id) => ({ contract: contracts.tokenLock as `0x${string}`, tokenId: id.toString(), label: "Lock" })),
-    ...vestingIds.map((id) => ({ contract: contracts.vestingNFT as `0x${string}`, tokenId: id.toString(), label: "Vesting" })),
+    ...activeLocks.map((id) => ({ contract: contracts.tokenLock as `0x${string}`, tokenId: id.toString(), label: "Lock" })),
+    ...activeVestings.map((id) => ({ contract: contracts.vestingNFT as `0x${string}`, tokenId: id.toString(), label: "Vesting" })),
     ...farmIds.map((id) => ({ contract: contracts.streamFarm as `0x${string}`, tokenId: id.toString(), label: "Farm" })),
   ];
 
@@ -393,5 +418,3 @@ function UserPositionsList({ selected, onSelect }: { selected: any; onSelect: (s
     </div>
   );
 }
-
-// Fetches all user positions across all contracts — only ACTIVE ones
