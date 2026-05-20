@@ -117,7 +117,7 @@ function MyListingsTab() {
 
   return (
     <div className="space-y-3">
-      {myIds.map((id) => <ListingCard key={id.toString()} listingId={id} showUnlist showInactive />)}
+      {myIds.map((id) => <ListingCard key={id.toString()} listingId={id} showUnlist />)}
     </div>
   );
 }
