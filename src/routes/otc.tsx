@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ShoppingBag, Tag, X, Wallet } from "lucide-react";
 import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt, useChainId } from "wagmi";
 import { parseUnits, formatUnits } from "viem";
 import { AppShell } from "@/components/AppShell";
 import { useToast } from "@/components/Toast";
-import { OTC_MARKET_ABI, ERC721_ABI, ERC20_ABI, CONTRACTS } from "@/lib/web3/contracts";
+import { SuccessModal } from "@/components/SuccessModal";
+import { OTC_MARKET_ABI, ERC721_ABI, ERC20_ABI, CONTRACTS, TOKEN_LOCK_ABI, VESTING_NFT_ABI, STREAM_FARM_ABI } from "@/lib/web3/contracts";
 import { shortAddr } from "@/lib/web3/format";
 
 export const Route = createFileRoute("/otc")({
@@ -131,6 +132,8 @@ function ListingCard({ listingId, showBuy, showUnlist }: { listingId: bigint; sh
   const { address } = useAccount();
   const contracts = useContracts();
   const { toast } = useToast();
+  const [successOpen, setSuccessOpen] = useState(false);
+  const [successMsg, setSuccessMsg] = useState({ heading: "", subtext: "" });
 
   const listingQ = useReadContract({ address: contracts.otcMarket, abi: OTC_MARKET_ABI, functionName: "getListing", args: [listingId], query: { refetchInterval: 10_000 } });
   const data = listingQ.data as any;
@@ -149,6 +152,14 @@ function ListingCard({ listingId, showBuy, showUnlist }: { listingId: bigint; sh
 
   // Check allowance for buying
   const allowanceQ = useReadContract({ address: paymentToken, abi: ERC20_ABI, functionName: "allowance", args: address ? [address, contracts.otcMarket] : undefined, query: { enabled: !!address && hasPayment, refetchInterval: 5_000 } });
+
+  useEffect(() => {
+    if (buyRcpt.isSuccess) { setSuccessMsg({ heading: "Position Purchased", subtext: "The NFT position has been transferred to your wallet." }); setSuccessOpen(true); }
+  }, [buyRcpt.isSuccess]);
+
+  useEffect(() => {
+    if (unlistRcpt.isSuccess) { setSuccessMsg({ heading: "Listing Cancelled", subtext: "Your position has been returned to your wallet." }); setSuccessOpen(true); }
+  }, [unlistRcpt.isSuccess]);
 
   if (!data || !data[5]) return null; // not active
 
@@ -182,10 +193,9 @@ function ListingCard({ listingId, showBuy, showUnlist }: { listingId: bigint; sh
     unlistTx.writeContract({ address: contracts.otcMarket, abi: OTC_MARKET_ABI, functionName: "unlist", args: [listingId] });
   };
 
-  if (buyRcpt.isSuccess) toast("success", "Purchased!", "Position transferred to your wallet.");
-  if (unlistRcpt.isSuccess) toast("success", "Unlisted", "Position returned to your wallet.");
-
   return (
+    <>
+    <SuccessModal open={successOpen} onClose={() => setSuccessOpen(false)} title="OTC Market" heading={successMsg.heading} subtext={successMsg.subtext} rows={[{ label: "Listing", value: `#${listingId.toString()}` }, { label: "Price", value: `${priceFormatted} ${paySym}` }]} />
     <div className="rounded-xl p-5 flex items-center justify-between gap-4" style={{ border: "1px solid rgba(155,127,212,0.3)", background: "rgba(155,127,212,0.04)" }}>
       <div className="min-w-0">
         <div className="flex items-center gap-2 mb-1">
@@ -223,6 +233,7 @@ function ListingCard({ listingId, showBuy, showUnlist }: { listingId: bigint; sh
         {isSeller && showBuy && <span className="font-mono text-[9px]" style={{ color: "rgba(196,168,240,0.4)" }}>Your listing</span>}
       </div>
     </div>
+    </>
   );
 }
 
@@ -264,7 +275,8 @@ function SellTab() {
     listTx.writeContract({ address: contracts.otcMarket, abi: OTC_MARKET_ABI, functionName: "list", args: [selected.contract, BigInt(selected.tokenId), paymentToken as `0x${string}`, parsedPrice] });
   };
 
-  if (listRcpt.isSuccess) toast("success", "Listed!", "Your position is now for sale on the OTC market.");
+  const [listSuccess, setListSuccess] = useState(false);
+  useEffect(() => { if (listRcpt.isSuccess) setListSuccess(true); }, [listRcpt.isSuccess]);
 
   if (!address) {
     return (
@@ -276,6 +288,8 @@ function SellTab() {
   }
 
   return (
+    <>
+    <SuccessModal open={listSuccess} onClose={() => setListSuccess(false)} title="OTC Market" heading="Position Listed" subtext="Your position is now for sale on the OTC market." rows={[{ label: "Type", value: selected?.label || "—" }, { label: "Token ID", value: `#${selected?.tokenId || "—"}` }]} />
     <div className="space-y-6">
       {/* Step 1: Pick a position */}
       <div className="rounded-xl p-5" style={{ border: "1px solid rgba(155,127,212,0.35)", background: "rgba(155,127,212,0.04)" }}>
@@ -325,10 +339,9 @@ function SellTab() {
         </div>
       )}
     </div>
+    </>
   );
 }
-
-// Fetches all user positions across all contracts — only ACTIVE ones
 function UserPositionsList({ selected, onSelect }: { selected: any; onSelect: (s: any) => void }) {
   const { address } = useAccount();
   const contracts = useContracts();
@@ -380,3 +393,5 @@ function UserPositionsList({ selected, onSelect }: { selected: any; onSelect: (s
     </div>
   );
 }
+
+// Fetches all user positions across all contracts — only ACTIVE ones
