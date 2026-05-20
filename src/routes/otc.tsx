@@ -96,7 +96,22 @@ function MyListingsTab() {
   const contracts = useContracts();
 
   const myQ = useReadContract({ address: contracts.otcMarket, abi: OTC_MARKET_ABI, functionName: "getSellerListings", args: address ? [address] : undefined, query: { enabled: !!address, refetchInterval: 10_000 } });
-  const myIds = (myQ.data as bigint[]) ?? [];  if (!address) {
+  const myIds = (myQ.data as bigint[]) ?? [];
+
+  // Fetch details for all my listings to check which are active
+  const detailsQ = useReadContracts({
+    allowFailure: true,
+    contracts: myIds.map((id) => ({ address: contracts.otcMarket, abi: OTC_MARKET_ABI, functionName: "getListing" as const, args: [id] as const })),
+    query: { enabled: myIds.length > 0, refetchInterval: 10_000 },
+  });
+
+  // Filter to only active listings
+  const activeMyIds = myIds.filter((_, i) => {
+    const d = detailsQ.data?.[i]?.result as any;
+    return d && d[5]; // d[5] is the 'active' field
+  });
+
+  if (!address) {
     return (
       <div className="rounded-xl py-20 text-center" style={{ border: "1px solid rgba(155,127,212,0.35)" }}>
         <Wallet className="w-8 h-8 mx-auto mb-3" style={{ color: "rgba(196,168,240,0.4)" }} strokeWidth={1.5} />
@@ -105,11 +120,11 @@ function MyListingsTab() {
     );
   }
 
-  if (myIds.length === 0) {
+  if (activeMyIds.length === 0) {
     return (
       <div className="rounded-xl py-20 text-center" style={{ border: "1px solid rgba(155,127,212,0.35)" }}>
         <Tag className="w-8 h-8 mx-auto mb-3" style={{ color: "rgba(196,168,240,0.4)" }} strokeWidth={1.5} />
-        <p className="font-grotesk text-[14px]" style={{ color: "#EDE0FF" }}>No listings</p>
+        <p className="font-grotesk text-[14px]" style={{ color: "#EDE0FF" }}>No active listings</p>
         <p className="font-mono text-[11px] mt-1" style={{ color: "rgba(196,168,240,0.5)" }}>Go to "Sell" to list a position.</p>
       </div>
     );
@@ -117,7 +132,7 @@ function MyListingsTab() {
 
   return (
     <div className="space-y-3">
-      {myIds.map((id) => <ListingCard key={id.toString()} listingId={id} showUnlist />)}
+      {activeMyIds.map((id) => <ListingCard key={id.toString()} listingId={id} showUnlist />)}
     </div>
   );
 }
