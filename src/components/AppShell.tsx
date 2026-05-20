@@ -1,15 +1,15 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useLocation } from "@tanstack/react-router";
 import type { ReactNode } from "react";
-import { LayoutDashboard, Timer, LockKeyhole, Sprout, Send, ShoppingBag } from "lucide-react";
+import { LayoutDashboard, Timer, LockKeyhole, Sprout, Send, ShoppingBag, BarChart2 } from "lucide-react";
 import { WalletStatusPill } from "./WalletStatusPill";
 
 const NAV = [
-  { label: "Home",       href: "/"          },
   { label: "Dashboard",  href: "/dashboard" },
   { label: "Vesting",    href: "/vesting"   },
   { label: "Token Lock", href: "/lock"      },
   { label: "Yield Farm", href: "/farm"      },
   { label: "OTC",        href: "/otc"       },
+  { label: "CLMM",       href: "/clmm"      },
   { label: "Transfer",   href: "/transfer"  },
 ] as const;
 
@@ -22,6 +22,8 @@ const BOTTOM_NAV = [
 ] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {
+  const location = useLocation();
+  const isLanding = location.pathname === "/";
 
   return (
     <div
@@ -45,6 +47,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       />
 
       {/* ── HEADER ── */}
+      {!isLanding && (
       <header
         className="relative z-20 flex items-center justify-between px-5 sm:px-8 lg:px-14 pt-5 pb-4 gap-3"
         style={{ borderBottom: "1px solid rgba(155,127,212,0.15)" }}
@@ -86,6 +89,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         {/* wallet status */}
         <WalletStatusPill />
       </header>
+      )}
 
       {/* page content */}
       <main className="relative z-10 pb-24 lg:pb-0">
@@ -93,6 +97,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </main>
 
       {/* ── BOTTOM TAB BAR (mobile only) ── */}
+      {!isLanding && (
       <nav
         className="lg:hidden fixed bottom-0 left-0 right-0 z-30 flex items-stretch"
         style={{
@@ -115,6 +120,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </Link>
         ))}
       </nav>
+      )}
     </div>
   );
 }

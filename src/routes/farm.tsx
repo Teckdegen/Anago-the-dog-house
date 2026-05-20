@@ -443,13 +443,7 @@ function PositionCard({ tokenId }: { tokenId: bigint }) {
   const withdrawTx = useWriteContract();
   const withdrawRcpt = useWaitForTransactionReceipt({ hash: withdrawTx.data });
 
-  if (!posData) return <div className="rounded-xl p-5 animate-pulse h-28" style={{ border: "1px solid rgba(155,127,212,0.2)", background: "rgba(155,127,212,0.03)" }} />;
-
-  const [farmId, amount, shares, depositTime, lockExpiry, boostMultiplier] = posData;
-
-  const handleClaim = () => { claimTx.writeContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "claim", args: [tokenId] }); };
-  const handleWithdraw = () => { withdrawTx.writeContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "withdraw", args: [tokenId] }); };
-
+  // IMPORTANT: All hooks MUST be above any early return
   useEffect(() => {
     if (claimRcpt.isSuccess) toast("success", "Rewards claimed!", "Your pending rewards have been sent to your wallet.");
   }, [claimRcpt.isSuccess]);
@@ -457,6 +451,13 @@ function PositionCard({ tokenId }: { tokenId: bigint }) {
   useEffect(() => {
     if (withdrawRcpt.isSuccess) toast("success", "Withdrawn!", "Position closed and tokens returned.");
   }, [withdrawRcpt.isSuccess]);
+
+  if (!posData) return <div className="rounded-xl p-5 animate-pulse h-28" style={{ border: "1px solid rgba(155,127,212,0.2)", background: "rgba(155,127,212,0.03)" }} />;
+
+  const [farmId, amount, shares, depositTime, lockExpiry, boostMultiplier] = posData;
+
+  const handleClaim = () => { claimTx.writeContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "claim", args: [tokenId] }); };
+  const handleWithdraw = () => { withdrawTx.writeContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "withdraw", args: [tokenId] }); };
 
   const now = Math.floor(Date.now() / 1000);
   const locked = Number(lockExpiry) > now;

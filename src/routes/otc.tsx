@@ -328,7 +328,7 @@ function SellTab() {
   );
 }
 
-// Fetches all user positions across all contracts
+// Fetches all user positions across all contracts — only ACTIVE ones
 function UserPositionsList({ selected, onSelect }: { selected: any; onSelect: (s: any) => void }) {
   const { address } = useAccount();
   const contracts = useContracts();
@@ -352,7 +352,7 @@ function UserPositionsList({ selected, onSelect }: { selected: any; onSelect: (s
   ];
 
   if (allPositions.length === 0) {
-    return <p className="font-mono text-[11px] py-4 text-center" style={{ color: "rgba(196,168,240,0.5)" }}>No positions found. Create a lock, vesting, or farm deposit first.</p>;
+    return <p className="font-mono text-[11px] py-4 text-center" style={{ color: "rgba(196,168,240,0.5)" }}>No active positions found.</p>;
   }
 
   return (
