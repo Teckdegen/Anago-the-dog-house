@@ -163,12 +163,12 @@ function LockRow({
       <div className="hidden sm:block text-right font-mono text-[10px]" style={{ color: "rgba(196,168,240,0.6)" }}>
         {formatDate(unlockAt)}
       </div>
-      <div className="hidden sm:block text-right font-mono text-[10px]" style={{ color: unlocked ? "#9be8a4" : "rgba(196,168,240,0.6)" }}>
+      <div className="hidden sm:block text-right font-mono text-[10px]" style={{ color: unlocked ? "#C4A8F0" : "rgba(196,168,240,0.6)" }}>
         {timeUntil(unlockAt)}
       </div>
       <div className="text-right">
         {localWithdrawn ? (
-          <span className="font-mono text-[9px] uppercase" style={{ color: "#9be8a4" }}>Unlocked ✓</span>
+          <span className="font-mono text-[9px] uppercase" style={{ color: "#C4A8F0" }}>Unlocked ✓</span>
         ) : unlocked && isOwner ? (
           <button
             onClick={doWithdraw}

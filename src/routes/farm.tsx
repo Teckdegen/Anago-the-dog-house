@@ -288,13 +288,20 @@ function DepositModal({ farmId, stakeToken, symbol, decimals, userBalance, onClo
   const needsApproval = parsedAmount > 0n && allowance < parsedAmount;
 
   const handleApprove = () => {
-    approveTx.writeContract({ address: stakeToken, abi: ERC20_ABI, functionName: "approve", args: [contracts.streamFarm, parsedAmount] });
+    approveTx.writeContract({ address: stakeToken, abi: ERC20_ABI, functionName: "approve", args: [contracts.streamFarm, parsedAmount], gas: 100000n });
   };
 
   const handleDeposit = () => {
     if (!parsedAmount || parsedAmount === 0n) return;
-    depositTx.writeContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "deposit", args: [BigInt(farmId), parsedAmount, BigInt(lockTier)] });
+    depositTx.writeContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "deposit", args: [BigInt(farmId), parsedAmount, BigInt(lockTier)], gas: 500000n });
   };
+
+  // Auto-trigger deposit after approval succeeds
+  useEffect(() => {
+    if (approveRcpt.isSuccess && parsedAmount > 0n) {
+      handleDeposit();
+    }
+  }, [approveRcpt.isSuccess]);
 
   useEffect(() => {
     if (depositRcpt.isSuccess) {

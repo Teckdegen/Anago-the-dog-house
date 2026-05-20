@@ -96,9 +96,7 @@ function MyListingsTab() {
   const contracts = useContracts();
 
   const myQ = useReadContract({ address: contracts.otcMarket, abi: OTC_MARKET_ABI, functionName: "getSellerListings", args: address ? [address] : undefined, query: { enabled: !!address, refetchInterval: 10_000 } });
-  const myIds = (myQ.data as bigint[]) ?? [];
-
-  if (!address) {
+  const myIds = (myQ.data as bigint[]) ?? [];  if (!address) {
     return (
       <div className="rounded-xl py-20 text-center" style={{ border: "1px solid rgba(155,127,212,0.35)" }}>
         <Wallet className="w-8 h-8 mx-auto mb-3" style={{ color: "rgba(196,168,240,0.4)" }} strokeWidth={1.5} />
@@ -119,7 +117,7 @@ function MyListingsTab() {
 
   return (
     <div className="space-y-3">
-      {myIds.map((id) => <ListingCard key={id.toString()} listingId={id} showUnlist />)}
+      {myIds.map((id) => <ListingCard key={id.toString()} listingId={id} showUnlist showInactive />)}
     </div>
   );
 }
@@ -128,7 +126,7 @@ function MyListingsTab() {
 //                              LISTING CARD
 // ═══════════════════════════════════════════════════════════════════════════
 
-function ListingCard({ listingId, showBuy, showUnlist }: { listingId: bigint; showBuy?: boolean; showUnlist?: boolean }) {
+function ListingCard({ listingId, showBuy, showUnlist, showInactive }: { listingId: bigint; showBuy?: boolean; showUnlist?: boolean; showInactive?: boolean }) {
   const { address } = useAccount();
   const contracts = useContracts();
   const { toast } = useToast();
@@ -161,10 +159,10 @@ function ListingCard({ listingId, showBuy, showUnlist }: { listingId: bigint; sh
     if (unlistRcpt.isSuccess) { setSuccessMsg({ heading: "Listing Cancelled", subtext: "Your position has been returned to your wallet." }); setSuccessOpen(true); }
   }, [unlistRcpt.isSuccess]);
 
-  if (!data || !data[5]) return null; // not active
+  if (!data) return null;
 
   const [seller, nftContract, tokenId, , price, active] = data;
-  if (!active) return null;
+  if (!active && !showInactive) return null;
 
   const paySym = (paySymQ.data as string) || "...";
   const payDec = (payDecQ.data as number) ?? 18;
@@ -274,6 +272,14 @@ function SellTab() {
     const parsedPrice = parseUnits(price, payDec);
     listTx.writeContract({ address: contracts.otcMarket, abi: OTC_MARKET_ABI, functionName: "list", args: [selected.contract, BigInt(selected.tokenId), paymentToken as `0x${string}`, parsedPrice] });
   };
+
+  // Auto-trigger list after NFT approve succeeds
+  useEffect(() => {
+    if (approveRcpt.isSuccess && selected && paymentToken && price) {
+      const parsedPrice = parseUnits(price, payDec);
+      listTx.writeContract({ address: contracts.otcMarket, abi: OTC_MARKET_ABI, functionName: "list", args: [selected.contract, BigInt(selected.tokenId), paymentToken as `0x${string}`, parsedPrice] });
+    }
+  }, [approveRcpt.isSuccess]);
 
   const [listSuccess, setListSuccess] = useState(false);
   useEffect(() => { if (listRcpt.isSuccess) setListSuccess(true); }, [listRcpt.isSuccess]);
