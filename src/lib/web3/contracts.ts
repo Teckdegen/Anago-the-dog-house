@@ -9,8 +9,8 @@ export const CONTRACTS: Record<
   // Monad testnet (chainId 10143)
   10143: {
     vestingFactory: "0x83Cfd62A53210139f52DB6451bD0aaBDC71De283", // legacy — kept for reference
-    tokenLock:      "0xe6A045525C053259e096d2c48973856D9f06143f", // TokenLockNFT
-    vestingNFT:     "0x2f0326D9eDDB98da0d05CfD7e7C94cbAEdacB206", // VestingNFT
+    tokenLock:      "0xCF4171165f807dF47B66d72e731D781Fc62e58df", // TokenLockNFT (with SVG)
+    vestingNFT:     "0xF1A3992E1B68295668A6bCE0Dff90f63b6EF8872", // VestingNFT (with SVG)
     streamFarm:     "0x8cdaB2A0c70B27E0f6B4eE0540bBC50395978EC1", // StreamFarm
     otcMarket:      "0x2B9242272eebF49ca0c2f3fC8Bb2eCf054B14Ef6", // OTCMarket
   },

@@ -1,4 +1,4 @@
-# Stream Farm Admin Dashboard
+s# Stream Farm Admin Dashboard
 
 Admin-only dashboard for managing Stream Farm contracts. Deploy this to a separate domain.
 

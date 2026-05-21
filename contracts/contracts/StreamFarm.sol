@@ -542,11 +542,66 @@ contract StreamFarm is ERC721, Ownable, ReentrancyGuard {
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
         require(_ownerOf(tokenId) != address(0), "Invalid token");
         Position storage pos = positions[tokenId];
-        return string(abi.encodePacked(
-            "Stream Farm Position #", _toString(tokenId),
-            " | Farm ", _toString(pos.farmId),
-            " | ", _toString(pos.amount / 1e18), " staked"
+        
+        string memory boostStr = _toString(pos.boostMultiplier / 1e18);
+        string memory amountStr = _toString(pos.amount / 1e18);
+        string memory farmStr = _toString(pos.farmId);
+        string memory idStr = _toString(tokenId);
+        
+        // Generate SVG
+        string memory svg = string(abi.encodePacked(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="250" viewBox="0 0 400 250">',
+            '<defs><linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#0D0B14"/><stop offset="100%" style="stop-color:#1a1528"/></linearGradient></defs>',
+            '<rect width="400" height="250" fill="url(#bg)" rx="16"/>',
+            '<rect x="1" y="1" width="398" height="248" rx="15" fill="none" stroke="#6B5CE7" stroke-opacity="0.4"/>',
+            '<text x="24" y="36" font-family="monospace" font-size="10" fill="#9B7FD4" opacity="0.6">STREAM FARM</text>',
+            '<text x="24" y="70" font-family="sans-serif" font-size="22" font-weight="bold" fill="#EDE0FF">Position #', idStr, '</text>',
+            '<text x="24" y="110" font-family="monospace" font-size="12" fill="#C4A8F0">Farm #', farmStr, '</text>',
+            '<rect x="24" y="130" width="352" height="1" fill="#6B5CE7" opacity="0.2"/>',
+            '<text x="24" y="165" font-family="monospace" font-size="11" fill="#9B7FD4">STAKED</text>',
+            '<text x="24" y="185" font-family="sans-serif" font-size="18" fill="#EDE0FF">', amountStr, ' tokens</text>',
+            '<text x="280" y="165" font-family="monospace" font-size="11" fill="#9B7FD4">BOOST</text>',
+            '<text x="280" y="185" font-family="sans-serif" font-size="18" fill="#EDE0FF">', boostStr, 'x</text>',
+            '<circle cx="360" cy="36" r="16" fill="#6B5CE7" opacity="0.2"/><text x="354" y="41" font-family="sans-serif" font-size="14" fill="#C4A8F0">&#x26A1;</text>',
+            '</svg>'
         ));
+
+        string memory json = string(abi.encodePacked(
+            '{"name":"Stream Farm Position #', idStr,
+            '","description":"', amountStr, ' tokens staked in Farm #', farmStr, ' with ', boostStr, 'x boost',
+            '","image":"data:image/svg+xml;base64,', _base64Encode(bytes(svg)),
+            '","attributes":[{"trait_type":"Farm","value":"', farmStr,
+            '"},{"trait_type":"Staked","value":"', amountStr,
+            '"},{"trait_type":"Boost","value":"', boostStr, 'x"}]}'
+        ));
+        
+        return string(abi.encodePacked("data:application/json;base64,", _base64Encode(bytes(json))));
+    }
+
+    // Base64 encoding for on-chain SVG
+    function _base64Encode(bytes memory data) internal pure returns (string memory) {
+        string memory TABLE = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        if (data.length == 0) return "";
+        uint256 encodedLen = 4 * ((data.length + 2) / 3);
+        bytes memory result = new bytes(encodedLen);
+        bytes memory table = bytes(TABLE);
+
+        uint256 dataPtr;
+        uint256 resultPtr;
+        assembly { dataPtr := add(data, 32) resultPtr := add(result, 32) }
+
+        for (uint256 i = 0; i < data.length; i += 3) {
+            uint256 a = uint8(data[i]);
+            uint256 b = i + 1 < data.length ? uint8(data[i + 1]) : 0;
+            uint256 c = i + 2 < data.length ? uint8(data[i + 2]) : 0;
+            uint256 triple = (a << 16) | (b << 8) | c;
+            
+            result[i / 3 * 4] = table[(triple >> 18) & 0x3F];
+            result[i / 3 * 4 + 1] = table[(triple >> 12) & 0x3F];
+            result[i / 3 * 4 + 2] = i + 1 < data.length ? table[(triple >> 6) & 0x3F] : bytes1("=");
+            result[i / 3 * 4 + 3] = i + 2 < data.length ? table[triple & 0x3F] : bytes1("=");
+        }
+        return string(result);
     }
 
     function _toString(uint256 value) internal pure returns (string memory) {

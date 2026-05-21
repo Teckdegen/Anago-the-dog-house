@@ -249,16 +249,58 @@ contract TokenLockNFT is ERC721, Ownable, ReentrancyGuard {
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
         require(_ownerOf(tokenId) != address(0), "Lock does not exist");
         Lock memory lock = locks[tokenId];
-        return string(
-            abi.encodePacked(
-                "Token Lock #",
-                _toString(tokenId),
-                " - ",
-                _toString(lock.amount),
-                " tokens locked until ",
-                _toString(lock.unlockTime)
-            )
-        );
+        
+        string memory idStr = _toString(tokenId);
+        string memory amountStr = _toString(lock.amount / 1e18);
+        string memory unlockStr = _toString(lock.unlockTime);
+        string memory status = lock.withdrawn ? "WITHDRAWN" : (block.timestamp >= lock.unlockTime ? "UNLOCKED" : "LOCKED");
+        
+        string memory svg = string(abi.encodePacked(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="250" viewBox="0 0 400 250">',
+            '<defs><linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#0D0B14"/><stop offset="100%" style="stop-color:#1a1528"/></linearGradient></defs>',
+            '<rect width="400" height="250" fill="url(#bg)" rx="16"/>',
+            '<rect x="1" y="1" width="398" height="248" rx="15" fill="none" stroke="#9B7FD4" stroke-opacity="0.4"/>',
+            '<text x="24" y="36" font-family="monospace" font-size="10" fill="#9B7FD4" opacity="0.6">TOKEN LOCK</text>',
+            '<text x="24" y="70" font-family="sans-serif" font-size="22" font-weight="bold" fill="#EDE0FF">Lock #', idStr, '</text>',
+            '<text x="24" y="100" font-family="monospace" font-size="12" fill="#C4A8F0">', status, '</text>',
+            '<rect x="24" y="120" width="352" height="1" fill="#9B7FD4" opacity="0.2"/>',
+            '<text x="24" y="155" font-family="monospace" font-size="11" fill="#9B7FD4">AMOUNT</text>',
+            '<text x="24" y="175" font-family="sans-serif" font-size="18" fill="#EDE0FF">', amountStr, ' tokens</text>',
+            '<text x="24" y="215" font-family="monospace" font-size="11" fill="#9B7FD4">UNLOCK TIME</text>',
+            '<text x="24" y="235" font-family="sans-serif" font-size="14" fill="#EDE0FF">', unlockStr, '</text>',
+            '<circle cx="360" cy="36" r="16" fill="#9B7FD4" opacity="0.2"/><text x="352" y="41" font-family="sans-serif" font-size="14" fill="#C4A8F0">&#x1F512;</text>',
+            '</svg>'
+        ));
+
+        string memory json = string(abi.encodePacked(
+            '{"name":"Token Lock #', idStr,
+            '","description":"', amountStr, ' tokens locked | Status: ', status,
+            '","image":"data:image/svg+xml;base64,', _base64Encode(bytes(svg)),
+            '","attributes":[{"trait_type":"Amount","value":"', amountStr,
+            '"},{"trait_type":"Status","value":"', status,
+            '"},{"trait_type":"Unlock Time","value":"', unlockStr, '"}]}'
+        ));
+        
+        return string(abi.encodePacked("data:application/json;base64,", _base64Encode(bytes(json))));
+    }
+
+    function _base64Encode(bytes memory data) internal pure returns (string memory) {
+        string memory TABLE = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        if (data.length == 0) return "";
+        bytes memory result = new bytes(4 * ((data.length + 2) / 3));
+        bytes memory table = bytes(TABLE);
+        uint256 i;
+        for (i = 0; i < data.length; i += 3) {
+            uint256 a = uint8(data[i]);
+            uint256 b = i + 1 < data.length ? uint8(data[i + 1]) : 0;
+            uint256 c = i + 2 < data.length ? uint8(data[i + 2]) : 0;
+            uint256 triple = (a << 16) | (b << 8) | c;
+            result[i / 3 * 4] = table[(triple >> 18) & 0x3F];
+            result[i / 3 * 4 + 1] = table[(triple >> 12) & 0x3F];
+            result[i / 3 * 4 + 2] = i + 1 < data.length ? table[(triple >> 6) & 0x3F] : bytes1("=");
+            result[i / 3 * 4 + 3] = i + 2 < data.length ? table[triple & 0x3F] : bytes1("=");
+        }
+        return string(result);
     }
 
     // ─────────────────────────────────────────────────────────────────────
