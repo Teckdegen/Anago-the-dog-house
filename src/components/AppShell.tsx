@@ -9,7 +9,7 @@ const NAV = [
   { label: "Token Lock", href: "/lock"      },
   { label: "Yield Farm", href: "/farm"      },
   { label: "OTC",        href: "/otc"       },
-  { label: "AMM",        href: "/clmm"      },
+  { label: "CLMM",       href: "/clmm"      },
   { label: "Transfer",   href: "/transfer"  },
 ] as const;
 
@@ -19,7 +19,7 @@ const BOTTOM_NAV = [
   { label: "Locks",     href: "/lock",      icon: LockKeyhole     },
   { label: "Farm",      href: "/farm",      icon: Sprout          },
   { label: "OTC",       href: "/otc",       icon: ShoppingBag     },
-  { label: "AMM",       href: "/clmm",      icon: BarChart2       },
+  { label: "CLMM",      href: "/clmm",      icon: BarChart2       },
   { label: "Transfer",  href: "/transfer",  icon: Send            },
 ] as const;
 
