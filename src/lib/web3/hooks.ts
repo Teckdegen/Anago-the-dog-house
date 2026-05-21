@@ -25,7 +25,7 @@ type CacheEntry<T> = {
 };
 
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-const CACHE_VERSION = "v2"; // Bump this to invalidate all caches
+const CACHE_VERSION = "v3"; // Bump this to invalidate all caches
 
 function getCacheKey(key: string, address?: string, chainId?: number): CacheKey {
   return `${CACHE_VERSION}_locks_cache_${key}_${address || 'global'}_${chainId || 'unknown'}`;
