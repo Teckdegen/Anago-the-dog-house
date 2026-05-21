@@ -1,4 +1,4 @@
-export const STREAM_FARM_ADDRESS = "0x8cdaB2A0c70B27E0f6B4eE0540bBC50395978EC1" as const;
+export const STREAM_FARM_ADDRESS = "0x4D3D3CAc4CA490d26D90711488aD8C891FA53e40" as const;
 
 export const STREAM_FARM_ABI = [
   { type: "function", name: "farmCount", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
