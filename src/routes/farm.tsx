@@ -2,8 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { Search, Sprout, Plus, X, Clock, Wallet } from "lucide-react";
 import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt, useChainId } from "wagmi";
-import { useQueryClient } from "@tanstack/react-query";
 import { GAS, contractGas } from "@/lib/web3/gasUtils";
+import { LIVE_CHAIN_QUERY } from "@/lib/web3/nftImage";
+import { NftImage } from "@/components/NftImage";
 import { parseUnits, formatUnits } from "viem";
 import { AppShell } from "@/components/AppShell";
 import { useToast } from "@/components/Toast";
@@ -30,7 +31,7 @@ function FarmPage() {
   const { address } = useAccount();
   const contracts = useContracts();
 
-  const farmCountQ = useReadContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "farmCount", query: { refetchInterval: 10_000 } });
+  const farmCountQ = useReadContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "farmCount", query: { ...LIVE_CHAIN_QUERY, refetchInterval: 10_000 } });
   const farmCount = Number(farmCountQ.data ?? 0);
 
   return (
@@ -107,7 +108,7 @@ function FarmCard({ farmId }: { farmId: number }) {
   const { address } = useAccount();
   const contracts = useContracts();
 
-  const farmQ = useReadContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "getFarm", args: [BigInt(farmId)], query: { refetchInterval: 10_000 } });
+  const farmQ = useReadContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "getFarm", args: [BigInt(farmId)], query: { ...LIVE_CHAIN_QUERY, refetchInterval: 10_000 } });
   const data = farmQ.data as any;
   if (!data) return <div className="rounded-xl p-5 animate-pulse h-36" style={{ border: "1px solid rgba(155,127,212,0.2)", background: "rgba(155,127,212,0.03)" }} />;
 
@@ -210,7 +211,7 @@ function RewardStreams({ farmId, count }: { farmId: number; count: number }) {
   const streamsQ = useReadContracts({
     allowFailure: true,
     contracts: Array.from({ length: count }, (_, i) => ({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "getRewardStream" as const, args: [BigInt(farmId), BigInt(i)] as const })),
-    query: { refetchInterval: 10_000 },
+    query: { ...LIVE_CHAIN_QUERY, refetchInterval: 10_000 },
   });
 
   return (
@@ -285,7 +286,7 @@ function DepositModal({ farmId, stakeToken, symbol, decimals, userBalance, onClo
 
   // Check allowance
   const { address } = useAccount();
-  const allowanceQ = useReadContract({ address: stakeToken, abi: ERC20_ABI, functionName: "allowance", args: address ? [address, contracts.streamFarm] : undefined, query: { enabled: !!address, refetchInterval: 5_000 } });
+  const allowanceQ = useReadContract({ address: stakeToken, abi: ERC20_ABI, functionName: "allowance", args: address ? [address, contracts.streamFarm] : undefined, query: { ...LIVE_CHAIN_QUERY, enabled: !!address, refetchInterval: 5_000 } });
   const allowance = (allowanceQ.data as bigint) ?? 0n;
   const needsApproval = parsedAmount > 0n && allowance < parsedAmount;
 
@@ -413,7 +414,7 @@ function MyPositionsTab() {
     abi: STREAM_FARM_ABI,
     functionName: "positionsOf",
     args: address ? [address] : undefined,
-    query: { enabled: !!address, refetchInterval: 10_000, staleTime: 0 },
+    query: { ...LIVE_CHAIN_QUERY, enabled: !!address, refetchInterval: 10_000 },
   });
   const positions = (positionsQ.data as bigint[] | undefined) ?? [];
 
@@ -464,10 +465,9 @@ function MyPositionsTab() {
 function PositionCard({ tokenId, onPositionChange }: { tokenId: bigint; onPositionChange?: () => void }) {
   const contracts = useContracts();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
-  const posQ = useReadContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "getPosition", args: [tokenId], query: { refetchInterval: 10_000, staleTime: 0 } });
-  const pendingQ = useReadContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "pendingRewards", args: [tokenId], query: { refetchInterval: 10_000, staleTime: 0 } });
+  const posQ = useReadContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "getPosition", args: [tokenId], query: { ...LIVE_CHAIN_QUERY, refetchInterval: 10_000 } });
+  const pendingQ = useReadContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "pendingRewards", args: [tokenId], query: { ...LIVE_CHAIN_QUERY, refetchInterval: 10_000 } });
 
   const posData = posQ.data as any;
   const pendingData = pendingQ.data as any;
@@ -481,7 +481,6 @@ function PositionCard({ tokenId, onPositionChange }: { tokenId: bigint; onPositi
   useEffect(() => {
     if (claimRcpt.isSuccess) {
       toast("success", "Rewards claimed!", "Your pending rewards have been sent to your wallet.");
-      queryClient.invalidateQueries({ queryKey: ["readContract"] });
       onPositionChange?.();
     }
   }, [claimRcpt.isSuccess]);
@@ -489,7 +488,6 @@ function PositionCard({ tokenId, onPositionChange }: { tokenId: bigint; onPositi
   useEffect(() => {
     if (withdrawRcpt.isSuccess) {
       toast("success", "Withdrawn!", "Position closed and tokens returned.");
-      queryClient.invalidateQueries({ queryKey: ["readContract"] });
       onPositionChange?.();
     }
   }, [withdrawRcpt.isSuccess]);
@@ -531,7 +529,7 @@ function PositionCard({ tokenId, onPositionChange }: { tokenId: bigint; onPositi
 function PositionCardInner({ tokenId, farmId, amount, boost, locked, lockExpiry, pendingData, onClaim, onWithdraw, claimPending, withdrawPending, error }: any) {
   const [expanded, setExpanded] = useState(false);
   const contracts = useContracts();
-  const farmQ = useReadContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "getFarm", args: [farmId], query: { refetchInterval: 30_000 } });
+  const farmQ = useReadContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "getFarm", args: [farmId], query: { ...LIVE_CHAIN_QUERY, refetchInterval: 10_000 } });
   const farmData = farmQ.data as any;
   const stakeToken = farmData?.[0];
 
@@ -553,10 +551,7 @@ function PositionCardInner({ tokenId, farmId, amount, boost, locked, lockExpiry,
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-9 h-9 rounded-full flex items-center justify-center font-grotesk text-[12px] shrink-0"
-            style={{ background: "rgba(155,127,212,0.15)", border: "1px solid rgba(155,127,212,0.35)", color: "#C4A8F0" }}>
-            {symbol[0]}
-          </div>
+          <NftImage contract={contracts.streamFarm} tokenId={tokenId} size={40} fallbackLetter={symbol} />
           <div className="min-w-0">
             <p className="font-grotesk text-[14px] font-medium tracking-tight" style={{ color: "#EDE0FF" }}>
               {stakedFormatted} {symbol}

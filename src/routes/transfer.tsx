@@ -9,6 +9,8 @@ import {
 } from "wagmi";
 import { AppShell } from "@/components/AppShell";
 import { GAS, contractGas } from "@/lib/web3/gasUtils";
+import { LIVE_CHAIN_QUERY } from "@/lib/web3/nftImage";
+import { NftImage } from "@/components/NftImage";
 import { useToast } from "@/components/Toast";
 import {
   TOKEN_LOCK_NFT_ABI,
@@ -96,7 +98,7 @@ function TransferPage() {
   // 1. Fetch user's token IDs
   const idsQ = useReadContracts({
     contracts: [{ address: contractAddress, abi: abi as any, functionName: listFn, args: address ? [address] : undefined }],
-    query: { enabled: !!address, refetchInterval: 10_000 },
+    query: { ...LIVE_CHAIN_QUERY, enabled: !!address, refetchInterval: 10_000 },
   });
   const tokenIds = (idsQ.data?.[0]?.result as bigint[] | undefined) ?? [];
 
@@ -105,7 +107,7 @@ function TransferPage() {
     contracts: tokenIds.map((id) => ({
       address: contractAddress, abi: abi as any, functionName: detailFn, args: [id] as const,
     })),
-    query: { enabled: tokenIds.length > 0, refetchInterval: 10_000 },
+    query: { ...LIVE_CHAIN_QUERY, enabled: tokenIds.length > 0, refetchInterval: 10_000 },
   });
 
   // 3. Build positions, filter to active only
@@ -132,14 +134,14 @@ function TransferPage() {
 
   const poolInfoQ = useReadContracts({
     contracts: farmPoolIds.map((poolId) => ({
-      address: contractAddress, abi: abi as any, functionName: "getPoolInfo", args: [poolId] as const,
+      address: contractAddress, abi: abi as any, functionName: "getFarm", args: [poolId] as const,
     })),
-    query: { enabled: isFarm && farmPoolIds.length > 0, refetchInterval: 10_000 },
+    query: { ...LIVE_CHAIN_QUERY, enabled: isFarm && farmPoolIds.length > 0, refetchInterval: 10_000 },
   });
 
   const farmStakeTokens = useMemo(() => {
     if (!isFarm || !poolInfoQ.data) return [] as (`0x${string}` | undefined)[];
-    return poolInfoQ.data.map((r) => (r?.result as any)?.stakeToken as `0x${string}` | undefined);
+    return poolInfoQ.data.map((r) => (r?.result as any)?.[0] as `0x${string}` | undefined);
   }, [isFarm, poolInfoQ.data]);
 
   const allTokenAddrs = useMemo(() => {
@@ -280,6 +282,7 @@ function TransferPage() {
                     return (
                       <PositionRow
                         key={pos.tokenId.toString()}
+                        contract={contractAddress}
                         tokenId={pos.tokenId}
                         symbol={symbol}
                         decimals={decimals}
@@ -338,9 +341,12 @@ function TransferPage() {
                     className="rounded-xl p-4 space-y-2"
                     style={{ background: "rgba(155,127,212,0.08)", border: "1px solid rgba(155,127,212,0.2)" }}
                   >
-                    <p className="font-mono text-[9px] uppercase tracking-wider" style={{ color: "rgba(196,168,240,0.4)" }}>
-                      Transferring
-                    </p>
+                    <div className="flex items-center gap-3 mb-2">
+                      <NftImage contract={contractAddress} tokenId={selectedPos.tokenId} size={48} fallbackLetter={symbol} />
+                      <p className="font-mono text-[9px] uppercase tracking-wider" style={{ color: "rgba(196,168,240,0.4)" }}>
+                        Transferring
+                      </p>
+                    </div>
                     {([
                       ["Type",   activeTab],
                       ["Token",  symbol],
@@ -396,12 +402,11 @@ function tabLabel(tab: TabKey) {
 }
 
 function PositionRow({
-  tokenId, symbol, decimals, amount, type, isSelected, onSelect, isLast,
+  contract, tokenId, symbol, decimals, amount, type, isSelected, onSelect, isLast,
 }: {
-  tokenId: bigint; symbol: string; decimals: number; amount: bigint | undefined;
+  contract: `0x${string}`; tokenId: bigint; symbol: string; decimals: number; amount: bigint | undefined;
   type: TabKey; isSelected: boolean; onSelect: () => void; isLast: boolean;
 }) {
-  const Icon = type === "Locks" ? LockKeyhole : type === "Vestings" ? Timer : Sprout;
   return (
     <button
       onClick={onSelect}
@@ -413,12 +418,7 @@ function PositionRow({
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3 min-w-0">
-          <div
-            className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
-            style={{ background: "rgba(155,127,212,0.14)", border: "1px solid rgba(155,127,212,0.28)" }}
-          >
-            <Icon className="w-3.5 h-3.5" style={{ color: "rgba(196,168,240,0.8)" }} strokeWidth={1.5} />
-          </div>
+          <NftImage contract={contract} tokenId={tokenId} size={40} fallbackLetter={symbol} />
           <div className="min-w-0">
             <p className="font-grotesk uppercase text-[12px] tracking-wider truncate" style={{ color: "#EDE0FF" }}>
               {symbol}

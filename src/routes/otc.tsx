@@ -9,6 +9,8 @@ import { SuccessModal } from "@/components/SuccessModal";
 import { OTC_MARKET_ABI, ERC721_ABI, ERC20_ABI, CONTRACTS, TOKEN_LOCK_ABI, VESTING_NFT_ABI, STREAM_FARM_ABI } from "@/lib/web3/contracts";
 import { shortAddr } from "@/lib/web3/format";
 import { GAS, contractGas } from "@/lib/web3/gasUtils";
+import { LIVE_CHAIN_QUERY } from "@/lib/web3/nftImage";
+import { NftImage } from "@/components/NftImage";
 
 export const Route = createFileRoute("/otc")({
   component: OTCPage,
@@ -229,14 +231,22 @@ function ListingCard({ listingId, showBuy, showUnlist, showInactive }: { listing
     <>
     <SuccessModal open={successOpen} onClose={() => setSuccessOpen(false)} title="OTC Market" heading={successMsg.heading} subtext={successMsg.subtext} rows={[{ label: "Listing", value: `#${listingId.toString()}` }, { label: "Price", value: `${priceFormatted} ${paySym}` }]} />
     <div className="rounded-xl p-5 flex items-center justify-between gap-4" style={{ border: "1px solid rgba(155,127,212,0.3)", background: "rgba(155,127,212,0.04)" }}>
-      <div className="min-w-0">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="px-2 py-0.5 rounded font-mono text-[9px] uppercase" style={{ background: "rgba(155,127,212,0.15)", color: "#C4A8F0", border: "1px solid rgba(155,127,212,0.3)" }}>{nftLabel}</span>
-          <p className="font-grotesk text-[14px] font-medium" style={{ color: "#EDE0FF" }}>#{tokenId?.toString()}</p>
+      <div className="flex items-center gap-3 min-w-0">
+        <NftImage
+          contract={nftContract as `0x${string}`}
+          tokenId={BigInt(tokenId ?? 0)}
+          size={56}
+          fallbackLetter={nftLabel}
+        />
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="px-2 py-0.5 rounded font-mono text-[9px] uppercase" style={{ background: "rgba(155,127,212,0.15)", color: "#C4A8F0", border: "1px solid rgba(155,127,212,0.3)" }}>{nftLabel}</span>
+            <p className="font-grotesk text-[14px] font-medium" style={{ color: "#EDE0FF" }}>#{tokenId?.toString()}</p>
+          </div>
+          <p className="font-mono text-[10px]" style={{ color: "rgba(196,168,240,0.5)" }}>
+            Seller: {shortAddr(seller)} · Price: {priceFormatted} {paySym}
+          </p>
         </div>
-        <p className="font-mono text-[10px]" style={{ color: "rgba(196,168,240,0.5)" }}>
-          Seller: {shortAddr(seller)} · Price: {priceFormatted} {paySym}
-        </p>
       </div>
 
       <div className="flex items-center gap-2 shrink-0">
@@ -406,25 +416,25 @@ function UserPositionsList({ selected, onSelect }: { selected: any; onSelect: (s
   const { address } = useAccount();
   const contracts = useContracts();
 
-  const locksQ = useReadContract({ address: contracts.tokenLock, abi: TOKEN_LOCK_ABI, functionName: "locksOf", args: address ? [address] : undefined, query: { enabled: !!address } });
+  const locksQ = useReadContract({ address: contracts.tokenLock, abi: TOKEN_LOCK_ABI, functionName: "locksOf", args: address ? [address] : undefined, query: { ...LIVE_CHAIN_QUERY, enabled: !!address, refetchInterval: 10_000 } });
   const lockIds = (locksQ.data as bigint[]) ?? [];
 
   const lockDetailsQ = useReadContracts({
     allowFailure: true,
     contracts: lockIds.map((id) => ({ address: contracts.tokenLock, abi: TOKEN_LOCK_ABI, functionName: "getLock" as const, args: [id] as const })),
-    query: { enabled: lockIds.length > 0 },
+    query: { ...LIVE_CHAIN_QUERY, enabled: lockIds.length > 0, refetchInterval: 10_000 },
   });
 
-  const vestingsQ = useReadContract({ address: contracts.vestingNFT, abi: VESTING_NFT_ABI, functionName: "vestingsOf", args: address ? [address] : undefined, query: { enabled: !!address } });
+  const vestingsQ = useReadContract({ address: contracts.vestingNFT, abi: VESTING_NFT_ABI, functionName: "vestingsOf", args: address ? [address] : undefined, query: { ...LIVE_CHAIN_QUERY, enabled: !!address, refetchInterval: 10_000 } });
   const vestingIds = (vestingsQ.data as bigint[]) ?? [];
 
   const vestingDetailsQ = useReadContracts({
     allowFailure: true,
     contracts: vestingIds.map((id) => ({ address: contracts.vestingNFT, abi: VESTING_NFT_ABI, functionName: "getVesting" as const, args: [id] as const })),
-    query: { enabled: vestingIds.length > 0 },
+    query: { ...LIVE_CHAIN_QUERY, enabled: vestingIds.length > 0, refetchInterval: 10_000 },
   });
 
-  const farmsQ = useReadContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "positionsOf", args: address ? [address] : undefined, query: { enabled: !!address } });
+  const farmsQ = useReadContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "positionsOf", args: address ? [address] : undefined, query: { ...LIVE_CHAIN_QUERY, enabled: !!address, refetchInterval: 10_000 } });
   const farmIds = (farmsQ.data as bigint[]) ?? [];
 
   const now = Math.floor(Date.now() / 1000);
@@ -459,10 +469,13 @@ function UserPositionsList({ selected, onSelect }: { selected: any; onSelect: (s
           <button key={`${pos.contract}-${pos.tokenId}`} onClick={() => onSelect(isSelected ? null : pos)}
             className="w-full text-left p-3 rounded-xl transition"
             style={{ background: isSelected ? "rgba(155,127,212,0.2)" : "rgba(155,127,212,0.06)", border: `1px solid ${isSelected ? "rgba(155,127,212,0.6)" : "rgba(155,127,212,0.2)"}` }}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded font-mono text-[8px] uppercase" style={{ background: "rgba(155,127,212,0.15)", color: "#C4A8F0" }}>{pos.label}</span>
-                <span className="font-mono text-[12px]" style={{ color: "#EDE0FF" }}>#{pos.tokenId}</span>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <NftImage contract={pos.contract} tokenId={BigInt(pos.tokenId)} size={44} fallbackLetter={pos.label} />
+                <div className="min-w-0">
+                  <span className="px-2 py-0.5 rounded font-mono text-[8px] uppercase" style={{ background: "rgba(155,127,212,0.15)", color: "#C4A8F0" }}>{pos.label}</span>
+                  <span className="font-mono text-[12px] ml-2" style={{ color: "#EDE0FF" }}>#{pos.tokenId}</span>
+                </div>
               </div>
               {isSelected && (
                 <div className="w-4 h-4 rounded-full flex items-center justify-center" style={{ background: "#9B7FD4" }}>
