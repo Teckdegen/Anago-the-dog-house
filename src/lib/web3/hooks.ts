@@ -13,6 +13,11 @@ const ZERO = "0x0000000000000000000000000000000000000000" as const;
 /** 10-second poll interval used on all contract reads */
 const POLL = 10_000 as const;
 
+/** Etherscan-compatible explorer API bases per chain */
+const EXPLORER_API: Record<number, string> = {
+  10143: "https://testnet.monadexplorer.com/api",
+};
+
 // ──────────────────────────────────────────────────────────────────────────
 //                           PERSISTENT DATA CACHE
 // ──────────────────────────────────────────────────────────────────────────
