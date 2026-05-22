@@ -7,6 +7,7 @@ import {
   useReadContracts,
 } from "wagmi";
 import { CONTRACTS, TOKEN_LOCK_ABI, VESTING_NFT_ABI } from "./contracts";
+import { parseLockTuple, resolveLockOwner } from "./parseLock";
 import { ERC20_ABI, getTokenList, type TokenInfo } from "./tokens";
 
 const ZERO = "0x0000000000000000000000000000000000000000" as const;
@@ -232,17 +233,28 @@ export function useUserLocks(): { locks: LockView[]; isLoading: boolean } {
   });
 
   const locks = useMemo<LockView[]>(() => {
-    if (!detailsQ.data) return [];
+    if (!detailsQ.data || !address) return [];
     return ids.map((id, i) => {
       const lockRes = detailsQ.data[i * 2];
       const ownerRes = detailsQ.data[i * 2 + 1];
       if (lockRes?.status !== "success") return null;
-      const r = lockRes.result as { token: `0x${string}`; amount: bigint; unlockTime?: bigint; unlockAt?: bigint; createdAt: bigint; withdrawn: boolean };
-      const owner = (ownerRes?.status === "success" ? ownerRes.result : "0x0000000000000000000000000000000000000000") as `0x${string}`;
-      const unlockAt = r.unlockTime ?? r.unlockAt ?? 0n;
-      return { id, token: r.token, owner, amount: r.amount, unlockAt, createdAt: r.createdAt, withdrawn: r.withdrawn };
+      const r = parseLockTuple(lockRes.result);
+      if (!r) return null;
+      const owner = resolveLockOwner(
+        ownerRes?.status === "success" ? ownerRes.result : undefined,
+        address,
+      );
+      return {
+        id,
+        token: r.token,
+        owner,
+        amount: r.amount,
+        unlockAt: r.unlockAt,
+        createdAt: r.createdAt,
+        withdrawn: r.withdrawn,
+      };
     }).filter(Boolean) as LockView[];
-  }, [detailsQ.data, ids]);
+  }, [detailsQ.data, ids, address]);
 
   const fetchComplete =
     !idsQ.isLoading && !detailsQ.isLoading && (ids.length === 0 || !!detailsQ.data);
@@ -306,16 +318,20 @@ export function useAllLocks(limit = 100): { locks: LockView[]; isLoading: boolea
       const lockRes  = detailsQ.data[i * 2];
       const ownerRes = detailsQ.data[i * 2 + 1];
       if (lockRes?.status !== "success") return null;
-      const r = lockRes.result as {
-        token: `0x${string}`; amount: bigint;
-        unlockTime?: bigint; unlockAt?: bigint;
-        createdAt: bigint; withdrawn: boolean;
+      const r = parseLockTuple(lockRes.result);
+      if (!r) return null;
+      const owner = resolveLockOwner(
+        ownerRes?.status === "success" ? ownerRes.result : undefined,
+      );
+      return {
+        id,
+        token: r.token,
+        owner,
+        amount: r.amount,
+        unlockAt: r.unlockAt,
+        createdAt: r.createdAt,
+        withdrawn: r.withdrawn,
       };
-      const owner = (ownerRes?.status === "success"
-        ? ownerRes.result
-        : "0x0000000000000000000000000000000000000000") as `0x${string}`;
-      const unlockAt = r.unlockTime ?? r.unlockAt ?? 0n;
-      return { id, token: r.token, owner, amount: r.amount, unlockAt, createdAt: r.createdAt, withdrawn: r.withdrawn };
     }).filter(Boolean) as LockView[];
   }, [detailsQ.data, ids]);
 

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState, useEffect } from "react";
 import { Search, LockKeyhole, Trophy } from "lucide-react";
-import { useAccount, useReadContracts, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { AppShell } from "@/components/AppShell";
 import { useToast } from "@/components/Toast";
 import { CreateLockDialog } from "@/components/CreateLockDialog";
@@ -76,6 +76,7 @@ function LockRow({
   unlockAt,
   withdrawn,
   isLast,
+  mine,
 }: {
   lockId: bigint;
   token: `0x${string}`;
@@ -84,13 +85,31 @@ function LockRow({
   unlockAt: bigint;
   withdrawn: boolean;
   isLast: boolean;
+  /** From locksOf — user definitely owns this lock NFT */
+  mine?: boolean;
 }) {
   const staticMeta = useTokenMeta()(token);
   const { tokenLock } = useContractAddresses();
   const { address } = useAccount();
   const publicClient = usePublicClient();
-  const unlocked = Number(unlockAt) <= Math.floor(Date.now() / 1000);
-  const isOwner = !!address && address.toLowerCase() === owner.toLowerCase();
+  const now = Math.floor(Date.now() / 1000);
+  const unlockedByTime = Number(unlockAt) > 0 && Number(unlockAt) <= now;
+  const isOwner =
+    mine ||
+    (!!address &&
+      (address.toLowerCase() === owner.toLowerCase() ||
+        owner === "0x0000000000000000000000000000000000000000"));
+
+  const unlockedQ = useReadContract({
+    address: tokenLock,
+    abi: TOKEN_LOCK_ABI,
+    functionName: "isUnlocked",
+    args: [lockId],
+    query: { enabled: tokenLock !== "0x0000000000000000000000000000000000000000" && !withdrawn },
+  });
+  const unlockedOnChain = unlockedQ.data === true;
+  const unlocked = unlockedOnChain || unlockedByTime;
+  const canClaim = !withdrawn && unlocked && isOwner;
 
   const onChain = useReadContracts({
     allowFailure: true,
@@ -108,6 +127,10 @@ function LockRow({
   const [localWithdrawn, setLocalWithdrawn] = useState(withdrawn);
   const [successOpen, setSuccessOpen] = useState(false);
   const { toast } = useToast();
+
+  useEffect(() => {
+    setLocalWithdrawn(withdrawn);
+  }, [withdrawn]);
 
   useEffect(() => {
     if (rcpt.isSuccess && !localWithdrawn) {
@@ -135,7 +158,7 @@ function LockRow({
         open={successOpen}
         onClose={() => setSuccessOpen(false)}
         title="Token Lock"
-        heading="Tokens Withdrawn"
+        heading="Tokens Claimed"
         subtext="Your locked tokens have been returned to your wallet."
         rows={[
           { label: "Token", value: symbol },
@@ -172,21 +195,27 @@ function LockRow({
       <div className="hidden sm:block text-right font-mono text-[10px]" style={{ color: unlocked ? "#C4A8F0" : "rgba(196,168,240,0.6)" }}>
         {timeUntil(unlockAt)}
       </div>
-      <div className="text-right">
+      <div className="col-span-2 sm:col-span-1 flex sm:justify-end items-center gap-2">
         {localWithdrawn ? (
-          <span className="font-mono text-[9px] uppercase" style={{ color: "#C4A8F0" }}>Unlocked ✓</span>
-        ) : unlocked && isOwner ? (
+          <span className="font-mono text-[9px] uppercase" style={{ color: "#C4A8F0" }}>Claimed ✓</span>
+        ) : canClaim ? (
           <button
+            type="button"
             onClick={doWithdraw}
             disabled={tx.isPending || rcpt.isLoading}
-            className="px-3 py-1 rounded-full font-grotesk text-[10px] uppercase tracking-wider disabled:opacity-50"
-            style={{ background: "rgba(155,127,212,0.25)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.6)" }}
+            className="px-4 py-2 rounded-full font-grotesk text-[10px] uppercase tracking-wider disabled:opacity-50 shrink-0"
+            style={{
+              background: "rgba(155,127,212,0.35)",
+              color: "#EDE0FF",
+              border: "1px solid rgba(155,127,212,0.7)",
+              boxShadow: "0 0 12px rgba(155,127,212,0.25)",
+            }}
           >
-            {tx.isPending || rcpt.isLoading ? "…" : "Withdraw"}
+            {tx.isPending || rcpt.isLoading ? "Claiming…" : "Claim"}
           </button>
         ) : (
-          <span className="font-mono text-[9px] uppercase" style={{ color: "rgba(155,127,212,0.45)" }}>
-            {unlocked ? "Unlocked" : "Locked"}
+          <span className="font-mono text-[9px] uppercase" style={{ color: unlocked ? "#C4A8F0" : "rgba(155,127,212,0.45)" }}>
+            {unlocked ? (isOwner ? "Ready to claim" : "Unlocked") : timeUntil(unlockAt)}
           </span>
         )}
       </div>
@@ -385,8 +414,10 @@ function LockPage() {
   const { tokens: tokenLb, users: userLb } = useLockLeaderboards();
   const tokenMeta = useTokenMeta();
 
+  const activeLocks = useMemo(() => locks.filter((l) => !l.withdrawn), [locks]);
+
   const filteredMyLocks = useMemo(() => {
-    let l = locks;
+    let l = activeLocks;
     if (search) {
       const s = search.toLowerCase();
       l = l.filter(
@@ -395,20 +426,35 @@ function LockPage() {
           (tokenMeta(x.token)?.symbol.toLowerCase() ?? "").includes(s),
       );
     }
-    return l;
-  }, [locks, search, tokenMeta]);
+    const now = Math.floor(Date.now() / 1000);
+    return [...l].sort((a, b) => {
+      const aClaim = Number(a.unlockAt) <= now ? 0 : 1;
+      const bClaim = Number(b.unlockAt) <= now ? 0 : 1;
+      if (aClaim !== bClaim) return aClaim - bClaim;
+      return Number(a.unlockAt) - Number(b.unlockAt);
+    });
+  }, [activeLocks, search, tokenMeta]);
 
   const unlockingSoon = useMemo(() => {
     const now = Math.floor(Date.now() / 1000);
-    return locks.filter(
-      (l) => !l.withdrawn && (
-        // Tokens unlocking within 72 hours
-        (Number(l.unlockAt) - now <= THREE_DAYS && Number(l.unlockAt) > now) ||
-        // Tokens already unlocked but not withdrawn
-        Number(l.unlockAt) <= now
-      ),
-    );
-  }, [locks]);
+    return activeLocks
+      .filter(
+        (l) =>
+          (Number(l.unlockAt) - now <= THREE_DAYS && Number(l.unlockAt) > now) ||
+          Number(l.unlockAt) <= now,
+      )
+      .sort((a, b) => {
+        const aClaim = Number(a.unlockAt) <= now ? 0 : 1;
+        const bClaim = Number(b.unlockAt) <= now ? 0 : 1;
+        if (aClaim !== bClaim) return aClaim - bClaim;
+        return Number(a.unlockAt) - Number(b.unlockAt);
+      });
+  }, [activeLocks]);
+
+  const claimableCount = useMemo(() => {
+    const now = Math.floor(Date.now() / 1000);
+    return activeLocks.filter((l) => Number(l.unlockAt) <= now).length;
+  }, [activeLocks]);
 
   const showSearch =
     activeTab !== "Token Leaderboard" && activeTab !== "User Leaderboard";
@@ -437,7 +483,7 @@ function LockPage() {
               <button
                 key={t}
                 onClick={() => setActiveTab(t)}
-                className="px-4 py-1.5 rounded-full font-grotesk text-[11px] uppercase tracking-wider transition whitespace-nowrap"
+                className="px-4 py-1.5 rounded-full font-grotesk text-[11px] uppercase tracking-wider transition whitespace-nowrap inline-flex items-center gap-1.5"
                 style={
                   activeTab === t
                     ? { background: "rgba(155,127,212,0.35)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.6)" }
@@ -445,6 +491,14 @@ function LockPage() {
                 }
               >
                 {t}
+                {t === "Unlocking Soon" && claimableCount > 0 && (
+                  <span
+                    className="font-mono text-[8px] px-1.5 py-0.5 rounded-full"
+                    style={{ background: "rgba(110,231,168,0.2)", color: "#6EE7A8" }}
+                  >
+                    {claimableCount} claim
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -495,7 +549,7 @@ function LockPage() {
               <div className="text-right">Value</div>
               <div className="text-right">Unlock Date</div>
               <div className="text-right">Time Left</div>
-              <div />
+              <div className="text-right">Action</div>
             </div>
 
             {(() => {
@@ -537,6 +591,7 @@ function LockPage() {
                   />
                 );
               }
+              const isMineTab = activeTab === "My Locks" || activeTab === "Unlocking Soon";
               return rows.map((l, i) => (
                 <LockRow
                   key={l.id.toString()}
@@ -547,6 +602,7 @@ function LockPage() {
                   unlockAt={l.unlockAt}
                   withdrawn={l.withdrawn}
                   isLast={i === rows.length - 1}
+                  mine={isMineTab}
                 />
               ));
             })()}
