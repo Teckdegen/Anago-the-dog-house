@@ -8,3 +8,5 @@ export * from "./swap";
 export * from "./positions";
 export * from "./liquidity";
 export * from "./abis";
+export * from "./poolMetrics";
+export * from "./poolMetricsCache";
