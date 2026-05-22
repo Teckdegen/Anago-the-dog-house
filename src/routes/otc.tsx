@@ -8,6 +8,7 @@ import { useToast } from "@/components/Toast";
 import { SuccessModal } from "@/components/SuccessModal";
 import { OTC_MARKET_ABI, ERC721_ABI, ERC20_ABI, CONTRACTS, TOKEN_LOCK_ABI, VESTING_NFT_ABI, STREAM_FARM_ABI } from "@/lib/web3/contracts";
 import { shortAddr } from "@/lib/web3/format";
+import { GAS, contractGas } from "@/lib/web3/gasUtils";
 
 export const Route = createFileRoute("/otc")({
   component: OTCPage,
@@ -195,15 +196,33 @@ function ListingCard({ listingId, showBuy, showUnlist, showInactive }: { listing
   })();
 
   const handleApprove = () => {
-    approveTx.writeContract({ address: paymentToken, abi: ERC20_ABI, functionName: "approve", args: [contracts.otcMarket, price] });
+    approveTx.writeContract({
+      address: paymentToken,
+      abi: ERC20_ABI,
+      functionName: "approve",
+      args: [contracts.otcMarket, price],
+      ...contractGas(GAS.APPROVE),
+    });
   };
 
   const handleBuy = () => {
-    buyTx.writeContract({ address: contracts.otcMarket, abi: OTC_MARKET_ABI, functionName: "buy", args: [listingId] });
+    buyTx.writeContract({
+      address: contracts.otcMarket,
+      abi: OTC_MARKET_ABI,
+      functionName: "buy",
+      args: [listingId],
+      ...contractGas(GAS.OTC_BUY),
+    });
   };
 
   const handleUnlist = () => {
-    unlistTx.writeContract({ address: contracts.otcMarket, abi: OTC_MARKET_ABI, functionName: "unlist", args: [listingId] });
+    unlistTx.writeContract({
+      address: contracts.otcMarket,
+      abi: OTC_MARKET_ABI,
+      functionName: "unlist",
+      args: [listingId],
+      ...contractGas(GAS.OTC_LIST),
+    });
   };
 
   return (
@@ -279,20 +298,38 @@ function SellTab() {
 
   const handleApproveNFT = () => {
     if (!selected) return;
-    approveTx.writeContract({ address: selected.contract, abi: ERC721_ABI, functionName: "approve", args: [contracts.otcMarket, BigInt(selected.tokenId)] });
+    approveTx.writeContract({
+      address: selected.contract,
+      abi: ERC721_ABI,
+      functionName: "approve",
+      args: [contracts.otcMarket, BigInt(selected.tokenId)],
+      ...contractGas(GAS.NFT_APPROVE),
+    });
   };
 
   const handleList = () => {
     if (!selected || !paymentToken || !price) return;
     const parsedPrice = parseUnits(price, payDec);
-    listTx.writeContract({ address: contracts.otcMarket, abi: OTC_MARKET_ABI, functionName: "list", args: [selected.contract, BigInt(selected.tokenId), paymentToken as `0x${string}`, parsedPrice] });
+    listTx.writeContract({
+      address: contracts.otcMarket,
+      abi: OTC_MARKET_ABI,
+      functionName: "list",
+      args: [selected.contract, BigInt(selected.tokenId), paymentToken as `0x${string}`, parsedPrice],
+      ...contractGas(GAS.OTC_LIST),
+    });
   };
 
   // Auto-trigger list after NFT approve succeeds
   useEffect(() => {
     if (approveRcpt.isSuccess && selected && paymentToken && price) {
       const parsedPrice = parseUnits(price, payDec);
-      listTx.writeContract({ address: contracts.otcMarket, abi: OTC_MARKET_ABI, functionName: "list", args: [selected.contract, BigInt(selected.tokenId), paymentToken as `0x${string}`, parsedPrice] });
+      listTx.writeContract({
+        address: contracts.otcMarket,
+        abi: OTC_MARKET_ABI,
+        functionName: "list",
+        args: [selected.contract, BigInt(selected.tokenId), paymentToken as `0x${string}`, parsedPrice],
+        ...contractGas(GAS.OTC_LIST),
+      });
     }
   }, [approveRcpt.isSuccess]);
 

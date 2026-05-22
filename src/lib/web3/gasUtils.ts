@@ -1,69 +1,56 @@
 /**
- * Gas estimation utilities for Monad transactions
+ * Gas utilities for Monad transactions.
+ * Uses fixed gas limits to avoid wallet/RPC simulation ("cannot estimate gas") failures.
  */
 
 import type { PublicClient } from "viem";
 
-/**
- * Estimate gas for a contract call with buffer
- */
-export async function estimateGasWithBuffer(
-  publicClient: PublicClient,
-  request: any,
-  bufferPercent = 20
-): Promise<bigint> {
-  try {
-    const estimated = await publicClient.estimateContractGas(request);
-    // Add buffer to avoid out of gas errors
-    const buffer = (estimated * BigInt(bufferPercent)) / 100n;
-    return estimated + buffer;
-  } catch (error) {
-    console.warn("[gasUtils] Gas estimation failed, using default:", error);
-    // Return a reasonable default gas limit for Monad
-    return 500000n; // 500k gas
-  }
-}
+const DEFAULT_GAS_PRICE = 1_000_000_000n; // 1 gwei fallback
 
-/**
- * Get recommended gas price for Monad
- */
+/** Generous fixed limits — Monad gas is cheap */
+export const GAS = {
+  APPROVE: 150_000n,
+  CREATE_LOCK: 1_000_000n,
+  WITHDRAW_LOCK: 400_000n,
+  CREATE_VESTING: 1_200_000n,
+  CLAIM_VESTING: 600_000n,
+  FARM_DEPOSIT: 800_000n,
+  FARM_CLAIM: 600_000n,
+  FARM_WITHDRAW: 700_000n,
+  OTC_BUY: 600_000n,
+  OTC_LIST: 500_000n,
+  NFT_APPROVE: 200_000n,
+  NFT_TRANSFER: 300_000n,
+  DEFAULT: 500_000n,
+} as const;
+
 export async function getRecommendedGasPrice(publicClient: PublicClient): Promise<bigint> {
   try {
     const gasPrice = await publicClient.getGasPrice();
-    // Add 10% buffer to gas price
     return (gasPrice * 110n) / 100n;
-  } catch (error) {
-    console.warn("[gasUtils] Gas price fetch failed, using default:", error);
-    // Default gas price for Monad testnet (1 gwei)
-    return 1000000000n;
+  } catch {
+    return DEFAULT_GAS_PRICE;
   }
 }
 
+/** Sync gas fields for writeContract — no RPC simulation */
+export function contractGas(gasLimit: bigint = GAS.DEFAULT, gasPrice = DEFAULT_GAS_PRICE) {
+  return { gas: gasLimit, gasPrice };
+}
+
 /**
- * Prepare transaction with gas estimation
+ * Prepare transaction with fixed gas (optional live gas price).
+ * Never calls estimateContractGas — avoids "cannot get gas estimate" errors.
  */
 export async function prepareTransactionWithGas(
   publicClient: PublicClient,
-  request: any
-): Promise<any> {
-  try {
-    const [gasLimit, gasPrice] = await Promise.all([
-      estimateGasWithBuffer(publicClient, request),
-      getRecommendedGasPrice(publicClient),
-    ]);
+  _request?: unknown,
+  gasLimit: bigint = GAS.DEFAULT,
+): Promise<{ gas: bigint; gasPrice: bigint }> {
+  const gasPrice = await getRecommendedGasPrice(publicClient);
+  return { gas: gasLimit, gasPrice };
+}
 
-    return {
-      ...request,
-      gas: gasLimit,
-      gasPrice,
-    };
-  } catch (error) {
-    console.warn("[gasUtils] Transaction preparation failed:", error);
-    // Return original request with default gas settings
-    return {
-      ...request,
-      gas: 500000n,
-      gasPrice: 1000000000n,
-    };
-  }
+export function getGasSettings(gasLimit: bigint = GAS.DEFAULT) {
+  return contractGas(gasLimit);
 }

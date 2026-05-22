@@ -24,8 +24,7 @@ type CacheEntry<T> = {
   chainId: number;
 };
 
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-const CACHE_VERSION = "v3"; // Bump this to invalidate all caches
+const CACHE_VERSION = "v6"; // Bump to invalidate stale localStorage caches
 
 function getCacheKey(key: string, address?: string, chainId?: number): CacheKey {
   return `${CACHE_VERSION}_locks_cache_${key}_${address || 'global'}_${chainId || 'unknown'}`;
@@ -75,7 +74,9 @@ function usePersistentData<T>(
   data: T | undefined,
   isLoading: boolean,
   address?: string,
-  chainId?: number
+  chainId?: number,
+  /** When true, prefer fresh on-chain data even if empty (avoids stale cache after withdraw) */
+  fetchComplete = false,
 ): { data: T | undefined; isLoading: boolean } {
   const cacheKey = getCacheKey(key, address, chainId);
   const [persistentData, setPersistentData] = useState<T | undefined>(() => {
@@ -83,7 +84,7 @@ function usePersistentData<T>(
   });
 
   useEffect(() => {
-    if (data && !isLoading && chainId) {
+    if (fetchComplete && data !== undefined && chainId) {
       try {
         setCachedData(cacheKey, data, chainId);
         setPersistentData(data);
@@ -91,11 +92,11 @@ function usePersistentData<T>(
         // Ignore cache write failures
       }
     }
-  }, [data, isLoading, cacheKey, chainId]);
+  }, [data, fetchComplete, cacheKey, chainId]);
 
   return {
-    data: data || persistentData,
-    isLoading: isLoading && !persistentData,
+    data: fetchComplete ? data : (data || persistentData),
+    isLoading: isLoading && !persistentData && !fetchComplete,
   };
 }
 
@@ -238,13 +239,16 @@ export function useUserLocks(): { locks: LockView[]; isLoading: boolean } {
     }).filter(Boolean) as LockView[];
   }, [detailsQ.data, ids]);
 
-  // Use persistent data to avoid empty states on RPC failures
+  const fetchComplete =
+    !idsQ.isLoading && !detailsQ.isLoading && (ids.length === 0 || !!detailsQ.data);
+
   const persistent = usePersistentData(
-    'user_locks',
-    locks.length > 0 ? locks : undefined,
+    "user_locks",
+    locks,
     idsQ.isLoading || detailsQ.isLoading,
     address,
-    chainId
+    chainId,
+    fetchComplete,
   );
 
   return { locks: persistent.data || [], isLoading: persistent.isLoading };
@@ -310,13 +314,16 @@ export function useAllLocks(limit = 100): { locks: LockView[]; isLoading: boolea
     }).filter(Boolean) as LockView[];
   }, [detailsQ.data, ids]);
 
-  // Use persistent data to avoid empty states on RPC failures
+  const fetchComplete =
+    !lengthQ.isLoading && !detailsQ.isLoading && (ids.length === 0 || !!detailsQ.data);
+
   const persistent = usePersistentData(
-    'all_locks',
-    locks.length > 0 ? locks : undefined,
+    "all_locks",
+    locks,
     lengthQ.isLoading || detailsQ.isLoading,
     undefined,
-    chainId
+    chainId,
+    fetchComplete,
   );
 
   return { locks: persistent.data || [], isLoading: persistent.isLoading };
@@ -362,20 +369,24 @@ export function useLockLeaderboards(limit = 50) {
   }, [locks, limit]);
 
   // Use persistent data for leaderboards
+  const fetchComplete = !isLoading;
+
   const persistentTokens = usePersistentData(
-    'token_leaderboard',
-    tokens.length > 0 ? tokens : undefined,
+    "token_leaderboard",
+    tokens,
     isLoading,
     undefined,
-    chainId
+    chainId,
+    fetchComplete,
   );
 
   const persistentUsers = usePersistentData(
-    'user_leaderboard',
-    users.length > 0 ? users : undefined,
+    "user_leaderboard",
+    users,
     isLoading,
     undefined,
-    chainId
+    chainId,
+    fetchComplete,
   );
 
   return { 
@@ -475,13 +486,16 @@ export function useUserVestings(): {
     }).filter(Boolean) as VestingView[];
   }, [detailsQ.data, ids]);
 
-  // Use persistent data for vestings
+  const fetchComplete =
+    !idsQ.isLoading && !detailsQ.isLoading && (ids.length === 0 || !!detailsQ.data);
+
   const persistent = usePersistentData(
-    'user_vestings',
-    vestings.length > 0 ? vestings : undefined,
+    "user_vestings",
+    vestings,
     idsQ.isLoading || detailsQ.isLoading,
     address,
-    chainId
+    chainId,
+    fetchComplete,
   );
 
   return { vestings: persistent.data || [], isLoading: persistent.isLoading };
@@ -515,7 +529,7 @@ export function useAllTokenBalances(): {
     // Initialize from cache
     if (!address) return [];
     try {
-      const cached = localStorage.getItem(`token_balances_${address}_${chainId}`);
+      const cached = localStorage.getItem(`token_balances_v6_${address}_${chainId}`);
       if (cached) {
         const { data } = JSON.parse(cached);
         // Restore bigints
@@ -546,7 +560,7 @@ export function useAllTokenBalances(): {
           // Cache results (serialize bigints as strings)
           try {
             const serializable = results.map(t => ({ ...t, balance: t.balance.toString() }));
-            localStorage.setItem(`token_balances_${address}_${chainId}`, JSON.stringify({ data: serializable, timestamp: Date.now() }));
+            localStorage.setItem(`token_balances_v6_${address}_${chainId}`, JSON.stringify({ data: serializable, timestamp: Date.now() }));
           } catch {}
         } else if (!cancelled) {
           // Don't clear existing data on empty results (RPC failure)

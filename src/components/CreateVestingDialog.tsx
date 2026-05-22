@@ -9,7 +9,7 @@ import { useContractAddresses } from "@/lib/web3/hooks";
 import { VESTING_NFT_ABI } from "@/lib/web3/contracts";
 import { ERC20_ABI, type TokenInfo } from "@/lib/web3/tokens";
 import { formatAmount } from "@/lib/web3/format";
-import { prepareTransactionWithGas } from "@/lib/web3/gasUtils";
+import { GAS, prepareTransactionWithGas } from "@/lib/web3/gasUtils";
 import { useToast } from "./Toast";
 
 const ZERO = "0x0000000000000000000000000000000000000000" as const;
@@ -77,15 +77,14 @@ export function CreateVestingDialog({ open, onClose }: Props) {
         account: address,
       };
 
-      prepareTransactionWithGas(publicClient, vestingRequest)
-        .then((preparedVesting) => {
+      prepareTransactionWithGas(publicClient, vestingRequest, GAS.CREATE_VESTING)
+        .then((gas) => {
           vestTx.writeContract({
             address: vestingNFT,
             abi: VESTING_NFT_ABI,
             functionName: "createVesting",
             args: [p.beneficiary, p.token, p.amount, p.duration, p.cliff],
-            gas: preparedVesting.gas,
-            gasPrice: preparedVesting.gasPrice,
+            ...gas,
           });
         })
         .catch((error) => {
@@ -129,15 +128,14 @@ export function CreateVestingDialog({ open, onClose }: Props) {
         account: address,
       };
 
-      const preparedApprove = await prepareTransactionWithGas(publicClient, approveRequest);
-      
+      const gas = await prepareTransactionWithGas(publicClient, approveRequest, GAS.APPROVE);
+
       approveTx.writeContract({
         address: token.address,
         abi: ERC20_ABI,
         functionName: "approve",
         args: [vestingNFT, maxUint256],
-        gas: preparedApprove.gas,
-        gasPrice: preparedApprove.gasPrice,
+        ...gas,
       });
     } catch (error) {
       console.error("[CreateVesting] Approve preparation failed:", error);
@@ -164,8 +162,8 @@ export function CreateVestingDialog({ open, onClose }: Props) {
         account: address,
       };
 
-      const preparedVesting = await prepareTransactionWithGas(publicClient, vestingRequest);
-      
+      const gas = await prepareTransactionWithGas(publicClient, vestingRequest, GAS.CREATE_VESTING);
+
       vestTx.writeContract({
         address: vestingNFT,
         abi: VESTING_NFT_ABI,
@@ -177,8 +175,7 @@ export function CreateVestingDialog({ open, onClose }: Props) {
           BigInt(duration),
           withCliff ? BigInt(cliff) : 0n,
         ],
-        gas: preparedVesting.gas,
-        gasPrice: preparedVesting.gasPrice,
+        ...gas,
       });
     } catch (error) {
       console.error("[CreateVesting] Vesting creation preparation failed:", error);

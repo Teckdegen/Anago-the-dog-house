@@ -8,6 +8,7 @@ import {
   useWaitForTransactionReceipt,
 } from "wagmi";
 import { AppShell } from "@/components/AppShell";
+import { GAS, contractGas } from "@/lib/web3/gasUtils";
 import { useToast } from "@/components/Toast";
 import {
   TOKEN_LOCK_NFT_ABI,
@@ -177,6 +178,7 @@ function TransferPage() {
       abi: abi as any,
       functionName: "transferFrom",
       args: [address, to, selectedTokenId],
+      ...contractGas(GAS.NFT_TRANSFER),
     });
   };
 

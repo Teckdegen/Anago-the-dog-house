@@ -11,7 +11,7 @@ import { useUserVestings, useContractAddresses, type VestingView } from "@/lib/w
 import { VESTING_NFT_ABI } from "@/lib/web3/contracts";
 import { ERC20_ABI } from "@/lib/web3/tokens";
 import { formatAmount } from "@/lib/web3/format";
-import { prepareTransactionWithGas } from "@/lib/web3/gasUtils";
+import { GAS, prepareTransactionWithGas } from "@/lib/web3/gasUtils";
 
 export const Route = createFileRoute("/vesting")({
   component: VestingPage,
@@ -83,15 +83,14 @@ function VestingRow({
         account: address,
       };
 
-      const preparedClaim = await prepareTransactionWithGas(publicClient, claimRequest);
-      
+      const gas = await prepareTransactionWithGas(publicClient, claimRequest, GAS.CLAIM_VESTING);
+
       tx.writeContract({
         address: vestingNFT,
         abi: VESTING_NFT_ABI,
         functionName: "claim",
         args: [vesting.id],
-        gas: preparedClaim.gas,
-        gasPrice: preparedClaim.gasPrice,
+        ...gas,
       });
     } catch (error) {
       console.error("[VestingClaim] Claim preparation failed:", error);

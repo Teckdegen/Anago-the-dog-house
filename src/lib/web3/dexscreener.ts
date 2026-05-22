@@ -40,8 +40,11 @@ export async function fetchTokenFromDexScreener(address: string): Promise<TokenD
     
     if (!pairs || pairs.length === 0) return null;
 
-    // Get the most liquid pair
-    const pair = pairs[0];
+    // Prefer Monad pairs when multiple chains are returned
+    const monadPair =
+      pairs.find((p: { chainId?: string }) => p.chainId === "monad" || p.chainId === "monad-testnet") ??
+      pairs[0];
+    const pair = monadPair;
     const isBase = pair.baseToken?.address?.toLowerCase() === key;
     const token = isBase ? pair.baseToken : pair.quoteToken;
     const priceUsd = isBase ? parseFloat(pair.priceUsd || "0") : (1 / parseFloat(pair.priceUsd || "1"));

@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as VestingRouteImport } from './routes/vesting'
 import { Route as TransferRouteImport } from './routes/transfer'
+import { Route as OtcRouteImport } from './routes/otc'
 import { Route as LockRouteImport } from './routes/lock'
 import { Route as FarmRouteImport } from './routes/farm'
 import { Route as DashboardRouteImport } from './routes/dashboard'
@@ -25,6 +26,11 @@ const VestingRoute = VestingRouteImport.update({
 const TransferRoute = TransferRouteImport.update({
   id: '/transfer',
   path: '/transfer',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OtcRoute = OtcRouteImport.update({
+  id: '/otc',
+  path: '/otc',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LockRoute = LockRouteImport.update({
@@ -59,6 +65,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRoute
   '/farm': typeof FarmRoute
   '/lock': typeof LockRoute
+  '/otc': typeof OtcRoute
   '/transfer': typeof TransferRoute
   '/vesting': typeof VestingRoute
 }
@@ -68,6 +75,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardRoute
   '/farm': typeof FarmRoute
   '/lock': typeof LockRoute
+  '/otc': typeof OtcRoute
   '/transfer': typeof TransferRoute
   '/vesting': typeof VestingRoute
 }
@@ -78,6 +86,7 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRoute
   '/farm': typeof FarmRoute
   '/lock': typeof LockRoute
+  '/otc': typeof OtcRoute
   '/transfer': typeof TransferRoute
   '/vesting': typeof VestingRoute
 }
@@ -89,6 +98,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/farm'
     | '/lock'
+    | '/otc'
     | '/transfer'
     | '/vesting'
   fileRoutesByTo: FileRoutesByTo
@@ -98,6 +108,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/farm'
     | '/lock'
+    | '/otc'
     | '/transfer'
     | '/vesting'
   id:
@@ -107,6 +118,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/farm'
     | '/lock'
+    | '/otc'
     | '/transfer'
     | '/vesting'
   fileRoutesById: FileRoutesById
@@ -117,6 +129,7 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRoute
   FarmRoute: typeof FarmRoute
   LockRoute: typeof LockRoute
+  OtcRoute: typeof OtcRoute
   TransferRoute: typeof TransferRoute
   VestingRoute: typeof VestingRoute
 }
@@ -135,6 +148,13 @@ declare module '@tanstack/react-router' {
       path: '/transfer'
       fullPath: '/transfer'
       preLoaderRoute: typeof TransferRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/otc': {
+      id: '/otc'
+      path: '/otc'
+      fullPath: '/otc'
+      preLoaderRoute: typeof OtcRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/lock': {
@@ -181,6 +201,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRoute,
   FarmRoute: FarmRoute,
   LockRoute: LockRoute,
+  OtcRoute: OtcRoute,
   TransferRoute: TransferRoute,
   VestingRoute: VestingRoute,
 }

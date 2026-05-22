@@ -2,6 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { Search, Sprout, Plus, X, Clock, Wallet } from "lucide-react";
 import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt, useChainId } from "wagmi";
+import { useQueryClient } from "@tanstack/react-query";
+import { GAS, contractGas } from "@/lib/web3/gasUtils";
 import { parseUnits, formatUnits } from "viem";
 import { AppShell } from "@/components/AppShell";
 import { useToast } from "@/components/Toast";
@@ -288,12 +290,24 @@ function DepositModal({ farmId, stakeToken, symbol, decimals, userBalance, onClo
   const needsApproval = parsedAmount > 0n && allowance < parsedAmount;
 
   const handleApprove = () => {
-    approveTx.writeContract({ address: stakeToken, abi: ERC20_ABI, functionName: "approve", args: [contracts.streamFarm, parsedAmount], gas: 100000n });
+    approveTx.writeContract({
+      address: stakeToken,
+      abi: ERC20_ABI,
+      functionName: "approve",
+      args: [contracts.streamFarm, parsedAmount],
+      ...contractGas(GAS.APPROVE),
+    });
   };
 
   const handleDeposit = () => {
     if (!parsedAmount || parsedAmount === 0n) return;
-    depositTx.writeContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "deposit", args: [BigInt(farmId), parsedAmount, BigInt(lockTier)], gas: 500000n });
+    depositTx.writeContract({
+      address: contracts.streamFarm,
+      abi: STREAM_FARM_ABI,
+      functionName: "deposit",
+      args: [BigInt(farmId), parsedAmount, BigInt(lockTier)],
+      ...contractGas(GAS.FARM_DEPOSIT),
+    });
   };
 
   // Auto-trigger deposit after approval succeeds
@@ -394,7 +408,13 @@ function MyPositionsTab() {
   const { address } = useAccount();
   const contracts = useContracts();
 
-  const positionsQ = useReadContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "positionsOf", args: address ? [address] : undefined, query: { enabled: !!address, refetchInterval: 10_000 } });
+  const positionsQ = useReadContract({
+    address: contracts.streamFarm,
+    abi: STREAM_FARM_ABI,
+    functionName: "positionsOf",
+    args: address ? [address] : undefined,
+    query: { enabled: !!address, refetchInterval: 10_000, staleTime: 0 },
+  });
   const positions = (positionsQ.data as bigint[] | undefined) ?? [];
 
   if (!address) {
@@ -429,18 +449,25 @@ function MyPositionsTab() {
     <div className="space-y-4">
       <p className="font-mono text-[11px]" style={{ color: "rgba(196,168,240,0.6)" }}>{positions.length} position{positions.length !== 1 ? "s" : ""}</p>
       <div className="grid gap-4">
-        {positions.map((id) => <PositionCard key={id.toString()} tokenId={id} />)}
+        {positions.map((id) => (
+          <PositionCard
+            key={id.toString()}
+            tokenId={id}
+            onPositionChange={() => positionsQ.refetch()}
+          />
+        ))}
       </div>
     </div>
   );
 }
 
-function PositionCard({ tokenId }: { tokenId: bigint }) {
+function PositionCard({ tokenId, onPositionChange }: { tokenId: bigint; onPositionChange?: () => void }) {
   const contracts = useContracts();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  const posQ = useReadContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "getPosition", args: [tokenId], query: { refetchInterval: 10_000 } });
-  const pendingQ = useReadContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "pendingRewards", args: [tokenId], query: { refetchInterval: 10_000 } });
+  const posQ = useReadContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "getPosition", args: [tokenId], query: { refetchInterval: 10_000, staleTime: 0 } });
+  const pendingQ = useReadContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "pendingRewards", args: [tokenId], query: { refetchInterval: 10_000, staleTime: 0 } });
 
   const posData = posQ.data as any;
   const pendingData = pendingQ.data as any;
@@ -452,19 +479,43 @@ function PositionCard({ tokenId }: { tokenId: bigint }) {
 
   // IMPORTANT: All hooks MUST be above any early return
   useEffect(() => {
-    if (claimRcpt.isSuccess) toast("success", "Rewards claimed!", "Your pending rewards have been sent to your wallet.");
+    if (claimRcpt.isSuccess) {
+      toast("success", "Rewards claimed!", "Your pending rewards have been sent to your wallet.");
+      queryClient.invalidateQueries({ queryKey: ["readContract"] });
+      onPositionChange?.();
+    }
   }, [claimRcpt.isSuccess]);
 
   useEffect(() => {
-    if (withdrawRcpt.isSuccess) toast("success", "Withdrawn!", "Position closed and tokens returned.");
+    if (withdrawRcpt.isSuccess) {
+      toast("success", "Withdrawn!", "Position closed and tokens returned.");
+      queryClient.invalidateQueries({ queryKey: ["readContract"] });
+      onPositionChange?.();
+    }
   }, [withdrawRcpt.isSuccess]);
 
   if (!posData) return <div className="rounded-xl p-5 animate-pulse h-28" style={{ border: "1px solid rgba(155,127,212,0.2)", background: "rgba(155,127,212,0.03)" }} />;
 
   const [farmId, amount, shares, depositTime, lockExpiry, boostMultiplier] = posData;
 
-  const handleClaim = () => { claimTx.writeContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "claim", args: [tokenId] }); };
-  const handleWithdraw = () => { withdrawTx.writeContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "withdraw", args: [tokenId] }); };
+  const handleClaim = () => {
+    claimTx.writeContract({
+      address: contracts.streamFarm,
+      abi: STREAM_FARM_ABI,
+      functionName: "claim",
+      args: [tokenId],
+      ...contractGas(GAS.FARM_CLAIM),
+    });
+  };
+  const handleWithdraw = () => {
+    withdrawTx.writeContract({
+      address: contracts.streamFarm,
+      abi: STREAM_FARM_ABI,
+      functionName: "withdraw",
+      args: [tokenId],
+      ...contractGas(GAS.FARM_WITHDRAW),
+    });
+  };
 
   const now = Math.floor(Date.now() / 1000);
   const locked = Number(lockExpiry) > now;

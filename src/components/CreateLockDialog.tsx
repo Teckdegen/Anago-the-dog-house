@@ -10,6 +10,7 @@ import { TOKEN_LOCK_ABI } from "@/lib/web3/contracts";
 import { ERC20_ABI, type TokenInfo } from "@/lib/web3/tokens";
 import { formatAmount } from "@/lib/web3/format";
 import { useToast } from "./Toast";
+import { GAS, contractGas } from "@/lib/web3/gasUtils";
 
 const ZERO = "0x0000000000000000000000000000000000000000" as const;
 
@@ -61,6 +62,7 @@ export function CreateLockDialog({ open, onClose }: Props) {
         abi: TOKEN_LOCK_ABI,
         functionName: "createLock",
         args: [tokenAddr as `0x${string}`, amt, unlockAt],
+        ...contractGas(GAS.CREATE_LOCK),
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -92,6 +94,7 @@ export function CreateLockDialog({ open, onClose }: Props) {
       abi: ERC20_ABI,
       functionName: "approve",
       args: [tokenLock, maxUint256],
+      ...contractGas(GAS.APPROVE),
     });
   };
 
@@ -103,6 +106,7 @@ export function CreateLockDialog({ open, onClose }: Props) {
       abi: TOKEN_LOCK_ABI,
       functionName: "createLock",
       args: [token.address, parsedAmount, unlockAt],
+      ...contractGas(GAS.CREATE_LOCK),
     });
   };
 

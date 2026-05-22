@@ -18,6 +18,7 @@ import { TOKEN_LOCK_ABI } from "@/lib/web3/contracts";
 import { ERC20_ABI, getTokenList } from "@/lib/web3/tokens";
 import { formatAmount, formatDate, shortAddr, timeUntil } from "@/lib/web3/format";
 import { useChainId } from "wagmi";
+import { GAS, contractGas } from "@/lib/web3/gasUtils";
 
 export const Route = createFileRoute("/lock")({
   component: LockPage,
@@ -120,6 +121,7 @@ function LockRow({
       abi: TOKEN_LOCK_ABI,
       functionName: "withdraw",
       args: [lockId],
+      ...contractGas(GAS.WITHDRAW_LOCK),
     });
   };
 
