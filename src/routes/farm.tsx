@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Search, Sprout, Plus, X, Clock, Wallet } from "lucide-react";
-import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt, useChainId } from "wagmi";
-import { GAS, contractGas } from "@/lib/web3/gasUtils";
+import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt, useChainId, usePublicClient } from "wagmi";
+import { prepareTransactionWithGas } from "@/lib/web3/gasUtils";
 import { LIVE_CHAIN_QUERY } from "@/lib/web3/nftImage";
 import { NftImage } from "@/components/NftImage";
 import { parseUnits, formatUnits } from "viem";
@@ -269,6 +269,8 @@ function DepositModal({ farmId, stakeToken, symbol, decimals, userBalance, onClo
   const [lockTier, setLockTier] = useState(0);
   const { toast } = useToast();
   const contracts = useContracts();
+  const publicClient = usePublicClient();
+  const autoDepositRef = useRef(false);
 
   const boostQ = useReadContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "getBoostTiers" });
   const boostData = boostQ.data as any;
@@ -290,33 +292,50 @@ function DepositModal({ farmId, stakeToken, symbol, decimals, userBalance, onClo
   const allowance = (allowanceQ.data as bigint) ?? 0n;
   const needsApproval = parsedAmount > 0n && allowance < parsedAmount;
 
-  const handleApprove = () => {
-    approveTx.writeContract({
-      address: stakeToken,
-      abi: ERC20_ABI,
-      functionName: "approve",
-      args: [contracts.streamFarm, parsedAmount],
-      ...contractGas(GAS.APPROVE),
-    });
-  };
-
-  const handleDeposit = () => {
-    if (!parsedAmount || parsedAmount === 0n) return;
+  const runDeposit = async () => {
+    if (!parsedAmount || parsedAmount === 0n || !publicClient) return;
+    const gas = await prepareTransactionWithGas(publicClient);
     depositTx.writeContract({
       address: contracts.streamFarm,
       abi: STREAM_FARM_ABI,
       functionName: "deposit",
       args: [BigInt(farmId), parsedAmount, BigInt(lockTier)],
-      ...contractGas(GAS.FARM_DEPOSIT),
+      ...gas,
     });
   };
 
-  // Auto-trigger deposit after approval succeeds
-  useEffect(() => {
-    if (approveRcpt.isSuccess && parsedAmount > 0n) {
-      handleDeposit();
+  const handleApproveAndDeposit = async () => {
+    if (!parsedAmount || parsedAmount === 0n || !publicClient) return;
+    autoDepositRef.current = true;
+    try {
+      const gas = await prepareTransactionWithGas(publicClient);
+      approveTx.writeContract({
+        address: stakeToken,
+        abi: ERC20_ABI,
+        functionName: "approve",
+        args: [contracts.streamFarm, parsedAmount],
+        ...gas,
+      });
+    } catch {
+      autoDepositRef.current = false;
+      toast("error", "Transaction Failed", "Failed to prepare approval");
     }
-  }, [approveRcpt.isSuccess]);
+  };
+
+  const handleDeposit = async () => {
+    try {
+      await runDeposit();
+    } catch {
+      toast("error", "Transaction Failed", "Failed to prepare deposit");
+    }
+  };
+
+  useEffect(() => {
+    if (!approveRcpt.isSuccess || !autoDepositRef.current || !publicClient) return;
+    autoDepositRef.current = false;
+    runDeposit().catch(() => toast("error", "Transaction Failed", "Failed to deposit after approval"));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [approveRcpt.isSuccess, publicClient]);
 
   useEffect(() => {
     if (depositRcpt.isSuccess) {
@@ -373,18 +392,31 @@ function DepositModal({ farmId, stakeToken, symbol, decimals, userBalance, onClo
             </div>
           </div>
 
+          {(approveTx.isPending || approveRcpt.isLoading) && (
+            <p className="font-mono text-[10px]" style={{ color: "rgba(196,168,240,0.7)" }}>Step 1 of 2 — Approving {symbol}…</p>
+          )}
+          {(depositTx.isPending || depositRcpt.isLoading) && (
+            <p className="font-mono text-[10px]" style={{ color: "rgba(196,168,240,0.7)" }}>{needsApproval ? "Step 2 of 2 — " : ""}Depositing…</p>
+          )}
+
           <div className="flex gap-3">
             {needsApproval ? (
-              <button onClick={handleApprove} disabled={approveTx.isPending || approveRcpt.isLoading}
+              <button
+                onClick={handleApproveAndDeposit}
+                disabled={!parsedAmount || parsedAmount === 0n || parsedAmount > userBalance || approveTx.isPending || approveRcpt.isLoading || depositTx.isPending || depositRcpt.isLoading}
                 className="flex-1 rounded-xl py-3 font-grotesk text-[12px] uppercase tracking-wider transition disabled:opacity-40 active:scale-[0.99]"
-                style={{ background: "rgba(155,127,212,0.2)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.5)" }}>
-                {approveTx.isPending || approveRcpt.isLoading ? "Approving..." : "Approve"}
+                style={{ background: "rgba(155,127,212,0.2)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.5)" }}
+              >
+                {approveTx.isPending || approveRcpt.isLoading ? "Approving…" : depositTx.isPending || depositRcpt.isLoading ? "Depositing…" : `Approve & Deposit`}
               </button>
             ) : (
-              <button onClick={handleDeposit} disabled={!parsedAmount || parsedAmount === 0n || parsedAmount > userBalance || depositTx.isPending || depositRcpt.isLoading}
+              <button
+                onClick={handleDeposit}
+                disabled={!parsedAmount || parsedAmount === 0n || parsedAmount > userBalance || depositTx.isPending || depositRcpt.isLoading}
                 className="flex-1 rounded-xl py-3 font-grotesk text-[12px] uppercase tracking-wider transition disabled:opacity-40 active:scale-[0.99]"
-                style={{ background: "rgba(155,127,212,0.25)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.55)" }}>
-                {depositTx.isPending || depositRcpt.isLoading ? "Depositing..." : "Deposit"}
+                style={{ background: "rgba(155,127,212,0.25)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.55)" }}
+              >
+                {depositTx.isPending || depositRcpt.isLoading ? "Depositing…" : "Deposit"}
               </button>
             )}
           </div>
@@ -465,6 +497,7 @@ function MyPositionsTab() {
 function PositionCard({ tokenId, onPositionChange }: { tokenId: bigint; onPositionChange?: () => void }) {
   const contracts = useContracts();
   const { toast } = useToast();
+  const publicClient = usePublicClient();
 
   const posQ = useReadContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "getPosition", args: [tokenId], query: { ...LIVE_CHAIN_QUERY, refetchInterval: 10_000 } });
   const pendingQ = useReadContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "pendingRewards", args: [tokenId], query: { ...LIVE_CHAIN_QUERY, refetchInterval: 10_000 } });
@@ -496,22 +529,26 @@ function PositionCard({ tokenId, onPositionChange }: { tokenId: bigint; onPositi
 
   const [farmId, amount, shares, depositTime, lockExpiry, boostMultiplier] = posData;
 
-  const handleClaim = () => {
+  const handleClaim = async () => {
+    if (!publicClient) return;
+    const gas = await prepareTransactionWithGas(publicClient);
     claimTx.writeContract({
       address: contracts.streamFarm,
       abi: STREAM_FARM_ABI,
       functionName: "claim",
       args: [tokenId],
-      ...contractGas(GAS.FARM_CLAIM),
+      ...gas,
     });
   };
-  const handleWithdraw = () => {
+  const handleWithdraw = async () => {
+    if (!publicClient) return;
+    const gas = await prepareTransactionWithGas(publicClient);
     withdrawTx.writeContract({
       address: contracts.streamFarm,
       abi: STREAM_FARM_ABI,
       functionName: "withdraw",
       args: [tokenId],
-      ...contractGas(GAS.FARM_WITHDRAW),
+      ...gas,
     });
   };
 

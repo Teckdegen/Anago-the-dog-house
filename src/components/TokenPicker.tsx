@@ -4,6 +4,7 @@ import { formatAmount } from "@/lib/web3/format";
 import { ERC20_ABI, type TokenInfo } from "@/lib/web3/tokens";
 import { Check, Search, Loader2, Coins, RefreshCw } from "lucide-react";
 import { useAllTokenBalances } from "@/lib/web3/hooks";
+import { TokenIcon } from "./TokenIcon";
 
 type Props = {
   selected?: TokenInfo;
@@ -173,12 +174,7 @@ export function TokenPicker({ selected, onSelect, excludeNative }: Props) {
                   </span>
                 )}
                 <div className="flex items-center gap-2.5 pr-6">
-                  <div
-                    className="w-8 h-8 rounded-full flex items-center justify-center font-grotesk text-[12px] shrink-0"
-                    style={{ background: "rgba(155,127,212,0.15)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.35)" }}
-                  >
-                    {token.symbol[0]}
-                  </div>
+                  <TokenIcon address={token.address} symbol={token.symbol} size={32} />
                   <div className="min-w-0 flex-1">
                     <p className="font-grotesk text-[12px] uppercase tracking-wider" style={{ color: "#EDE0FF" }}>
                       {token.symbol}

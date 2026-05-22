@@ -1,12 +1,14 @@
 /**
- * DexScreener API integration for token details (logos, prices, etc.)
- * Falls back gracefully when tokens aren't listed (testnet)
+ * DexScreener API + on-chain token metadata fallback
  */
 
-const DEXSCREENER_API = "https://api.dexscreener.com/latest/dex";
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+import type { PublicClient } from "viem";
+import { fetchTokenBasicsFromChain, fetchTokenLogoFromChain } from "./tokenOnChain";
 
-type TokenData = {
+const DEXSCREENER_API = "https://api.dexscreener.com/latest/dex";
+const CACHE_TTL = 5 * 60 * 1000;
+
+export type TokenData = {
   address: string;
   name: string;
   symbol: string;
@@ -16,13 +18,9 @@ type TokenData = {
 
 const cache = new Map<string, { data: TokenData; timestamp: number }>();
 
-/**
- * Fetch token details from DexScreener by address
- */
-export async function fetchTokenFromDexScreener(address: string): Promise<TokenData | null> {
+async function fetchTokenFromDexScreenerOnly(address: string): Promise<TokenData | null> {
   const key = address.toLowerCase();
-  
-  // Check cache
+
   const cached = cache.get(key);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
     return cached.data;
@@ -32,15 +30,14 @@ export async function fetchTokenFromDexScreener(address: string): Promise<TokenD
     const res = await fetch(`${DEXSCREENER_API}/tokens/${address}`, {
       signal: AbortSignal.timeout(5000),
     });
-    
+
     if (!res.ok) return null;
-    
+
     const json = await res.json();
     const pairs = json?.pairs;
-    
+
     if (!pairs || pairs.length === 0) return null;
 
-    // Prefer Monad pairs when multiple chains are returned
     const monadPair =
       pairs.find((p: { chainId?: string }) => p.chainId === "monad" || p.chainId === "monad-testnet") ??
       pairs[0];
@@ -65,35 +62,65 @@ export async function fetchTokenFromDexScreener(address: string): Promise<TokenD
 }
 
 /**
- * Get token logo URL — tries DexScreener first, falls back to null
+ * DexScreener first, then on-chain logoURI / tokenURI / contractURI + ERC-20 symbol/name.
  */
-export async function getTokenLogo(address: string): Promise<string | null> {
-  const data = await fetchTokenFromDexScreener(address);
+export async function fetchTokenFromDexScreener(
+  address: string,
+  publicClient?: PublicClient | null,
+): Promise<TokenData | null> {
+  const key = address.toLowerCase();
+  const dex = await fetchTokenFromDexScreenerOnly(address);
+
+  if (dex?.logoURI && dex.symbol) return dex;
+
+  if (!publicClient || key === "0x0000000000000000000000000000000000000000") {
+    return dex;
+  }
+
+  const addr = key as `0x${string}`;
+  const [logoURI, basics] = await Promise.all([
+    dex?.logoURI ? Promise.resolve(dex.logoURI) : fetchTokenLogoFromChain(addr, publicClient),
+    (!dex?.symbol || !dex?.name) ? fetchTokenBasicsFromChain(addr, publicClient) : Promise.resolve(null),
+  ]);
+
+  const merged: TokenData = {
+    address: key,
+    name: dex?.name || basics?.name || "",
+    symbol: dex?.symbol || basics?.symbol || key.slice(0, 6),
+    logoURI: logoURI ?? dex?.logoURI ?? null,
+    priceUsd: dex?.priceUsd ?? null,
+  };
+
+  if (merged.symbol || merged.logoURI) {
+    cache.set(key, { data: merged, timestamp: Date.now() });
+    return merged;
+  }
+
+  return dex;
+}
+
+export async function getTokenLogo(
+  address: string,
+  publicClient?: PublicClient | null,
+): Promise<string | null> {
+  const data = await fetchTokenFromDexScreener(address, publicClient);
   return data?.logoURI || null;
 }
 
-/**
- * Get token price in USD — returns null if not available
- */
 export async function getTokenPriceUsd(address: string): Promise<number | null> {
-  const data = await fetchTokenFromDexScreener(address);
+  const data = await fetchTokenFromDexScreenerOnly(address);
   return data?.priceUsd || null;
 }
 
-/**
- * Batch fetch multiple token prices
- */
 export async function batchGetTokenPrices(addresses: string[]): Promise<Map<string, number>> {
   const prices = new Map<string, number>();
-  
-  // DexScreener supports comma-separated addresses
-  const unique = [...new Set(addresses.map(a => a.toLowerCase()))];
-  
+  const unique = [...new Set(addresses.map((a) => a.toLowerCase()))];
+
   await Promise.all(
     unique.map(async (addr) => {
       const price = await getTokenPriceUsd(addr);
       if (price !== null) prices.set(addr, price);
-    })
+    }),
   );
 
   return prices;

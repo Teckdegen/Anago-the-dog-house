@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { formatUnits, maxUint256, parseUnits } from "viem";
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, usePublicClient } from "wagmi";
 import { CheckCircle2 } from "lucide-react";
 import { Modal } from "./Modal";
 import { TokenPicker } from "./TokenPicker";
@@ -10,7 +10,7 @@ import { TOKEN_LOCK_ABI } from "@/lib/web3/contracts";
 import { ERC20_ABI, type TokenInfo } from "@/lib/web3/tokens";
 import { formatAmount } from "@/lib/web3/format";
 import { useToast } from "./Toast";
-import { GAS, contractGas } from "@/lib/web3/gasUtils";
+import { prepareTransactionWithGas } from "@/lib/web3/gasUtils";
 
 const ZERO = "0x0000000000000000000000000000000000000000" as const;
 
@@ -18,6 +18,7 @@ type Props = { open: boolean; onClose: () => void };
 
 export function CreateLockDialog({ open, onClose }: Props) {
   const { address } = useAccount();
+  const publicClient = usePublicClient();
   const { tokenLock } = useContractAddresses();
   const { toast } = useToast();
   const [token, setToken] = useState<(TokenInfo & { balance: bigint }) | undefined>();
@@ -26,7 +27,6 @@ export function CreateLockDialog({ open, onClose }: Props) {
   const [confirmed, setConfirmed] = useState(false);
 
   const autoLockRef = useRef(false);
-  // Capture lock params at click time to avoid stale closure in the effect
   const pendingLockRef = useRef<{ token: string; amount: bigint; unlockAt: bigint } | null>(null);
 
   const parsedAmount = (() => {
@@ -53,20 +53,27 @@ export function CreateLockDialog({ open, onClose }: Props) {
   const lockRcpt = useWaitForTransactionReceipt({ hash: lockTx.data });
 
   useEffect(() => {
-    if (approveRcpt.isSuccess && autoLockRef.current && pendingLockRef.current) {
-      autoLockRef.current = false;
-      const { token: tokenAddr, amount: amt, unlockAt } = pendingLockRef.current;
-      pendingLockRef.current = null;
-      lockTx.writeContract({
-        address: tokenLock,
-        abi: TOKEN_LOCK_ABI,
-        functionName: "createLock",
-        args: [tokenAddr as `0x${string}`, amt, unlockAt],
-        ...contractGas(GAS.CREATE_LOCK),
+    if (!approveRcpt.isSuccess || !autoLockRef.current || !pendingLockRef.current || !publicClient) return;
+    autoLockRef.current = false;
+    const { token: tokenAddr, amount: amt, unlockAt } = pendingLockRef.current;
+    pendingLockRef.current = null;
+
+    prepareTransactionWithGas(publicClient)
+      .then((gas) => {
+        lockTx.writeContract({
+          address: tokenLock,
+          abi: TOKEN_LOCK_ABI,
+          functionName: "createLock",
+          args: [tokenAddr as `0x${string}`, amt, unlockAt],
+          ...gas,
+        });
+      })
+      .catch((err) => {
+        console.error("[CreateLock] Auto-lock failed:", err);
+        toast("error", "Transaction Failed", "Failed to prepare lock transaction after approval");
       });
-    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [approveRcpt.isSuccess]);
+  }, [approveRcpt.isSuccess, publicClient]);
 
   useEffect(() => {
     if (lockRcpt.isSuccess) {
@@ -80,34 +87,47 @@ export function CreateLockDialog({ open, onClose }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lockRcpt.isSuccess]);
 
-  const handleApproveAndLock = () => {
-    if (!token || parsedAmount === 0n) return;
-    // Capture params now so the effect doesn't use stale values
+  const handleApproveAndLock = async () => {
+    if (!token || parsedAmount === 0n || !publicClient) return;
     pendingLockRef.current = {
       token: token.address,
       amount: parsedAmount,
       unlockAt: BigInt(Math.floor(Date.now() / 1000) + duration),
     };
     autoLockRef.current = true;
-    approveTx.writeContract({
-      address: token.address,
-      abi: ERC20_ABI,
-      functionName: "approve",
-      args: [tokenLock, maxUint256],
-      ...contractGas(GAS.APPROVE),
-    });
+    try {
+      const gas = await prepareTransactionWithGas(publicClient);
+      approveTx.writeContract({
+        address: token.address,
+        abi: ERC20_ABI,
+        functionName: "approve",
+        args: [tokenLock, maxUint256],
+        ...gas,
+      });
+    } catch (err) {
+      autoLockRef.current = false;
+      pendingLockRef.current = null;
+      console.error("[CreateLock] Approve failed:", err);
+      toast("error", "Transaction Failed", "Failed to prepare approval transaction");
+    }
   };
 
-  const handleLock = () => {
-    if (!token) return;
+  const handleLock = async () => {
+    if (!token || !publicClient) return;
     const unlockAt = BigInt(Math.floor(Date.now() / 1000) + duration);
-    lockTx.writeContract({
-      address: tokenLock,
-      abi: TOKEN_LOCK_ABI,
-      functionName: "createLock",
-      args: [token.address, parsedAmount, unlockAt],
-      ...contractGas(GAS.CREATE_LOCK),
-    });
+    try {
+      const gas = await prepareTransactionWithGas(publicClient);
+      lockTx.writeContract({
+        address: tokenLock,
+        abi: TOKEN_LOCK_ABI,
+        functionName: "createLock",
+        args: [token.address, parsedAmount, unlockAt],
+        ...gas,
+      });
+    } catch (err) {
+      console.error("[CreateLock] Lock failed:", err);
+      toast("error", "Transaction Failed", "Failed to prepare lock transaction");
+    }
   };
 
   const handleClose = () => {
@@ -128,7 +148,6 @@ export function CreateLockDialog({ open, onClose }: Props) {
   return (
     <Modal open={open} onClose={handleClose} title="New Lock">
 
-      {/* ── Confirmation screen ── */}
       {confirmed ? (
         <div className="flex flex-col items-center gap-5 py-4 text-center">
           <div
@@ -188,7 +207,6 @@ export function CreateLockDialog({ open, onClose }: Props) {
       ) : (
         <div className="space-y-5">
 
-          {/* Step 1 — Token */}
           <div>
             <Label>1. Token</Label>
             <TokenPicker selected={token} onSelect={setToken} excludeNative />
@@ -196,7 +214,6 @@ export function CreateLockDialog({ open, onClose }: Props) {
 
           {token && (
             <>
-              {/* Step 2 — Amount */}
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <Label>2. Amount</Label>
@@ -223,13 +240,11 @@ export function CreateLockDialog({ open, onClose }: Props) {
                 />
               </div>
 
-              {/* Step 3 — Duration */}
               <div>
                 <Label>3. Lock Duration</Label>
                 <DurationPicker value={duration} onChange={setDuration} />
               </div>
 
-              {/* Step progress */}
               {approving && (
                 <div
                   className="flex items-center gap-3 px-4 py-3 rounded-xl"
@@ -253,7 +268,6 @@ export function CreateLockDialog({ open, onClose }: Props) {
                 </div>
               )}
 
-              {/* Action button */}
               {needsApproval ? (
                 <ActionButton
                   onClick={handleApproveAndLock}
@@ -284,8 +298,6 @@ export function CreateLockDialog({ open, onClose }: Props) {
     </Modal>
   );
 }
-
-// ── Helpers ───────────────────────────────────────────────────────────────
 
 function Label({ children }: { children: React.ReactNode }) {
   return (

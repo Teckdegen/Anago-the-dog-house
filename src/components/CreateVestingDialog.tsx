@@ -9,7 +9,7 @@ import { useContractAddresses } from "@/lib/web3/hooks";
 import { VESTING_NFT_ABI } from "@/lib/web3/contracts";
 import { ERC20_ABI, type TokenInfo } from "@/lib/web3/tokens";
 import { formatAmount } from "@/lib/web3/format";
-import { GAS, prepareTransactionWithGas } from "@/lib/web3/gasUtils";
+import { prepareTransactionWithGas } from "@/lib/web3/gasUtils";
 import { useToast } from "./Toast";
 
 const ZERO = "0x0000000000000000000000000000000000000000" as const;
@@ -77,7 +77,7 @@ export function CreateVestingDialog({ open, onClose }: Props) {
         account: address,
       };
 
-      prepareTransactionWithGas(publicClient, vestingRequest, GAS.CREATE_VESTING)
+      prepareTransactionWithGas(publicClient)
         .then((gas) => {
           vestTx.writeContract({
             address: vestingNFT,
@@ -128,7 +128,7 @@ export function CreateVestingDialog({ open, onClose }: Props) {
         account: address,
       };
 
-      const gas = await prepareTransactionWithGas(publicClient, approveRequest, GAS.APPROVE);
+      const gas = await prepareTransactionWithGas(publicClient);
 
       approveTx.writeContract({
         address: token.address,
@@ -162,7 +162,7 @@ export function CreateVestingDialog({ open, onClose }: Props) {
         account: address,
       };
 
-      const gas = await prepareTransactionWithGas(publicClient, vestingRequest, GAS.CREATE_VESTING);
+      const gas = await prepareTransactionWithGas(publicClient);
 
       vestTx.writeContract({
         address: vestingNFT,

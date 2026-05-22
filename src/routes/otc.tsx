@@ -1,14 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ShoppingBag, Tag, X, Wallet } from "lucide-react";
-import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt, useChainId } from "wagmi";
+import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt, useChainId, usePublicClient } from "wagmi";
 import { parseUnits, formatUnits } from "viem";
 import { AppShell } from "@/components/AppShell";
 import { useToast } from "@/components/Toast";
 import { SuccessModal } from "@/components/SuccessModal";
 import { OTC_MARKET_ABI, ERC721_ABI, ERC20_ABI, CONTRACTS, TOKEN_LOCK_ABI, VESTING_NFT_ABI, STREAM_FARM_ABI } from "@/lib/web3/contracts";
 import { shortAddr } from "@/lib/web3/format";
-import { GAS, contractGas } from "@/lib/web3/gasUtils";
+import { prepareTransactionWithGas } from "@/lib/web3/gasUtils";
 import { LIVE_CHAIN_QUERY } from "@/lib/web3/nftImage";
 import { NftImage } from "@/components/NftImage";
 
@@ -146,10 +146,12 @@ function MyListingsTab() {
 
 function ListingCard({ listingId, showBuy, showUnlist, showInactive }: { listingId: bigint; showBuy?: boolean; showUnlist?: boolean; showInactive?: boolean }) {
   const { address } = useAccount();
+  const publicClient = usePublicClient();
   const contracts = useContracts();
   const { toast } = useToast();
   const [successOpen, setSuccessOpen] = useState(false);
   const [successMsg, setSuccessMsg] = useState({ heading: "", subtext: "" });
+  const autoBuyRef = useRef(false);
 
   const listingQ = useReadContract({ address: contracts.otcMarket, abi: OTC_MARKET_ABI, functionName: "getListing", args: [listingId], query: { refetchInterval: 10_000 } });
   const data = listingQ.data as any;
@@ -177,6 +179,23 @@ function ListingCard({ listingId, showBuy, showUnlist, showInactive }: { listing
     if (unlistRcpt.isSuccess) { setSuccessMsg({ heading: "Listing Cancelled", subtext: "Your position has been returned to your wallet." }); setSuccessOpen(true); }
   }, [unlistRcpt.isSuccess]);
 
+  useEffect(() => {
+    if (!approveRcpt.isSuccess || !autoBuyRef.current || !publicClient) return;
+    autoBuyRef.current = false;
+    prepareTransactionWithGas(publicClient)
+      .then((gas) => {
+        buyTx.writeContract({
+          address: contracts.otcMarket,
+          abi: OTC_MARKET_ABI,
+          functionName: "buy",
+          args: [listingId],
+          ...gas,
+        });
+      })
+      .catch(() => toast("error", "Transaction Failed", "Failed to buy after approval"));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [approveRcpt.isSuccess, publicClient]);
+
   if (!data) return null;
 
   const [seller, nftContract, tokenId, , price, active] = data;
@@ -197,33 +216,45 @@ function ListingCard({ listingId, showBuy, showUnlist, showInactive }: { listing
     return "NFT";
   })();
 
-  const handleApprove = () => {
-    approveTx.writeContract({
-      address: paymentToken,
-      abi: ERC20_ABI,
-      functionName: "approve",
-      args: [contracts.otcMarket, price],
-      ...contractGas(GAS.APPROVE),
-    });
+  const handleApproveAndBuy = async () => {
+    if (!publicClient) return;
+    autoBuyRef.current = true;
+    try {
+      const gas = await prepareTransactionWithGas(publicClient);
+      approveTx.writeContract({
+        address: paymentToken,
+        abi: ERC20_ABI,
+        functionName: "approve",
+        args: [contracts.otcMarket, price],
+        ...gas,
+      });
+    } catch {
+      autoBuyRef.current = false;
+      toast("error", "Transaction Failed", "Failed to prepare approval");
+    }
   };
 
-  const handleBuy = () => {
+  const handleBuy = async () => {
+    if (!publicClient) return;
+    const gas = await prepareTransactionWithGas(publicClient);
     buyTx.writeContract({
       address: contracts.otcMarket,
       abi: OTC_MARKET_ABI,
       functionName: "buy",
       args: [listingId],
-      ...contractGas(GAS.OTC_BUY),
+      ...gas,
     });
   };
 
-  const handleUnlist = () => {
+  const handleUnlist = async () => {
+    if (!publicClient) return;
+    const gas = await prepareTransactionWithGas(publicClient);
     unlistTx.writeContract({
       address: contracts.otcMarket,
       abi: OTC_MARKET_ABI,
       functionName: "unlist",
       args: [listingId],
-      ...contractGas(GAS.OTC_LIST),
+      ...gas,
     });
   };
 
@@ -252,10 +283,13 @@ function ListingCard({ listingId, showBuy, showUnlist, showInactive }: { listing
       <div className="flex items-center gap-2 shrink-0">
         {showBuy && !isSeller && (
           needsApproval ? (
-            <button onClick={handleApprove} disabled={approveTx.isPending || approveRcpt.isLoading}
+            <button
+              onClick={handleApproveAndBuy}
+              disabled={approveTx.isPending || approveRcpt.isLoading || buyTx.isPending || buyRcpt.isLoading}
               className="px-4 py-2 rounded-xl font-grotesk text-[10px] uppercase tracking-wider transition disabled:opacity-40"
-              style={{ background: "rgba(155,127,212,0.2)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.5)" }}>
-              {approveTx.isPending ? "..." : "Approve"}
+              style={{ background: "rgba(155,127,212,0.2)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.5)" }}
+            >
+              {approveTx.isPending || approveRcpt.isLoading ? "Approving…" : buyTx.isPending || buyRcpt.isLoading ? "Buying…" : "Approve & Buy"}
             </button>
           ) : (
             <button onClick={handleBuy} disabled={buyTx.isPending || buyRcpt.isLoading}
@@ -285,8 +319,10 @@ function ListingCard({ listingId, showBuy, showUnlist, showInactive }: { listing
 
 function SellTab() {
   const { address } = useAccount();
+  const publicClient = usePublicClient();
   const contracts = useContracts();
   const { toast } = useToast();
+  const autoListRef = useRef(false);
 
   const [selected, setSelected] = useState<{ contract: `0x${string}`; tokenId: string; label: string } | null>(null);
   const [paymentToken, setPaymentToken] = useState("");
@@ -306,41 +342,50 @@ function SellTab() {
   const approvedQ = useReadContract({ address: nftAddr, abi: ERC721_ABI, functionName: "getApproved", args: selected ? [BigInt(selected.tokenId)] : undefined, query: { enabled: hasSelected } });
   const isApproved = (approvedQ.data as string)?.toLowerCase() === contracts.otcMarket.toLowerCase();
 
-  const handleApproveNFT = () => {
-    if (!selected) return;
-    approveTx.writeContract({
-      address: selected.contract,
-      abi: ERC721_ABI,
-      functionName: "approve",
-      args: [contracts.otcMarket, BigInt(selected.tokenId)],
-      ...contractGas(GAS.NFT_APPROVE),
-    });
-  };
-
-  const handleList = () => {
-    if (!selected || !paymentToken || !price) return;
+  const runList = async () => {
+    if (!selected || !paymentToken || !price || !publicClient) return;
     const parsedPrice = parseUnits(price, payDec);
+    const gas = await prepareTransactionWithGas(publicClient);
     listTx.writeContract({
       address: contracts.otcMarket,
       abi: OTC_MARKET_ABI,
       functionName: "list",
       args: [selected.contract, BigInt(selected.tokenId), paymentToken as `0x${string}`, parsedPrice],
-      ...contractGas(GAS.OTC_LIST),
+      ...gas,
     });
   };
 
-  // Auto-trigger list after NFT approve succeeds
-  useEffect(() => {
-    if (approveRcpt.isSuccess && selected && paymentToken && price) {
-      const parsedPrice = parseUnits(price, payDec);
-      listTx.writeContract({
-        address: contracts.otcMarket,
-        abi: OTC_MARKET_ABI,
-        functionName: "list",
-        args: [selected.contract, BigInt(selected.tokenId), paymentToken as `0x${string}`, parsedPrice],
-        ...contractGas(GAS.OTC_LIST),
+  const handleApproveAndList = async () => {
+    if (!selected || !paymentToken || !price || !publicClient) return;
+    autoListRef.current = true;
+    try {
+      const gas = await prepareTransactionWithGas(publicClient);
+      approveTx.writeContract({
+        address: selected.contract,
+        abi: ERC721_ABI,
+        functionName: "approve",
+        args: [contracts.otcMarket, BigInt(selected.tokenId)],
+        ...gas,
       });
+    } catch {
+      autoListRef.current = false;
+      toast("error", "Transaction Failed", "Failed to prepare NFT approval");
     }
+  };
+
+  const handleList = async () => {
+    try {
+      await runList();
+    } catch {
+      toast("error", "Transaction Failed", "Failed to prepare listing");
+    }
+  };
+
+  useEffect(() => {
+    if (!approveRcpt.isSuccess || !autoListRef.current || !selected || !paymentToken || !price) return;
+    autoListRef.current = false;
+    runList().catch(() => toast("error", "Transaction Failed", "Failed to list after approval"));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [approveRcpt.isSuccess]);
 
   const [listSuccess, setListSuccess] = useState(false);
@@ -388,10 +433,13 @@ function SellTab() {
             </div>
 
             {!isApproved ? (
-              <button onClick={handleApproveNFT} disabled={approveTx.isPending || approveRcpt.isLoading}
+              <button
+                onClick={handleApproveAndList}
+                disabled={approveTx.isPending || approveRcpt.isLoading || listTx.isPending || listRcpt.isLoading}
                 className="w-full rounded-xl py-3 font-grotesk text-[11px] uppercase tracking-wider transition disabled:opacity-40"
-                style={{ background: "rgba(155,127,212,0.2)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.5)" }}>
-                {approveTx.isPending || approveRcpt.isLoading ? "Approving..." : "Approve NFT"}
+                style={{ background: "rgba(155,127,212,0.2)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.5)" }}
+              >
+                {approveTx.isPending || approveRcpt.isLoading ? "Approving…" : listTx.isPending || listRcpt.isLoading ? "Listing…" : "Approve & List"}
               </button>
             ) : (
               <button onClick={handleList} disabled={!paymentToken || !price || listTx.isPending || listRcpt.isLoading}

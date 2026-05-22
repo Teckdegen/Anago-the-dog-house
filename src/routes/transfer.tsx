@@ -6,9 +6,10 @@ import {
   useReadContracts,
   useWriteContract,
   useWaitForTransactionReceipt,
+  usePublicClient,
 } from "wagmi";
 import { AppShell } from "@/components/AppShell";
-import { GAS, contractGas } from "@/lib/web3/gasUtils";
+import { prepareTransactionWithGas } from "@/lib/web3/gasUtils";
 import { LIVE_CHAIN_QUERY } from "@/lib/web3/nftImage";
 import { NftImage } from "@/components/NftImage";
 import { useToast } from "@/components/Toast";
@@ -171,16 +172,17 @@ function TransferPage() {
   const transferTx  = useWriteContract();
   const transferRcpt = useWaitForTransactionReceipt({ hash: transferTx.data });
 
-  const handleTransfer = () => {
-    if (!selectedTokenId || !address || !isValidAddress) return;
+  const handleTransfer = async () => {
+    if (!selectedTokenId || !address || !isValidAddress || !publicClient) return;
     const to = recipientAddress as `0x${string}`;
     pendingRef.current = { from: address, to, tokenId: selectedTokenId };
+    const gas = await prepareTransactionWithGas(publicClient);
     transferTx.writeContract({
       address: contractAddress,
       abi: abi as any,
       functionName: "transferFrom",
       args: [address, to, selectedTokenId],
-      ...contractGas(GAS.NFT_TRANSFER),
+      ...gas,
     });
   };
 

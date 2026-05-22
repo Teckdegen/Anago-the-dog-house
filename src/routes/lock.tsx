@@ -18,7 +18,8 @@ import { TOKEN_LOCK_ABI } from "@/lib/web3/contracts";
 import { ERC20_ABI, getTokenList } from "@/lib/web3/tokens";
 import { formatAmount, formatDate, shortAddr, timeUntil } from "@/lib/web3/format";
 import { useChainId } from "wagmi";
-import { GAS, contractGas } from "@/lib/web3/gasUtils";
+import { prepareTransactionWithGas } from "@/lib/web3/gasUtils";
+import { usePublicClient } from "wagmi";
 
 export const Route = createFileRoute("/lock")({
   component: LockPage,
@@ -87,6 +88,7 @@ function LockRow({
   const staticMeta = useTokenMeta()(token);
   const { tokenLock } = useContractAddresses();
   const { address } = useAccount();
+  const publicClient = usePublicClient();
   const unlocked = Number(unlockAt) <= Math.floor(Date.now() / 1000);
   const isOwner = !!address && address.toLowerCase() === owner.toLowerCase();
 
@@ -115,13 +117,15 @@ function LockRow({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rcpt.isSuccess]);
 
-  const doWithdraw = () => {
+  const doWithdraw = async () => {
+    if (!publicClient) return;
+    const gas = await prepareTransactionWithGas(publicClient);
     tx.writeContract({
       address: tokenLock,
       abi: TOKEN_LOCK_ABI,
       functionName: "withdraw",
       args: [lockId],
-      ...contractGas(GAS.WITHDRAW_LOCK),
+      ...gas,
     });
   };
 
