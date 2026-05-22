@@ -112,6 +112,45 @@ export async function getTokenPriceUsd(address: string): Promise<number | null> 
   return data?.priceUsd || null;
 }
 
+export type PairDexData = {
+  pairAddress: string;
+  imageUrl: string | null;
+  baseSymbol: string;
+  quoteSymbol: string;
+};
+
+const pairCache = new Map<string, { data: PairDexData; timestamp: number }>();
+
+/** DexScreener pair lookup — pool/pair image for CLMM pool pages */
+export async function fetchPairFromDexScreener(
+  pairAddress: string,
+): Promise<PairDexData | null> {
+  const key = pairAddress.toLowerCase();
+  const cached = pairCache.get(key);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) return cached.data;
+
+  try {
+    const res = await fetch(`${DEXSCREENER_API}/pairs/monad/${key}`, {
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    const pair = json?.pair ?? json?.pairs?.[0];
+    if (!pair) return null;
+
+    const data: PairDexData = {
+      pairAddress: key,
+      imageUrl: pair.info?.imageUrl ?? null,
+      baseSymbol: pair.baseToken?.symbol ?? "",
+      quoteSymbol: pair.quoteToken?.symbol ?? "",
+    };
+    pairCache.set(key, { data, timestamp: Date.now() });
+    return data;
+  } catch {
+    return null;
+  }
+}
+
 export async function batchGetTokenPrices(addresses: string[]): Promise<Map<string, number>> {
   const prices = new Map<string, number>();
   const unique = [...new Set(addresses.map((a) => a.toLowerCase()))];

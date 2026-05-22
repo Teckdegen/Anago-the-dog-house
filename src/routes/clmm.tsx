@@ -1,224 +1,273 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
-import { BarChart2, Droplets } from "lucide-react";
-import { useAccount, useReadContract, usePublicClient, useChainId } from "wagmi";
-import { formatUnits } from "viem";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Droplets, Layers, RefreshCw, Search } from "lucide-react";
+import { useAccount, useChainId, usePublicClient } from "wagmi";
 import { AppShell } from "@/components/AppShell";
-import { ERC20_ABI } from "@/lib/web3/contracts";
+import { TokenIcon } from "@/components/TokenIcon";
+import { PositionCards } from "@/components/clmm/PositionCards";
+import {
+  isUniswapSupportedChain,
+  loadPoolCache,
+  discoverPoolsIncremental,
+  feeToPercent,
+  fetchUserPositions,
+  UNISWAP_V3,
+  type CachedPool,
+  type LpPosition,
+} from "@/lib/uniswap";
 
 export const Route = createFileRoute("/clmm")({
   component: CLMMPage,
-  head: () => ({ meta: [{ title: "CLMM Pools — The Dog House" }, { name: "description", content: "Concentrated liquidity pools on Monad." }] }),
+  head: () => ({
+    meta: [
+      { title: "CLMM — Uniswap V3 on Monad" },
+      { name: "description", content: "Trade and explore Uniswap V3 concentrated liquidity pools on Monad." },
+    ],
+  }),
 });
 
-// Capricorn CL testnet contracts
-const CAPRICORN_FACTORY = "0xd0a37cf728CE2902eB8d4F6f2afc76854048253b" as const;
-const CAPRICORN_POSITION_MANAGER = "0x311819d339B87a10cc4Bbf137d5A0F233Ab56Ad7" as const;
-
-const FACTORY_ABI = [
-  { type: "function", name: "getPool", stateMutability: "view", inputs: [{ name: "tokenA", type: "address" }, { name: "tokenB", type: "address" }, { name: "fee", type: "uint24" }], outputs: [{ type: "address" }] },
-] as const;
-
-const POOL_ABI = [
-  { type: "function", name: "token0", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
-  { type: "function", name: "token1", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
-  { type: "function", name: "fee", stateMutability: "view", inputs: [], outputs: [{ type: "uint24" }] },
-  { type: "function", name: "liquidity", stateMutability: "view", inputs: [], outputs: [{ type: "uint128" }] },
-  { type: "function", name: "slot0", stateMutability: "view", inputs: [], outputs: [{ name: "sqrtPriceX96", type: "uint160" }, { name: "tick", type: "int24" }, { name: "observationIndex", type: "uint16" }, { name: "observationCardinality", type: "uint16" }, { name: "observationCardinalityNext", type: "uint16" }, { name: "feeProtocol", type: "uint8" }, { name: "unlocked", type: "bool" }] },
-] as const;
-
-// Known pools on Capricorn testnet (we'll fetch their data)
-const KNOWN_POOLS = [
-  { address: "0x0000000000000000000000000000000000000000", token0: "MON", token1: "USDC", fee: 3000 },
-];
-
-type PoolData = {
-  address: string;
-  token0: string;
-  token1: string;
-  token0Symbol: string;
-  token1Symbol: string;
-  fee: number;
-  liquidity: string;
-  tvl: string;
-};
+type ClmmView = "pools" | "positions";
 
 function CLMMPage() {
+  const chainId = useChainId();
+  const supported = isUniswapSupportedChain(chainId);
   const { address } = useAccount();
+
+  const [pools, setPools] = useState<CachedPool[]>(() => loadPoolCache()?.pools ?? []);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState("");
+  const [poolSearch, setPoolSearch] = useState("");
+  const [view, setView] = useState<ClmmView>("pools");
+  const [positions, setPositions] = useState<LpPosition[]>([]);
+  const [loadingPos, setLoadingPos] = useState(false);
+  const [posMsg, setPosMsg] = useState("");
+
   const publicClient = usePublicClient();
-  const [pools, setPools] = useState<PoolData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [customPool, setCustomPool] = useState("");
+
+  const syncPools = useCallback(async () => {
+    if (!publicClient || !supported) return;
+    setSyncing(true);
+    try {
+      const result = await discoverPoolsIncremental(publicClient, setSyncMsg);
+      setPools(result.pools);
+      setSyncMsg(
+        result.newPools > 0
+          ? `Synced ${result.newPools} new pools (block ${result.lastIndexedBlock.toString()})`
+          : `Up to date at block ${result.lastIndexedBlock.toString()}`,
+      );
+    } catch (e) {
+      console.error(e);
+      setSyncMsg("Sync failed — try again");
+    } finally {
+      setSyncing(false);
+    }
+  }, [publicClient, supported]);
 
   useEffect(() => {
-    if (!publicClient) return;
-    setLoading(false);
-    // Pools will be loaded when user enters addresses or we add known pools
-  }, [publicClient]);
+    if (supported && publicClient && pools.length === 0) {
+      syncPools();
+    }
+  }, [supported, publicClient]);
+
+  const refreshPositions = useCallback(async () => {
+    if (!publicClient || !address) return;
+    setLoadingPos(true);
+    try {
+      const all = await fetchUserPositions(publicClient, address, setPosMsg);
+      setPositions(all);
+    } finally {
+      setLoadingPos(false);
+      setPosMsg("");
+    }
+  }, [publicClient, address]);
+
+  useEffect(() => {
+    if (view === "positions" && address) refreshPositions();
+  }, [view, address, refreshPositions]);
+
+  const filteredPools = useMemo(() => {
+    if (!poolSearch) return pools;
+    const q = poolSearch.toLowerCase();
+    return pools.filter(
+      (p) =>
+        p.address.toLowerCase().includes(q) ||
+        p.token0.toLowerCase().includes(q) ||
+        p.token1.toLowerCase().includes(q),
+    );
+  }, [pools, poolSearch]);
+
+  if (!supported) {
+    return (
+      <AppShell>
+        <div className="max-w-[680px] mx-auto px-5 pt-12 pb-20 text-center">
+          <p className="font-grotesk text-[18px] uppercase" style={{ color: "#EDE0FF" }}>
+            Switch to Monad Mainnet
+          </p>
+          <p className="font-mono text-[11px] mt-3" style={{ color: "rgba(196,168,240,0.55)" }}>
+            Uniswap V3 CLMM uses official deployments on chain <strong>143</strong>. Connect wallet and select Monad in your wallet app.
+          </p>
+        </div>
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell>
-      <div className="max-w-[1280px] mx-auto px-5 sm:px-8 lg:px-14 pt-8 pb-20">
-        {/* Header */}
-        <div className="mb-7">
-          <h1 className="font-grotesk uppercase text-[22px] sm:text-[28px] leading-none tracking-tight" style={{ color: "#EDE0FF" }}>CLMM Pools</h1>
-          <p className="font-mono text-[10px] mt-1 tracking-wide" style={{ color: "rgba(196,168,240,0.55)" }}>
-            Concentrated liquidity · Provide liquidity in custom price ranges · Earn trading fees
-          </p>
-        </div>
-
-        {/* Pool lookup */}
-        <div className="rounded-xl p-5 mb-6" style={{ border: "1px solid rgba(155,127,212,0.35)", background: "rgba(155,127,212,0.04)" }}>
-          <p className="font-grotesk text-[13px] font-medium mb-3" style={{ color: "#EDE0FF" }}>Enter Pool Address</p>
-          <div className="flex gap-3">
-            <input type="text" value={customPool} onChange={(e) => setCustomPool(e.target.value)} placeholder="0x... (Capricorn CL pool address)"
-              className="flex-1 rounded-xl px-4 py-2.5 font-mono text-[12px] outline-none"
-              style={{ background: "rgba(155,127,212,0.06)", border: "1px solid rgba(155,127,212,0.3)", color: "#EDE0FF" }} />
-            {customPool.length === 42 && (
-              <Link to={`/clmm`} search={{ pool: customPool }}
-                className="px-5 py-2.5 rounded-xl font-grotesk text-[11px] uppercase tracking-wider transition hover:opacity-90"
-                style={{ background: "rgba(155,127,212,0.2)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.5)" }}>
-                View Pool
-              </Link>
-            )}
+      <div className="max-w-[1400px] mx-auto px-5 sm:px-8 lg:px-14 pt-8 pb-20">
+        <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
+          <div>
+            <h1 className="font-grotesk uppercase text-[22px] sm:text-[28px] leading-none tracking-tight" style={{ color: "#EDE0FF" }}>
+              Uniswap V3 CLMM
+            </h1>
+            <p className="font-mono text-[10px] mt-1 tracking-wide" style={{ color: "rgba(196,168,240,0.55)" }}>
+              Trade · add liquidity · claim fees · DexScreener logos
+            </p>
           </div>
-          <p className="font-mono text-[9px] mt-2" style={{ color: "rgba(196,168,240,0.4)" }}>
-            Powered by Capricorn CL · Factory: {CAPRICORN_FACTORY.slice(0, 10)}...
-          </p>
+          <div className="flex flex-wrap gap-2">
+            <div className="flex p-1 rounded-xl" style={{ background: "rgba(155,127,212,0.1)", border: "1px solid rgba(155,127,212,0.25)" }}>
+              <button
+                onClick={() => setView("pools")}
+                className="px-3 py-1.5 rounded-lg font-grotesk text-[10px] uppercase flex items-center gap-1"
+                style={{
+                  background: view === "pools" ? "rgba(155,127,212,0.25)" : "transparent",
+                  color: view === "pools" ? "#EDE0FF" : "rgba(196,168,240,0.5)",
+                }}
+              >
+                <Droplets className="w-3.5 h-3.5" /> Pools
+              </button>
+              <button
+                onClick={() => setView("positions")}
+                className="px-3 py-1.5 rounded-lg font-grotesk text-[10px] uppercase flex items-center gap-1"
+                style={{
+                  background: view === "positions" ? "rgba(155,127,212,0.25)" : "transparent",
+                  color: view === "positions" ? "#EDE0FF" : "rgba(196,168,240,0.5)",
+                }}
+              >
+                <Layers className="w-3.5 h-3.5" /> My Positions
+              </button>
+            </div>
+            <button
+              onClick={syncPools}
+              disabled={syncing}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl font-grotesk text-[10px] uppercase tracking-wider transition disabled:opacity-40"
+              style={{ background: "rgba(155,127,212,0.15)", border: "1px solid rgba(155,127,212,0.4)", color: "#EDE0FF" }}
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${syncing ? "animate-spin" : ""}`} />
+              {syncing ? "Syncing…" : "Sync Pools"}
+            </button>
+          </div>
         </div>
 
-        {/* Pool detail view if pool is selected */}
-        {customPool.length === 42 ? (
-          <PoolDetail poolAddress={customPool as `0x${string}`} />
+        {syncMsg && (
+          <p className="font-mono text-[10px] mb-4" style={{ color: "rgba(196,168,240,0.5)" }}>
+            {syncMsg} · {pools.length} pools cached
+          </p>
+        )}
+
+        {view === "pools" ? (
+          <div
+            className="rounded-xl overflow-hidden flex flex-col min-h-[480px] max-w-3xl"
+            style={{ border: "1px solid rgba(155,127,212,0.35)", background: "rgba(155,127,212,0.03)" }}
+          >
+            <div className="p-4 border-b flex items-center gap-2" style={{ borderColor: "rgba(155,127,212,0.2)" }}>
+              <Search className="w-3.5 h-3.5 shrink-0" style={{ color: "rgba(196,168,240,0.45)" }} />
+              <input
+                value={poolSearch}
+                onChange={(e) => setPoolSearch(e.target.value)}
+                placeholder="Search by address or token…"
+                className="flex-1 bg-transparent font-mono text-[11px] outline-none"
+                style={{ color: "#EDE0FF" }}
+              />
+            </div>
+            <div className="flex-1 overflow-y-auto max-h-[640px]">
+              {filteredPools.length === 0 ? (
+                <div className="py-16 text-center px-4">
+                  <Droplets className="w-8 h-8 mx-auto mb-2 opacity-40" style={{ color: "#C4A8F0" }} />
+                  <p className="font-mono text-[11px]" style={{ color: "rgba(196,168,240,0.5)" }}>
+                    {syncing ? "Discovering pools from Factory events…" : "No pools yet — click Sync Pools"}
+                  </p>
+                </div>
+              ) : (
+                filteredPools.map((p) => <PoolListRow key={p.address} pool={p} />)
+              )}
+            </div>
+          </div>
         ) : (
-          /* Info cards */
-          <div className="grid sm:grid-cols-3 gap-4">
-            <InfoCard title="Concentrated Liquidity" desc="Provide liquidity in custom price ranges for higher capital efficiency" />
-            <InfoCard title="Earn Trading Fees" desc="Earn fees proportional to your share of liquidity in the active range" />
-            <InfoCard title="NFT Positions" desc="Each LP position is an NFT — transferable and composable" />
+          <div
+            className="rounded-xl p-5 max-w-3xl"
+            style={{ border: "1px solid rgba(155,127,212,0.35)", background: "rgba(155,127,212,0.04)" }}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <p className="font-grotesk text-[13px] uppercase" style={{ color: "#EDE0FF" }}>
+                My LP positions
+              </p>
+              <button
+                onClick={refreshPositions}
+                disabled={loadingPos || !address}
+                className="font-mono text-[9px] px-3 py-1 rounded-lg uppercase disabled:opacity-40"
+                style={{ border: "1px solid rgba(155,127,212,0.35)", color: "#C4A8F0" }}
+              >
+                {loadingPos ? "Scanning NFTs…" : "Refresh"}
+              </button>
+            </div>
+            {posMsg && (
+              <p className="font-mono text-[9px] mb-3" style={{ color: "rgba(196,168,240,0.45)" }}>{posMsg}</p>
+            )}
+            <PositionCards
+              positions={positions}
+              loading={loadingPos}
+              emptyLabel="No positions — open a pool to add liquidity or refresh after minting"
+              onRefresh={refreshPositions}
+            />
           </div>
         )}
 
-        {/* Contract info */}
-        <div className="mt-8 rounded-xl p-5" style={{ border: "1px solid rgba(155,127,212,0.15)", background: "rgba(155,127,212,0.02)" }}>
-          <p className="font-mono text-[9px] uppercase tracking-wider mb-3" style={{ color: "rgba(196,168,240,0.4)" }}>Capricorn CL Contracts (Testnet)</p>
-          <div className="grid sm:grid-cols-2 gap-2 font-mono text-[10px]" style={{ color: "rgba(196,168,240,0.5)" }}>
-            <p>Factory: <span style={{ color: "#C4A8F0" }}>{CAPRICORN_FACTORY.slice(0, 18)}...</span></p>
-            <p>Position Manager: <span style={{ color: "#C4A8F0" }}>{CAPRICORN_POSITION_MANAGER.slice(0, 18)}...</span></p>
-          </div>
-        </div>
+        <ContractsFooter />
       </div>
     </AppShell>
   );
 }
 
-function PoolDetail({ poolAddress }: { poolAddress: `0x${string}` }) {
-  const { address } = useAccount();
-  const publicClient = usePublicClient();
-  const [poolData, setPoolData] = useState<any>(null);
-  const [token0Sym, setToken0Sym] = useState("...");
-  const [token1Sym, setToken1Sym] = useState("...");
-
-  useEffect(() => {
-    if (!publicClient) return;
-    let cancelled = false;
-
-    async function load() {
-      try {
-        const [token0, token1, fee, liquidity, slot0] = await Promise.all([
-          publicClient.readContract({ address: poolAddress, abi: POOL_ABI, functionName: "token0" }),
-          publicClient.readContract({ address: poolAddress, abi: POOL_ABI, functionName: "token1" }),
-          publicClient.readContract({ address: poolAddress, abi: POOL_ABI, functionName: "fee" }),
-          publicClient.readContract({ address: poolAddress, abi: POOL_ABI, functionName: "liquidity" }),
-          publicClient.readContract({ address: poolAddress, abi: POOL_ABI, functionName: "slot0" }),
-        ]);
-
-        if (cancelled) return;
-        setPoolData({ token0, token1, fee, liquidity, slot0 });
-
-        // Fetch symbols
-        const [sym0, sym1] = await Promise.all([
-          publicClient.readContract({ address: token0 as `0x${string}`, abi: ERC20_ABI, functionName: "symbol" }).catch(() => "???"),
-          publicClient.readContract({ address: token1 as `0x${string}`, abi: ERC20_ABI, functionName: "symbol" }).catch(() => "???"),
-        ]);
-        if (!cancelled) { setToken0Sym(sym0 as string); setToken1Sym(sym1 as string); }
-      } catch (e) {
-        console.error("Failed to load pool:", e);
-      }
-    }
-
-    load();
-    return () => { cancelled = true; };
-  }, [poolAddress, publicClient]);
-
-  if (!poolData) {
-    return (
-      <div className="rounded-xl p-8 text-center" style={{ border: "1px solid rgba(155,127,212,0.35)" }}>
-        <div className="w-6 h-6 rounded-full border-2 animate-spin mx-auto mb-3" style={{ borderColor: "rgba(155,127,212,0.2)", borderTopColor: "rgba(155,127,212,0.8)" }} />
-        <p className="font-mono text-[11px]" style={{ color: "rgba(196,168,240,0.5)" }}>Loading pool data...</p>
-      </div>
-    );
-  }
-
-  const feePct = Number(poolData.fee) / 10000;
-  const tick = Number(poolData.slot0[1]);
-
+function PoolListRow({ pool }: { pool: CachedPool }) {
   return (
-    <div className="space-y-4">
-      {/* Pool header */}
-      <div className="rounded-xl p-6" style={{ border: "1px solid rgba(155,127,212,0.35)", background: "rgba(155,127,212,0.04)" }}>
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <p className="font-grotesk text-[20px] font-medium" style={{ color: "#EDE0FF" }}>{token0Sym} / {token1Sym}</p>
-            <p className="font-mono text-[10px] mt-1" style={{ color: "rgba(196,168,240,0.5)" }}>
-              Fee: {feePct}% · Tick: {tick} · Pool: {poolAddress.slice(0, 10)}...
-            </p>
-          </div>
-          <div className="px-3 py-1.5 rounded-lg font-mono text-[10px]" style={{ background: "rgba(155,127,212,0.15)", color: "#C4A8F0", border: "1px solid rgba(155,127,212,0.3)" }}>
-            {feePct}% fee
-          </div>
+    <Link
+      to="/clmm/pool/$poolAddress"
+      params={{ poolAddress: pool.address }}
+      className="block w-full text-left px-4 py-3 transition hover:bg-[rgba(155,127,212,0.06)]"
+      style={{ borderBottom: "1px solid rgba(155,127,212,0.1)" }}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <TokenIcon address={pool.token0} size={22} />
+          <span className="font-mono text-[10px]" style={{ color: "rgba(196,168,240,0.5)" }}>/</span>
+          <TokenIcon address={pool.token1} size={22} />
         </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-          <div>
-            <p className="font-mono text-[9px] uppercase tracking-wider" style={{ color: "rgba(196,168,240,0.4)" }}>Liquidity</p>
-            <p className="font-mono text-[14px] mt-1" style={{ color: "#EDE0FF" }}>{Number(poolData.liquidity).toLocaleString()}</p>
-          </div>
-          <div>
-            <p className="font-mono text-[9px] uppercase tracking-wider" style={{ color: "rgba(196,168,240,0.4)" }}>Current Tick</p>
-            <p className="font-mono text-[14px] mt-1" style={{ color: "#EDE0FF" }}>{tick}</p>
-          </div>
-          <div>
-            <p className="font-mono text-[9px] uppercase tracking-wider" style={{ color: "rgba(196,168,240,0.4)" }}>Token Pair</p>
-            <p className="font-mono text-[14px] mt-1" style={{ color: "#EDE0FF" }}>{token0Sym}/{token1Sym}</p>
-          </div>
-        </div>
+        <span
+          className="font-mono text-[9px] px-1.5 py-0.5 rounded shrink-0"
+          style={{ background: "rgba(155,127,212,0.12)", color: "#C4A8F0" }}
+        >
+          {feeToPercent(pool.fee)}
+        </span>
       </div>
-
-      {/* Add liquidity section */}
-      <div className="rounded-xl p-6" style={{ border: "1px solid rgba(155,127,212,0.35)", background: "rgba(155,127,212,0.04)" }}>
-        <p className="font-grotesk text-[14px] font-medium mb-4" style={{ color: "#EDE0FF" }}>Add Liquidity</p>
-        <p className="font-mono text-[10px] mb-4" style={{ color: "rgba(196,168,240,0.5)" }}>
-          To add liquidity, interact with the Capricorn NonfungiblePositionManager at:
-        </p>
-        <p className="font-mono text-[11px] p-3 rounded-lg" style={{ background: "rgba(155,127,212,0.08)", color: "#C4A8F0", border: "1px solid rgba(155,127,212,0.2)" }}>
-          {CAPRICORN_POSITION_MANAGER}
-        </p>
-        <p className="font-mono text-[9px] mt-3" style={{ color: "rgba(196,168,240,0.4)" }}>
-          Use mint() with your desired tick range and amounts. Each position is an NFT.
-        </p>
-      </div>
-    </div>
+      <p className="font-mono text-[9px] mt-1 truncate" style={{ color: "rgba(196,168,240,0.4)" }}>
+        {pool.address}
+      </p>
+    </Link>
   );
 }
 
-function InfoCard({ title, desc }: { title: string; desc: string }) {
+function ContractsFooter() {
   return (
-    <div className="rounded-xl p-5" style={{ border: "1px solid rgba(155,127,212,0.25)", background: "rgba(155,127,212,0.03)" }}>
-      <Droplets className="w-5 h-5 mb-3" style={{ color: "#C4A8F0" }} strokeWidth={1.5} />
-      <p className="font-grotesk text-[12px] font-medium mb-1" style={{ color: "#EDE0FF" }}>{title}</p>
-      <p className="font-mono text-[10px]" style={{ color: "rgba(196,168,240,0.5)" }}>{desc}</p>
+    <div className="rounded-xl p-4 mt-6 max-w-3xl" style={{ border: "1px solid rgba(155,127,212,0.15)", background: "rgba(155,127,212,0.02)" }}>
+      <p className="font-mono text-[8px] uppercase tracking-wider mb-2" style={{ color: "rgba(196,168,240,0.4)" }}>
+        Uniswap V3 on Monad
+      </p>
+      <div className="space-y-1 font-mono text-[9px] break-all" style={{ color: "rgba(196,168,240,0.45)" }}>
+        <p>Factory: {UNISWAP_V3.factory}</p>
+        <p>QuoterV2: {UNISWAP_V3.quoterV2}</p>
+        <p>SwapRouter02: {UNISWAP_V3.swapRouter02}</p>
+        <p>UniversalRouter: {UNISWAP_V3.universalRouter}</p>
+      </div>
     </div>
   );
 }

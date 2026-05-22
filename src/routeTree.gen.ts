@@ -17,6 +17,7 @@ import { Route as FarmRouteImport } from './routes/farm'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ClmmRouteImport } from './routes/clmm'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ClmmPoolPoolAddressRouteImport } from './routes/clmm.pool.$poolAddress'
 
 const VestingRoute = VestingRouteImport.update({
   id: '/vesting',
@@ -58,37 +59,45 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ClmmPoolPoolAddressRoute = ClmmPoolPoolAddressRouteImport.update({
+  id: '/pool/$poolAddress',
+  path: '/pool/$poolAddress',
+  getParentRoute: () => ClmmRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/clmm': typeof ClmmRoute
+  '/clmm': typeof ClmmRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/farm': typeof FarmRoute
   '/lock': typeof LockRoute
   '/otc': typeof OtcRoute
   '/transfer': typeof TransferRoute
   '/vesting': typeof VestingRoute
+  '/clmm/pool/$poolAddress': typeof ClmmPoolPoolAddressRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/clmm': typeof ClmmRoute
+  '/clmm': typeof ClmmRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/farm': typeof FarmRoute
   '/lock': typeof LockRoute
   '/otc': typeof OtcRoute
   '/transfer': typeof TransferRoute
   '/vesting': typeof VestingRoute
+  '/clmm/pool/$poolAddress': typeof ClmmPoolPoolAddressRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/clmm': typeof ClmmRoute
+  '/clmm': typeof ClmmRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/farm': typeof FarmRoute
   '/lock': typeof LockRoute
   '/otc': typeof OtcRoute
   '/transfer': typeof TransferRoute
   '/vesting': typeof VestingRoute
+  '/clmm/pool/$poolAddress': typeof ClmmPoolPoolAddressRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -101,6 +110,7 @@ export interface FileRouteTypes {
     | '/otc'
     | '/transfer'
     | '/vesting'
+    | '/clmm/pool/$poolAddress'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -111,6 +121,7 @@ export interface FileRouteTypes {
     | '/otc'
     | '/transfer'
     | '/vesting'
+    | '/clmm/pool/$poolAddress'
   id:
     | '__root__'
     | '/'
@@ -121,11 +132,12 @@ export interface FileRouteTypes {
     | '/otc'
     | '/transfer'
     | '/vesting'
+    | '/clmm/pool/$poolAddress'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  ClmmRoute: typeof ClmmRoute
+  ClmmRoute: typeof ClmmRouteWithChildren
   DashboardRoute: typeof DashboardRoute
   FarmRoute: typeof FarmRoute
   LockRoute: typeof LockRoute
@@ -192,12 +204,29 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/clmm/pool/$poolAddress': {
+      id: '/clmm/pool/$poolAddress'
+      path: '/pool/$poolAddress'
+      fullPath: '/clmm/pool/$poolAddress'
+      preLoaderRoute: typeof ClmmPoolPoolAddressRouteImport
+      parentRoute: typeof ClmmRoute
+    }
   }
 }
 
+interface ClmmRouteChildren {
+  ClmmPoolPoolAddressRoute: typeof ClmmPoolPoolAddressRoute
+}
+
+const ClmmRouteChildren: ClmmRouteChildren = {
+  ClmmPoolPoolAddressRoute: ClmmPoolPoolAddressRoute,
+}
+
+const ClmmRouteWithChildren = ClmmRoute._addFileChildren(ClmmRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  ClmmRoute: ClmmRoute,
+  ClmmRoute: ClmmRouteWithChildren,
   DashboardRoute: DashboardRoute,
   FarmRoute: FarmRoute,
   LockRoute: LockRoute,

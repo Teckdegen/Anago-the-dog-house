@@ -29,7 +29,20 @@ export const monadTestnet = defineChain({
   testnet: true,
 });
 
-export const networks = [monadTestnet] as const;
+/** Monad mainnet — Uniswap V3 official deployments (chainId 143) */
+export const monad = defineChain({
+  id: 143,
+  name: "Monad",
+  nativeCurrency: { name: "Monad", symbol: "MON", decimals: 18 },
+  rpcUrls: {
+    default: { http: ["https://rpc.monad.xyz"] },
+  },
+  blockExplorers: {
+    default: { name: "Monad Explorer", url: "https://monadexplorer.com" },
+  },
+});
+
+export const networks = [monad, monadTestnet] as const;
 
 export const wagmiAdapter = new WagmiAdapter({
   projectId,
@@ -62,7 +75,7 @@ createAppKit({
   adapters: [wagmiAdapter],
   networks: [...networks],
   projectId,
-  defaultNetwork: monadTestnet,
+  defaultNetwork: monad,
   metadata: {
     name: "The Dog House",
     description: "Vesting, Locks, CLMM & Yield Farming on Monad",
