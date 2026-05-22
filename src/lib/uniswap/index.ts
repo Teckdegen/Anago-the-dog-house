@@ -1,7 +1,9 @@
 export * from "./addresses";
 export * from "./types";
 export * from "./poolCache";
+export { SEED_POOLS, SEED_POOLS_LAST_INDEXED_BLOCK } from "./seedPools.generated";
 export * from "./discoverPools";
+export * from "./discoverPoolsDexScreener";
 export * from "./poolState";
 export * from "./quote";
 export * from "./swap";

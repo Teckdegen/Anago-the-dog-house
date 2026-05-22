@@ -3,14 +3,20 @@ import { parseAbiItem } from "viem";
 import { UNISWAP_V3 } from "./addresses";
 import { FACTORY_ABI } from "./abis";
 import type { CachedPool } from "./types";
-import { loadPoolCache, mergePools, savePoolCache } from "./poolCache";
+import { getSeedPools, loadPoolCache, mergePools, savePoolCache } from "./poolCache";
+import { SEED_POOLS_LAST_INDEXED_BLOCK } from "./seedPools.generated";
+import {
+  discoverPoolsFromDexScreener,
+  enrichPoolsOnChain,
+} from "./discoverPoolsDexScreener";
 
 const POOL_CREATED = parseAbiItem(
   "event PoolCreated(address indexed token0, address indexed token1, uint24 indexed fee, int24 tickSpacing, address pool)",
 );
 
-const CHUNK_SIZE = 50_000n;
-const INITIAL_LOOKBACK = 300_000n;
+/** Monad RPC: max 100 blocks per eth_getLogs */
+const LOG_CHUNK = 100n;
+const MAX_LOG_CHUNKS_PER_SYNC = 30;
 
 export type DiscoverResult = {
   pools: CachedPool[];
@@ -18,57 +24,82 @@ export type DiscoverResult = {
   newPools: number;
 };
 
+/**
+ * Primary: DexScreener lists Uniswap V3 pairs on Monad (works in browser + Vercel).
+ * Secondary: small on-chain log tail for brand-new pools after last index.
+ */
 export async function discoverPoolsIncremental(
   client: PublicClient,
   onProgress?: (msg: string) => void,
 ): Promise<DiscoverResult> {
   const latest = await client.getBlockNumber();
   const cached = loadPoolCache();
-  const existing = cached?.pools ?? [];
+  let existing = cached.pools.length > 0 ? cached.pools : getSeedPools();
 
-  let fromBlock =
-    cached?.lastIndexedBlock != null
-      ? BigInt(cached.lastIndexedBlock) + 1n
-      : latest > INITIAL_LOOKBACK
-        ? latest - INITIAL_LOOKBACK
-        : 0n;
+  onProgress?.("Loading Uniswap V3 pools from DexScreener…");
+  let dexPools = await discoverPoolsFromDexScreener(onProgress);
+  if (dexPools.length > 0) {
+    onProgress?.(`Enriching ${dexPools.length} pools on-chain…`);
+    dexPools = await enrichPoolsOnChain(client, dexPools, onProgress);
+  }
+  existing = mergePools(existing, dexPools);
+
+  const seedBlock = BigInt(SEED_POOLS_LAST_INDEXED_BLOCK || "0");
+  const cachedBlock = BigInt(cached.lastIndexedBlock || "0");
+  const highWater = cachedBlock > seedBlock ? cachedBlock : seedBlock;
+
+  let fromBlock = highWater > 0n ? highWater + 1n : latest > LOG_CHUNK * MAX_LOG_CHUNKS_PER_SYNC
+    ? latest - LOG_CHUNK * BigInt(MAX_LOG_CHUNKS_PER_SYNC)
+    : 0n;
 
   if (fromBlock > latest) {
+    savePoolCache({
+      lastIndexedBlock: latest.toString(),
+      pools: existing,
+      updatedAt: Date.now(),
+    });
     return { pools: existing, lastIndexedBlock: latest, newPools: 0 };
   }
 
   const discovered: CachedPool[] = [];
+  let chunks = 0;
 
-  while (fromBlock <= latest) {
-    const toBlock = fromBlock + CHUNK_SIZE > latest ? latest : fromBlock + CHUNK_SIZE;
-    onProgress?.(`Scanning blocks ${fromBlock.toString()} → ${toBlock.toString()}…`);
+  while (fromBlock <= latest && chunks < MAX_LOG_CHUNKS_PER_SYNC) {
+    const toBlock =
+      fromBlock + LOG_CHUNK - 1n > latest ? latest : fromBlock + LOG_CHUNK - 1n;
+    onProgress?.(`New pools · blocks ${fromBlock}–${toBlock}`);
 
-    const logs = await client.getLogs({
-      address: UNISWAP_V3.factory,
-      event: POOL_CREATED,
-      fromBlock,
-      toBlock,
-    });
-
-    for (const log of logs) {
-      const args = log.args as {
-        token0?: `0x${string}`;
-        token1?: `0x${string}`;
-        fee?: number;
-        tickSpacing?: number;
-        pool?: `0x${string}`;
-      };
-      if (!args.pool || !args.token0 || !args.token1) continue;
-      discovered.push({
-        address: args.pool,
-        token0: args.token0,
-        token1: args.token1,
-        fee: Number(args.fee ?? 0),
-        tickSpacing: Number(args.tickSpacing ?? 0),
+    try {
+      const logs = await client.getLogs({
+        address: UNISWAP_V3.factory,
+        event: POOL_CREATED,
+        fromBlock,
+        toBlock,
       });
+
+      for (const log of logs) {
+        const args = log.args as {
+          token0?: `0x${string}`;
+          token1?: `0x${string}`;
+          fee?: number;
+          tickSpacing?: number;
+          pool?: `0x${string}`;
+        };
+        if (!args.pool || !args.token0 || !args.token1) continue;
+        discovered.push({
+          address: args.pool,
+          token0: args.token0,
+          token1: args.token1,
+          fee: Number(args.fee ?? 0),
+          tickSpacing: Number(args.tickSpacing ?? 0),
+        });
+      }
+    } catch {
+      break;
     }
 
     fromBlock = toBlock + 1n;
+    chunks++;
   }
 
   const merged = mergePools(existing, discovered);
@@ -81,7 +112,7 @@ export async function discoverPoolsIncremental(
   return {
     pools: merged,
     lastIndexedBlock: latest,
-    newPools: discovered.length,
+    newPools: dexPools.length + discovered.length,
   };
 }
 

@@ -12,6 +12,7 @@ import { useEnrichedPools } from "@/hooks/useEnrichedPools";
 import {
   isUniswapSupportedChain,
   loadPoolCache,
+  getSeedPools,
   discoverPoolsIncremental,
   fetchUserPositions,
   UNISWAP_V3,
@@ -36,7 +37,10 @@ function CLMMPage() {
   const { address } = useAccount();
   const publicClient = usePublicClient();
 
-  const [pools, setPools] = useState(() => loadPoolCache()?.pools ?? []);
+  const [pools, setPools] = useState(() => {
+    const cached = loadPoolCache();
+    return cached.pools.length > 0 ? cached.pools : getSeedPools();
+  });
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState("");
   const [poolSearch, setPoolSearch] = useState("");
@@ -61,16 +65,23 @@ function CLMMPage() {
           ? `+${result.newPools} pools · block ${result.lastIndexedBlock}`
           : `Indexed · block ${result.lastIndexedBlock}`,
       );
-    } catch {
-      setSyncMsg("Sync failed");
+    } catch (e) {
+      console.error("CLMM pool sync:", e);
+      const fallback = loadPoolCache().pools;
+      if (fallback.length > 0) setPools(fallback);
+      setSyncMsg(
+        fallback.length > 0
+          ? `${fallback.length} pools (DexScreener) · live tail skipped`
+          : "Could not load pools — connect Monad mainnet & retry",
+      );
     } finally {
       setSyncing(false);
     }
   }, [publicClient, supported]);
 
   useEffect(() => {
-    if (supported && publicClient && pools.length === 0) syncPools();
-  }, [supported, publicClient, pools.length, syncPools]);
+    if (supported && publicClient) syncPools();
+  }, [supported, publicClient]);
 
   const filteredRows = useMemo(() => {
     if (!poolSearch.trim()) return rows;
@@ -153,7 +164,7 @@ function CLMMPage() {
         {view === "explore" ? (
           filteredRows.length === 0 && !indexing ? (
             <div className="py-20 text-center font-mono text-[11px]" style={{ color: clmm.textMuted }}>
-              {syncing ? "Discovering pools…" : "No pools — tap refresh to sync factory events"}
+              {syncing ? "Loading Uniswap V3 from DexScreener…" : "No pools — connect Monad mainnet (143) & refresh"}
             </div>
           ) : (
             <PoolsExploreTable rows={filteredRows} indexing={indexing} progress={progress} />
@@ -218,8 +229,8 @@ function ContractsFooter() {
       style={{ color: clmm.textDim, border: `1px solid ${clmm.border}`, background: clmm.purpleBg }}
     >
       <p className="uppercase tracking-wider">Uniswap V3 · Monad</p>
-      <p>Factory {UNISWAP_V3.factory}</p>
-      <p>Pool stats cached 10m · second visit loads from localStorage instantly</p>
+        <p>Factory {UNISWAP_V3.factory}</p>
+        <p>Pools from DexScreener (Uniswap V3 · Monad) · fees from on-chain · npm run sync:pools to refresh seed</p>
     </div>
   );
 }

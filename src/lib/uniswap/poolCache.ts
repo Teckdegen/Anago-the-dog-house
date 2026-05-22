@@ -1,4 +1,9 @@
 import type { CachedPool } from "./types";
+import {
+  SEED_POOLS,
+  SEED_POOLS_LAST_INDEXED_BLOCK,
+  SEED_POOLS_UPDATED_AT,
+} from "./seedPools.generated";
 
 const CACHE_KEY = "uniswap_v3_pools_monad_v1";
 
@@ -8,13 +13,35 @@ export type PoolIndexCache = {
   updatedAt: number;
 };
 
-export function loadPoolCache(): PoolIndexCache | null {
+export function getSeedPools(): CachedPool[] {
+  return SEED_POOLS.map((p) => ({ ...p }));
+}
+
+export function getSeedPoolIndex(): PoolIndexCache {
+  return {
+    lastIndexedBlock: SEED_POOLS_LAST_INDEXED_BLOCK,
+    pools: getSeedPools(),
+    updatedAt: SEED_POOLS_UPDATED_AT || Date.now(),
+  };
+}
+
+/** Hardcoded pools + optional browser cache (instant on Vercel, auto-sync after) */
+export function loadPoolCache(): PoolIndexCache {
+  const seed = getSeedPoolIndex();
   try {
     const raw = localStorage.getItem(CACHE_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw) as PoolIndexCache;
+    if (!raw) return seed;
+    const cached = JSON.parse(raw) as PoolIndexCache;
+    return {
+      lastIndexedBlock:
+        BigInt(cached.lastIndexedBlock || 0) > BigInt(seed.lastIndexedBlock)
+          ? cached.lastIndexedBlock
+          : seed.lastIndexedBlock,
+      pools: mergePools(seed.pools, cached.pools ?? []),
+      updatedAt: Math.max(cached.updatedAt ?? 0, seed.updatedAt),
+    };
   } catch {
-    return null;
+    return seed;
   }
 }
 
