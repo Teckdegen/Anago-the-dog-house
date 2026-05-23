@@ -1,25 +1,22 @@
 /**
  * 24/7 CLMM pool indexer — The Graph subgraph → Supabase.
  *
- * The web UI never talks to the subgraph. It only reads /api/clmm/pools (Supabase).
- * Run this on a VPS, Railway, Render, or locally with pm2:
+ *   node script.js              # every 5 min (default)
+ *   node script.js --once
  *
- *   node script.js              # loop forever (default every 15 min)
- *   node script.js --once       # single sync then exit
- *
- * Env (.env.local): THE_GRAPH_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
- * Optional: SYNC_INTERVAL_MS=900000  FULL_METRICS_SYNC=true
+ * Env: .env or .env.local — THE_GRAPH_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
  */
 
 import { readFileSync, existsSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 import { syncClmmPoolsToSupabase } from "./lib/clmm-sync.mjs";
+import { testSupabaseConnection } from "./lib/supabase-admin.mjs";
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 
 function loadEnv() {
-  for (const name of [".env.local", ".env"]) {
+  for (const name of [".env", ".env.local"]) {
     const path = join(ROOT, name);
     if (!existsSync(path)) continue;
     for (const line of readFileSync(path, "utf8").split(/\r?\n/)) {
@@ -32,7 +29,7 @@ function loadEnv() {
       if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
         val = val.slice(1, -1);
       }
-      if (!process.env[key]) process.env[key] = val;
+      process.env[key] = val;
     }
   }
 }
@@ -40,7 +37,8 @@ function loadEnv() {
 loadEnv();
 
 const once = process.argv.includes("--once");
-const intervalMs = Math.max(60_000, parseInt(process.env.SYNC_INTERVAL_MS ?? "900000", 10) || 900_000);
+const FIVE_MIN_MS = 300_000;
+const intervalMs = Math.max(60_000, parseInt(process.env.SYNC_INTERVAL_MS ?? String(FIVE_MIN_MS), 10) || FIVE_MIN_MS);
 const fullMetrics =
   process.env.FULL_METRICS_SYNC === "true" || process.env.FULL_METRICS_SYNC === "1";
 
@@ -60,6 +58,7 @@ async function tick() {
     );
   } catch (e) {
     console.error(`[${iso()}] Sync failed:`, e instanceof Error ? e.message : e);
+    if (e instanceof Error && e.cause) console.error("  cause:", e.cause);
   } finally {
     running = false;
   }
@@ -79,14 +78,32 @@ async function main() {
 
   if (missing.length) {
     console.error(`Missing env: ${missing.join(", ")}`);
-    console.error("Add them to .env.local — see .env.example");
+    console.error("Add them to .env — see .env.example");
     process.exit(1);
   }
 
   console.log("CLMM pool indexer");
   console.log(`  Subgraph → Supabase (UI reads Supabase only)`);
+  console.log(`  Supabase: ${process.env.SUPABASE_URL?.replace(/\/+$/, "")}`);
   console.log(`  Full metrics: ${fullMetrics ? "yes (all pools)" : "top 1500 by liquidity"}`);
-  console.log(`  Mode: ${once ? "once" : `every ${Math.round(intervalMs / 60_000)} min`}`);
+  console.log(`  Interval: ${once ? "once" : `every ${Math.round(intervalMs / 60_000)} min`}`);
+
+  console.log(`[${iso()}] Testing Supabase connection…`);
+  try {
+    await testSupabaseConnection();
+    console.log(`[${iso()}] Supabase OK (clmm_pools table reachable)`);
+  } catch (e) {
+    console.error(`[${iso()}] Supabase check failed:`, e instanceof Error ? e.message : e);
+    console.error(`
+Fix checklist:
+  1. Supabase Dashboard → Project Settings → API
+  2. SUPABASE_URL = Project URL (https://xxxxx.supabase.co)
+  3. SUPABASE_SERVICE_ROLE_KEY = service_role secret (not anon)
+  4. SQL Editor → run supabase/migrations/001_clmm_pools.sql
+  5. Project not paused (Dashboard home)
+`);
+    process.exit(1);
+  }
 
   await tick();
 
