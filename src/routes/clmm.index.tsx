@@ -13,7 +13,9 @@ import {
   loadPoolCache,
   getSeedPools,
   discoverPoolsIncremental,
+  loadLocalV4Pools,
   fetchUserPositions,
+  getMonadPublicClient,
   type LpPosition,
 } from "@/lib/uniswap";
 
@@ -21,8 +23,8 @@ export const Route = createFileRoute("/clmm/")({
   component: CLMMExplorePage,
   head: () => ({
     meta: [
-      { title: "Explore Pools — Uniswap CLMM" },
-      { name: "description", content: "Explore concentrated liquidity pools on Monad." },
+      { title: "Explore Pools — Uniswap V4" },
+      { name: "description", content: "Explore Uniswap V4 concentrated liquidity pools on Monad." },
     ],
   }),
 });
@@ -38,8 +40,8 @@ function CLMMExplorePage() {
   const publicClient = usePublicClient();
 
   const [pools, setPools] = useState(() => {
-    const cached = loadPoolCache();
-    return cached.pools.length > 0 ? cached.pools : getSeedPools();
+    const local = loadLocalV4Pools();
+    return local.length > 0 ? local : getSeedPools();
   });
   const [syncing, setSyncing] = useState(false);
   const [poolSearch, setPoolSearch] = useState("");
@@ -50,10 +52,10 @@ function CLMMExplorePage() {
   const { rows, indexing, progress } = useEnrichedPools(pools, publicClient, supported);
 
   const syncPools = useCallback(async () => {
-    if (!publicClient || !supported) return;
+    if (!supported) return;
     setSyncing(true);
     try {
-      const result = await discoverPoolsIncremental(publicClient);
+      const result = await discoverPoolsIncremental(getMonadPublicClient());
       setPools(result.pools);
     } catch (e) {
       console.error("CLMM pool sync:", e);
@@ -62,11 +64,11 @@ function CLMMExplorePage() {
     } finally {
       setSyncing(false);
     }
-  }, [publicClient, supported]);
+  }, [supported]);
 
   useEffect(() => {
-    if (supported && publicClient) syncPools();
-  }, [supported, publicClient, syncPools]);
+    if (supported) syncPools();
+  }, [supported, syncPools]);
 
   const filteredRows = useMemo(() => {
     if (!poolSearch.trim()) return rows;
@@ -77,7 +79,7 @@ function CLMMExplorePage() {
         r.metrics.symbol0.toLowerCase().includes(q) ||
         r.metrics.symbol1.toLowerCase().includes(q) ||
         r.metrics.displayId.toLowerCase().includes(q) ||
-        (r.protocol ?? "v3").includes(q),
+        (r.protocol ?? "v4").includes(q),
     );
   }, [rows, poolSearch]);
 
@@ -104,7 +106,7 @@ function CLMMExplorePage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div className="flex gap-6 border-b sm:border-b-0" style={{ borderColor: clmm.border }}>
             <TabBtn active={view === "explore"} onClick={() => setView("explore")}>
-              Explore pools
+              Explore pools{pools.length > 0 ? ` (${pools.length})` : ""}
             </TabBtn>
             <TabBtn active={view === "positions"} onClick={() => setView("positions")}>
               Your positions
@@ -133,7 +135,11 @@ function CLMMExplorePage() {
         {view === "explore" ? (
           filteredRows.length === 0 && !indexing ? (
             <div className="py-20 text-center font-mono text-[11px]" style={{ color: clmm.textMuted }}>
-              {syncing ? "Loading pools…" : "No pools — switch to Monad mainnet (143)"}
+              {syncing
+                ? "Loading pools…"
+                : pools.length === 0
+                  ? "No pools in app — run npm run sync:pools (THE_GRAPH_API_KEY in .env.local)"
+                  : "No pools match your search"}
             </div>
           ) : (
             <PoolsExploreTable rows={filteredRows} indexing={indexing} progress={progress} />

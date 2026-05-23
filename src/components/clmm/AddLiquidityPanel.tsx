@@ -1,130 +1,25 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Plus } from "lucide-react";
-import {
-  useAccount,
-  usePublicClient,
-  useReadContract,
-  useWriteContract,
-  useWaitForTransactionReceipt,
-} from "wagmi";
-import { parseUnits, maxUint256 } from "viem";
+import { useAccount } from "wagmi";
+import { parseUnits } from "viem";
 import { useToast } from "@/components/Toast";
-import { ERC20_ABI } from "@/lib/web3/tokens";
-import { prepareTransactionWithGas } from "@/lib/web3/gasUtils";
-import {
-  UNISWAP_V3,
-  buildMintArgs,
-  type PoolLiveState,
-} from "@/lib/uniswap";
-import { NPM_ABI } from "@/lib/uniswap/abis";
+import { UNISWAP_V4, type PoolLiveState } from "@/lib/uniswap";
 
 export function AddLiquidityPanel({ live }: { live: PoolLiveState }) {
   const { address } = useAccount();
-  const publicClient = usePublicClient();
   const { toast } = useToast();
+  const positionManager = UNISWAP_V4.positionManager;
 
   const [amount0, setAmount0] = useState("");
   const [amount1, setAmount1] = useState("");
-  const stepRef = useRef<"idle" | "t0" | "t1" | "mint">("idle");
-
-  const approveTx = useWriteContract();
-  const mintTx = useWriteContract();
-  const approveRcpt = useWaitForTransactionReceipt({ hash: approveTx.data });
-  const mintRcpt = useWaitForTransactionReceipt({ hash: mintTx.data });
 
   const parsed0 = safeParse(amount0, live.token0Decimals);
   const parsed1 = safeParse(amount1, live.token1Decimals);
 
-  const allow0 = useReadContract({
-    address: live.pool.token0,
-    abi: ERC20_ABI,
-    functionName: "allowance",
-    args: address ? [address, UNISWAP_V3.positionManager] : undefined,
-    query: { enabled: !!address && parsed0 > 0n },
-  });
-  const allow1 = useReadContract({
-    address: live.pool.token1,
-    abi: ERC20_ABI,
-    functionName: "allowance",
-    args: address ? [address, UNISWAP_V3.positionManager] : undefined,
-    query: { enabled: !!address && parsed1 > 0n },
-  });
-
-  const needs0 = parsed0 > 0n && ((allow0.data as bigint | undefined) ?? 0n) < parsed0;
-  const needs1 = parsed1 > 0n && ((allow1.data as bigint | undefined) ?? 0n) < parsed1;
-
-  const runMint = async () => {
-    if (!address || !publicClient || (parsed0 === 0n && parsed1 === 0n)) return;
-    const gas = await prepareTransactionWithGas(publicClient);
-    mintTx.writeContract({
-      address: UNISWAP_V3.positionManager,
-      abi: NPM_ABI,
-      functionName: "mint",
-      args: [
-        buildMintArgs({
-          live,
-          recipient: address,
-          amount0Desired: parsed0,
-          amount1Desired: parsed1,
-        }),
-      ],
-      ...gas,
-    });
-  };
-
-  const approve = async (token: `0x${string}`) => {
-    if (!publicClient) return;
-    const gas = await prepareTransactionWithGas(publicClient);
-    approveTx.writeContract({
-      address: token,
-      abi: ERC20_ABI,
-      functionName: "approve",
-      args: [UNISWAP_V3.positionManager, maxUint256],
-      ...gas,
-    });
-  };
-
-  useEffect(() => {
-    if (!approveRcpt.isSuccess || stepRef.current === "idle") return;
-    if (stepRef.current === "t0" && needs1) {
-      stepRef.current = "t1";
-      approve(live.pool.token1).catch((e) => toast("error", "Approve failed", (e as Error).message));
-    } else {
-      stepRef.current = "mint";
-      runMint().catch((e) => toast("error", "Mint failed", (e as Error).message));
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [approveRcpt.isSuccess]);
-
-  useEffect(() => {
-    if (mintRcpt.isSuccess) {
-      stepRef.current = "idle";
-      toast("success", "Liquidity added", "Position NFT minted");
-      setAmount0("");
-      setAmount1("");
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mintRcpt.isSuccess]);
-
   const handleAdd = () => {
     if (!address) return;
-    if (parsed0 === 0n && parsed1 === 0n) {
-      toast("error", "Enter amount", "Provide at least one token");
-      return;
-    }
-    if (needs0) {
-      stepRef.current = "t0";
-      approve(live.pool.token0).catch((e) => toast("error", "Approve failed", (e as Error).message));
-    } else if (needs1) {
-      stepRef.current = "t1";
-      approve(live.pool.token1).catch((e) => toast("error", "Approve failed", (e as Error).message));
-    } else {
-      runMint().catch((e) => toast("error", "Mint failed", (e as Error).message));
-    }
+    toast("error", "V4 liquidity", "Use the Uniswap LP API with a server-side key on Monad 143.");
   };
-
-  const busy = approveTx.isPending || approveRcpt.isLoading || mintTx.isPending || mintRcpt.isLoading;
-  const label = needs0 || needs1 ? "Approve & Add Liquidity" : "Add Liquidity";
 
   if (!address) {
     return (
@@ -137,25 +32,21 @@ export function AddLiquidityPanel({ live }: { live: PoolLiveState }) {
   return (
     <div className="space-y-4">
       <p className="font-mono text-[10px]" style={{ color: "rgba(196,168,240,0.5)" }}>
-        Wide range around current tick · NonfungiblePositionManager mint
+        Uniswap V4 · Position Manager {positionManager.slice(0, 10)}… · add via LP API
       </p>
       <AmountField label={live.token0Symbol} value={amount0} onChange={setAmount0} />
       <AmountField label={live.token1Symbol} value={amount1} onChange={setAmount1} />
       <button
+        type="button"
         onClick={handleAdd}
-        disabled={busy || (parsed0 === 0n && parsed1 === 0n)}
+        disabled={parsed0 === 0n && parsed1 === 0n}
         className="w-full rounded-xl py-3 font-grotesk text-[11px] uppercase tracking-wider disabled:opacity-40"
         style={{ background: "rgba(155,127,212,0.22)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.5)" }}
       >
-        {busy ? "Working…" : label}
+        Add Liquidity (LP API)
       </button>
-      {(approveTx.error || mintTx.error) && (
-        <p className="font-mono text-[9px] break-words" style={{ color: "rgba(255,100,100,0.9)" }}>
-          {(approveTx.error || mintTx.error)?.message}
-        </p>
-      )}
       <p className="font-mono text-[8px] flex items-center gap-1" style={{ color: "rgba(196,168,240,0.35)" }}>
-        <Plus className="w-3 h-3" /> NPM {UNISWAP_V3.positionManager.slice(0, 10)}…
+        <Plus className="w-3 h-3" /> V4 PM {positionManager.slice(0, 10)}…
       </p>
     </div>
   );

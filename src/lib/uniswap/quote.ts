@@ -1,5 +1,5 @@
 import type { PublicClient } from "viem";
-import { UNISWAP_V3 } from "./addresses";
+import { UNISWAP_V4 } from "./addresses";
 import { QUOTER_V2_ABI } from "./abis";
 
 export async function quoteExactInputSingle(
@@ -12,7 +12,7 @@ export async function quoteExactInputSingle(
   if (amountIn <= 0n) return 0n;
   try {
     const result = await client.simulateContract({
-      address: UNISWAP_V3.quoterV2,
+      address: UNISWAP_V4.quoter,
       abi: QUOTER_V2_ABI,
       functionName: "quoteExactInputSingle",
       args: [
@@ -29,7 +29,7 @@ export async function quoteExactInputSingle(
   } catch {
     try {
       const result = await client.readContract({
-        address: UNISWAP_V3.quoterV2,
+        address: UNISWAP_V4.quoter,
         abi: QUOTER_V2_ABI,
         functionName: "quoteExactInputSingle",
         args: [

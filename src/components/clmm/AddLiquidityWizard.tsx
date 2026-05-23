@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { ArrowLeft, Check } from "lucide-react";
 import { AddLiquidityPanel } from "./AddLiquidityPanel";
 import { PoolPriceChart } from "./PoolPriceChart";
+import { ClmmTxGate } from "@/components/clmm/SwitchToMonadMainnet";
 import { feeToPercent, type PoolLiveState } from "@/lib/uniswap";
 import type { PoolMetrics } from "@/lib/uniswap/poolMetrics";
 import { clmm } from "./clmmTheme";
@@ -105,10 +106,12 @@ export function AddLiquidityWizard({
 
               <div className="grid lg:grid-cols-2 gap-4">
                 <PoolPriceChart
+                  livePrice={live.price}
                   priceUsd={metrics.priceUsd}
                   priceChange24h={metrics.priceChange24h}
                   symbol0={metrics.symbol0}
                   symbol1={metrics.symbol1}
+                  volume24hUsd={metrics.volume24hUsd}
                 />
                 <div className="rounded-xl p-4" style={{ border: `1px solid ${clmm.border}`, background: clmm.panel }}>
                   <p className="font-grotesk text-[11px] uppercase mb-3" style={{ color: clmm.textMuted }}>
@@ -138,7 +141,9 @@ export function AddLiquidityWizard({
                 <h3 className="font-grotesk text-[14px] uppercase mb-4" style={{ color: clmm.text }}>
                   Deposit liquidity
                 </h3>
-                <AddLiquidityPanel live={live} />
+                <ClmmTxGate>
+                  <AddLiquidityPanel live={live} />
+                </ClmmTxGate>
               </div>
             </>
           )}

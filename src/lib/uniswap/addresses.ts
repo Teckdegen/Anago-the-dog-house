@@ -1,19 +1,35 @@
-/** Official Uniswap V3 deployments on Monad (chainId 143) */
+/** Official Uniswap V4 deployments on Monad mainnet (chainId 143) */
 
 export const MONAD_CHAIN_ID = 143;
 
-export const UNISWAP_V3 = {
-  factory: "0x204faca1764b154221e35c0d20abb3c525710498",
-  quoterV2: "0x661e93cca42afacb172121ef892830ca3b70f08d",
-  swapRouter02: "0xfe31f71c1b106eac32f1a19239c9a9a72ddfb900",
+export const UNISWAP_V4 = {
+  poolManager: "0x188d586ddcf52439676ca21a244753fa19f9ea8e",
+  positionDescriptor: "0x5770d2914355a6d0a39a70aeea9bcce55df4201b",
+  positionManager: "0x5b7ec4a94ff9bedb700fb82ab09d5846972f4016",
+  quoter: "0xa222dd357a9076d1091ed6aa2e16c9742dd26891",
+  stateView: "0x77395f3b2e73ae90843717371294fa97cc419d64",
   universalRouter: "0x0d97dc33264bfc1c226207428a79b26757fb9dc3",
+  universalRouter211: "0xfdf682f51fe81aa4898f0ae2163d8a55c127fbc7",
   permit2: "0x000000000022D473030F116dDEE9F6B43aC78BA3",
-  positionManager: "0x7197e214c0b767cfb76fb734ab638e2c192f4e53",
-  tickLens: "0xf025e0fe9e331a0ef05c2ad3c4e9c64b625cda6f",
   wmon: "0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A",
-  multicall: "0xd1b797d92d87b688193a2b976efc8d577d204343",
+} as const;
+
+/** @deprecated Use UNISWAP_V4 */
+export const UNISWAP_SHARED = {
+  wmon: UNISWAP_V4.wmon,
+  permit2: UNISWAP_V4.permit2,
+  universalRouter: UNISWAP_V4.universalRouter,
 } as const;
 
 export function isUniswapSupportedChain(chainId: number): boolean {
   return chainId === MONAD_CHAIN_ID;
+}
+
+/** V4 pool IDs are bytes32 (0x + 64 hex chars). */
+export function isV4PoolId(value: string): boolean {
+  return /^0x[0-9a-fA-F]{64}$/.test(value);
+}
+
+export function isPoolRef(value: string): boolean {
+  return isV4PoolId(value);
 }

@@ -5,12 +5,10 @@ import {
   SEED_POOLS_UPDATED_AT,
 } from "./seedPools.generated";
 
-const CACHE_KEY = "uniswap_v3_pools_monad_v2";
+const CACHE_KEY = "uniswap_v4_pools_monad_subgraph_v1";
 
 export type PoolIndexCache = {
   lastIndexedBlock: string;
-  /** Highest block fully scanned for PoolCreated logs */
-  factoryIndexedThroughBlock?: string;
   pools: CachedPool[];
   updatedAt: number;
 };
@@ -20,7 +18,7 @@ export function getSeedPools(): CachedPool[] {
 }
 
 function normalizePool(p: CachedPool): CachedPool {
-  return { ...p, protocol: p.protocol ?? "v3" };
+  return { ...p, protocol: "v4" };
 }
 
 export function getSeedPoolIndex(): PoolIndexCache {
@@ -43,7 +41,6 @@ export function loadPoolCache(): PoolIndexCache {
         BigInt(cached.lastIndexedBlock || 0) > BigInt(seed.lastIndexedBlock)
           ? cached.lastIndexedBlock
           : seed.lastIndexedBlock,
-      factoryIndexedThroughBlock: cached.factoryIndexedThroughBlock,
       pools: mergePools(seed.pools, (cached.pools ?? []).map(normalizePool)),
       updatedAt: Math.max(cached.updatedAt ?? 0, seed.updatedAt),
     };

@@ -2,7 +2,6 @@ import { Link } from "@tanstack/react-router";
 import { Loader2 } from "lucide-react";
 import { TokenIcon } from "@/components/TokenIcon";
 import { formatApr, formatUsdCompact, type EnrichedPool } from "@/lib/uniswap/poolMetrics";
-import type { PoolProtocol } from "@/lib/uniswap/types";
 import { clmm } from "./clmmTheme";
 
 export function PoolsExploreTable({
@@ -58,7 +57,6 @@ export function PoolsExploreTable({
 
 function PoolTableRow({ row, loading }: { row: EnrichedPool; loading?: boolean }) {
   const m = row.metrics;
-  const protocol = row.protocol ?? "v3";
   const pairLabel = `${m.symbol0} / ${m.symbol1}`;
 
   return (
@@ -86,7 +84,7 @@ function PoolTableRow({ row, loading }: { row: EnrichedPool; loading?: boolean }
               >
                 {pairLabel}
               </span>
-              <ProtocolBadge protocol={protocol} />
+              <ProtocolBadge />
             </div>
             <p className="font-mono text-[10px] mt-0.5" style={{ color: clmm.textDim }}>
               {m.displayId} · {m.feePercent}
@@ -157,18 +155,17 @@ function PoolPairAvatar({ row }: { row: EnrichedPool }) {
   );
 }
 
-function ProtocolBadge({ protocol }: { protocol: PoolProtocol }) {
-  const label = protocol === "v4" ? "V4" : "V3";
+function ProtocolBadge() {
   return (
     <span
       className="font-mono text-[9px] px-1.5 py-0.5 rounded uppercase shrink-0"
       style={{
-        background: protocol === "v4" ? "rgba(127,200,255,0.12)" : "rgba(155,127,212,0.15)",
-        color: protocol === "v4" ? "#9BC8FF" : clmm.accent,
-        border: `1px solid ${protocol === "v4" ? "rgba(127,200,255,0.35)" : clmm.border}`,
+        background: "rgba(127,200,255,0.12)",
+        color: "#9BC8FF",
+        border: "1px solid rgba(127,200,255,0.35)",
       }}
     >
-      {label}
+      V4
     </span>
   );
 }

@@ -12,10 +12,10 @@ import { TokenIcon } from "@/components/TokenIcon";
 import { useToast } from "@/components/Toast";
 import { prepareTransactionWithGas } from "@/lib/web3/gasUtils";
 import {
-  UNISWAP_V3,
   type LpPosition,
   buildCollectArgs,
   buildDecreaseArgs,
+  UNISWAP_V4,
 } from "@/lib/uniswap";
 import { NPM_ABI } from "@/lib/uniswap/abis";
 import { clmm } from "./clmmTheme";
@@ -85,6 +85,7 @@ function PositionCard({ position: pos }: { position: LpPosition }) {
   const publicClient = usePublicClient();
   const { toast } = useToast();
   const [busy, setBusy] = useState(false);
+  const positionManager = UNISWAP_V4.positionManager;
 
   const collectTx = useWriteContract();
   const decreaseTx = useWriteContract();
@@ -100,7 +101,7 @@ function PositionCard({ position: pos }: { position: LpPosition }) {
     try {
       const gas = await prepareTransactionWithGas(publicClient);
       collectTx.writeContract({
-        address: UNISWAP_V3.positionManager,
+        address: positionManager,
         abi: NPM_ABI,
         functionName: "collect",
         args: [buildCollectArgs(pos.tokenId, address)],
@@ -118,7 +119,7 @@ function PositionCard({ position: pos }: { position: LpPosition }) {
     try {
       const gas = await prepareTransactionWithGas(publicClient);
       decreaseTx.writeContract({
-        address: UNISWAP_V3.positionManager,
+        address: positionManager,
         abi: NPM_ABI,
         functionName: "decreaseLiquidity",
         args: [buildDecreaseArgs({ tokenId: pos.tokenId, liquidity: pos.liquidity })],

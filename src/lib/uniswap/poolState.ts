@@ -1,9 +1,11 @@
 import type { PublicClient } from "viem";
 import { ERC20_ABI } from "@/lib/web3/tokens";
-import { POOL_ABI } from "./abis";
+import { STATE_VIEW_ABI } from "./abis";
+import { isV4PoolId, UNISWAP_V4 } from "./addresses";
+import { subgraphPoolToCached } from "./discoverPoolsSubgraph";
+import { fetchV4PoolFromSubgraph } from "./subgraph";
 import { loadPoolCache } from "./poolCache";
 import type { CachedPool, PoolLiveState, TokenMeta } from "./types";
-import { readPoolTickSpacing } from "./liquidity";
 
 export function sqrtPriceX96ToPrice(
   sqrtPriceX96: bigint,
@@ -38,29 +40,36 @@ export async function fetchPoolLiveState(
   client: PublicClient,
   pool: CachedPool,
 ): Promise<PoolLiveState | null> {
-  try {
-    const [token0, token1, fee, liquidity, slot0] = await Promise.all([
-      client.readContract({ address: pool.address, abi: POOL_ABI, functionName: "token0" }),
-      client.readContract({ address: pool.address, abi: POOL_ABI, functionName: "token1" }),
-      client.readContract({ address: pool.address, abi: POOL_ABI, functionName: "fee" }),
-      client.readContract({ address: pool.address, abi: POOL_ABI, functionName: "liquidity" }),
-      client.readContract({ address: pool.address, abi: POOL_ABI, functionName: "slot0" }),
-    ]);
+  const poolId = isV4PoolId(pool.address) ? pool.address : null;
+  if (!poolId) return fetchPoolLiveStateFallback(pool);
 
-    const [meta0, meta1] = await Promise.all([
-      fetchTokenMeta(client, token0 as `0x${string}`),
-      fetchTokenMeta(client, token1 as `0x${string}`),
+  try {
+    const [slot0, liquidity, meta0, meta1] = await Promise.all([
+      client.readContract({
+        address: UNISWAP_V4.stateView,
+        abi: STATE_VIEW_ABI,
+        functionName: "getSlot0",
+        args: [poolId],
+      }),
+      client.readContract({
+        address: UNISWAP_V4.stateView,
+        abi: STATE_VIEW_ABI,
+        functionName: "getLiquidity",
+        args: [poolId],
+      }),
+      fetchTokenMeta(client, pool.token0),
+      fetchTokenMeta(client, pool.token1),
     ]);
 
     const sqrtPriceX96 = slot0[0] as bigint;
     const tick = Number(slot0[1]);
+    const lpFee = Number(slot0[3]);
 
     return {
       pool: {
         ...pool,
-        token0: token0 as `0x${string}`,
-        token1: token1 as `0x${string}`,
-        fee: Number(fee),
+        protocol: "v4",
+        fee: lpFee || pool.fee,
       },
       token0Symbol: meta0.symbol,
       token1Symbol: meta1.symbol,
@@ -72,8 +81,23 @@ export async function fetchPoolLiveState(
       price: sqrtPriceX96ToPrice(sqrtPriceX96, meta0.decimals, meta1.decimals),
     };
   } catch {
-    return null;
+    return fetchPoolLiveStateFallback(pool);
   }
+}
+
+function fetchPoolLiveStateFallback(pool: CachedPool): PoolLiveState | null {
+  if (!pool.token0 || !pool.token1) return null;
+  return {
+    pool: { ...pool, protocol: "v4" },
+    token0Symbol: pool.token0.slice(0, 6),
+    token1Symbol: pool.token1.slice(0, 6),
+    token0Decimals: 18,
+    token1Decimals: 18,
+    liquidity: 0n,
+    sqrtPriceX96: 0n,
+    tick: 0,
+    price: 0,
+  };
 }
 
 export function feeToPercent(fee: number): string {
@@ -81,7 +105,7 @@ export function feeToPercent(fee: number): string {
 }
 
 export async function resolvePoolByAddress(
-  client: PublicClient,
+  _client: PublicClient,
   poolAddress: `0x${string}`,
 ): Promise<CachedPool | null> {
   const cached = loadPoolCache()?.pools.find(
@@ -89,22 +113,14 @@ export async function resolvePoolByAddress(
   );
   if (cached) return cached;
 
+  if (!isV4PoolId(poolAddress)) return null;
+
   try {
-    const [token0, token1, fee] = await Promise.all([
-      client.readContract({ address: poolAddress, abi: POOL_ABI, functionName: "token0" }),
-      client.readContract({ address: poolAddress, abi: POOL_ABI, functionName: "token1" }),
-      client.readContract({ address: poolAddress, abi: POOL_ABI, functionName: "fee" }),
-    ]);
-    const tickSpacing = await readPoolTickSpacing(client, poolAddress);
-    return {
-      address: poolAddress,
-      token0: token0 as `0x${string}`,
-      token1: token1 as `0x${string}`,
-      fee: Number(fee),
-      tickSpacing,
-      protocol: "v3",
-    };
+    const sg = await fetchV4PoolFromSubgraph(poolAddress);
+    if (sg) return subgraphPoolToCached(sg);
   } catch {
-    return null;
+    /* subgraph unavailable */
   }
+
+  return null;
 }

@@ -1,19 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { getAddress, isAddress } from "viem";
-import { usePublicClient } from "wagmi";
 import { AppShell } from "@/components/AppShell";
 import { AddLiquidityWizard } from "@/components/clmm/AddLiquidityWizard";
 import { ClmmLoading, ClmmTxGate } from "@/components/clmm/SwitchToMonadMainnet";
 import { clmm } from "@/components/clmm/clmmTheme";
-import {
-  fetchPoolLiveState,
-  resolvePoolByAddress,
-  fetchPoolMetrics,
-  enrichFromCache,
-  type CachedPool,
-  type PoolLiveState,
-} from "@/lib/uniswap";
+import { usePoolAddressParam, usePoolData } from "@/hooks/usePoolData";
 
 export const Route = createFileRoute("/clmm/pool/$poolAddress/add")({
   component: AddLiquidityPage,
@@ -21,43 +11,8 @@ export const Route = createFileRoute("/clmm/pool/$poolAddress/add")({
 
 function AddLiquidityPage() {
   const { poolAddress: poolParam } = Route.useParams();
-  const publicClient = usePublicClient();
-  const poolAddress = (() => {
-    if (!poolParam || !isAddress(poolParam)) return undefined;
-    try {
-      return getAddress(poolParam) as `0x${string}`;
-    } catch {
-      return undefined;
-    }
-  })();
-
-  const [pool, setPool] = useState<CachedPool | null>(null);
-  const [live, setLive] = useState<PoolLiveState | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const metrics = pool ? enrichFromCache(pool).metrics : null;
-
-  useEffect(() => {
-    if (!publicClient || !poolAddress) return;
-    let cancelled = false;
-    setLoadError(null);
-    resolvePoolByAddress(publicClient, poolAddress).then(async (p) => {
-      if (cancelled) return;
-      if (!p) {
-        setLoadError("Pool not found on Monad.");
-        return;
-      }
-      setPool(p);
-      fetchPoolMetrics(p, publicClient);
-      const s = await fetchPoolLiveState(publicClient, p);
-      if (!cancelled) {
-        if (!s) setLoadError("Could not read pool state.");
-        else setLive(s);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [publicClient, poolAddress]);
+  const poolAddress = usePoolAddressParam(poolParam);
+  const { pool, live, metrics, loadError } = usePoolData(poolAddress);
 
   if (!poolAddress) {
     return (
@@ -80,11 +35,9 @@ function AddLiquidityPage() {
             </Link>
           </div>
         ) : !pool || !live || !metrics ? (
-          <ClmmLoading label="Loading pool…" />
+          <ClmmLoading label="Loading pool from Monad…" />
         ) : (
-          <ClmmTxGate>
-            <AddLiquidityWizard poolAddress={poolAddress} live={live} metrics={metrics} />
-          </ClmmTxGate>
+          <AddLiquidityWizard poolAddress={poolAddress} live={live} metrics={metrics} />
         )}
       </div>
     </AppShell>

@@ -8,8 +8,22 @@ import {
   saveMetrics,
   poolDisplayId,
 } from "./poolMetricsCache";
+import { fetchV4PoolFromSubgraph } from "./subgraph";
+import { subgraphPoolToMetrics } from "./discoverPoolsSubgraph";
 
-const DEX_PAIR = "https://api.dexscreener.com/latest/dex/pairs/monad";
+function feeToPercent(fee: number): string {
+  return `${(fee / 10_000).toFixed(fee % 100 === 0 ? 2 : 4)}%`;
+}
+
+function estimateFees24h(volume24h: number | null, fee: number): number | null {
+  if (volume24h == null || volume24h <= 0) return null;
+  return volume24h * (fee / 1_000_000);
+}
+
+function estimateApr(fees24h: number | null, tvl: number | null): number | null {
+  if (fees24h == null || tvl == null || tvl <= 0) return null;
+  return (fees24h / tvl) * 365 * 100;
+}
 
 export type PoolMetrics = {
   poolAddress: string;
@@ -34,39 +48,12 @@ export type PoolMetrics = {
 
 export type EnrichedPool = CachedPool & { metrics: PoolMetrics };
 
-function feeToPercent(fee: number): string {
-  return `${(fee / 10_000).toFixed(fee % 100 === 0 ? 2 : 4)}%`;
-}
-
-function estimateFees24h(volume24h: number | null, fee: number): number | null {
-  if (volume24h == null || volume24h <= 0) return null;
-  return volume24h * (fee / 1_000_000);
-}
-
-function estimateApr(fees24h: number | null, tvl: number | null): number | null {
-  if (fees24h == null || tvl == null || tvl <= 0) return null;
-  return (fees24h / tvl) * 365 * 100;
-}
-
-type DexPair = {
-  baseToken?: { address?: string; symbol?: string };
-  quoteToken?: { address?: string; symbol?: string };
-  priceUsd?: string;
-  priceNative?: string;
-  priceChange?: { h24?: number };
-  liquidity?: { usd?: number };
-  volume?: { h24?: number };
-  info?: { imageUrl?: string };
-};
-
-async function fetchDexPair(poolAddress: string): Promise<DexPair | null> {
+async function fetchV4MetricsFromSubgraph(pool: CachedPool): Promise<PoolMetrics | null> {
+  if (typeof window !== "undefined") return null;
   try {
-    const res = await fetch(`${DEX_PAIR}/${poolAddress.toLowerCase()}`, {
-      signal: AbortSignal.timeout(6000),
-    });
-    if (!res.ok) return null;
-    const json = await res.json();
-    return (json?.pair ?? json?.pairs?.[0]) as DexPair | null;
+    const raw = await fetchV4PoolFromSubgraph(pool.address);
+    if (!raw) return null;
+    return subgraphPoolToMetrics(raw);
   } catch {
     return null;
   }
@@ -81,25 +68,19 @@ export async function fetchPoolMetrics(
   const cached = getCachedMetrics(key);
   if (!force && cached && isMetricsFresh(cached)) return cached;
 
-  const [dex, meta0, meta1] = await Promise.all([
-    fetchDexPair(key),
+  const fromSubgraph = await fetchV4MetricsFromSubgraph(pool);
+  if (fromSubgraph) {
+    saveMetrics(fromSubgraph);
+    return fromSubgraph;
+  }
+
+  const [meta0, meta1] = await Promise.all([
     fetchTokenFromDexScreener(pool.token0, publicClient),
     fetchTokenFromDexScreener(pool.token1, publicClient),
   ]);
 
   let symbol0 = meta0?.symbol || pool.token0.slice(0, 6);
   let symbol1 = meta1?.symbol || pool.token1.slice(0, 6);
-
-  if (dex?.baseToken?.symbol) {
-    const base = dex.baseToken.address?.toLowerCase();
-    if (base === pool.token0.toLowerCase()) {
-      symbol0 = dex.baseToken.symbol ?? symbol0;
-      symbol1 = dex.quoteToken?.symbol ?? symbol1;
-    } else {
-      symbol0 = dex.quoteToken?.symbol ?? symbol0;
-      symbol1 = dex.baseToken?.symbol ?? symbol1;
-    }
-  }
 
   if ((!symbol0 || symbol0.length > 12) && publicClient) {
     const m = await fetchTokenMeta(publicClient, pool.token0);
@@ -110,8 +91,8 @@ export async function fetchPoolMetrics(
     symbol1 = m.symbol;
   }
 
-  const tvlUsd = dex?.liquidity?.usd ?? null;
-  const volume24hUsd = dex?.volume?.h24 ?? null;
+  const tvlUsd = cached?.tvlUsd ?? null;
+  const volume24hUsd = cached?.volume24hUsd ?? null;
   const fees24hUsd = estimateFees24h(volume24hUsd, pool.fee);
   const aprPercent = estimateApr(fees24hUsd, tvlUsd);
 
@@ -124,15 +105,15 @@ export async function fetchPoolMetrics(
     token1: pool.token1,
     logo0: meta0?.logoURI ?? null,
     logo1: meta1?.logoURI ?? null,
-    pairImageUrl: dex?.info?.imageUrl ?? null,
+    pairImageUrl: null,
     feePercent: feeToPercent(pool.fee),
     tvlUsd,
     volume24hUsd,
     fees24hUsd,
     aprPercent,
-    priceUsd: dex?.priceUsd ? parseFloat(dex.priceUsd) : null,
-    priceChange24h: dex?.priceChange?.h24 ?? null,
-    priceNative: dex?.priceNative ?? null,
+    priceUsd: cached?.priceUsd ?? null,
+    priceChange24h: null,
+    priceNative: null,
     updatedAt: Date.now(),
   };
 

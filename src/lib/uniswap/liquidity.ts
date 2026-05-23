@@ -1,6 +1,5 @@
 import type { PublicClient } from "viem";
-import { UNISWAP_V3 } from "./addresses";
-import { NPM_ABI, POOL_ABI } from "./abis";
+import { NPM_ABI } from "./abis";
 import { wideRangeTicks } from "./tickMath";
 import type { PoolLiveState } from "./types";
 
@@ -62,17 +61,8 @@ export function buildDecreaseArgs(p: {
 }
 
 export async function readPoolTickSpacing(
-  client: PublicClient,
-  poolAddress: `0x${string}`,
+  _client: PublicClient,
+  _poolAddress: `0x${string}`,
 ): Promise<number> {
-  try {
-    const spacing = await client.readContract({
-      address: poolAddress,
-      abi: POOL_ABI,
-      functionName: "tickSpacing",
-    });
-    return Number(spacing);
-  } catch {
-    return 60;
-  }
+  return 60;
 }
