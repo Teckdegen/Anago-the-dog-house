@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { formatUsdCompact } from "@/lib/uniswap/poolMetrics";
+import { formatUsdCompact } from "@/lib/capricorn/poolMetrics";
 import { clmm } from "./clmmTheme";
 
 type Range = "1D" | "1W" | "1M";

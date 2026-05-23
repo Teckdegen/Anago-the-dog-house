@@ -4,9 +4,9 @@ import { CONTRACTS, STREAM_FARM_ABI } from "@/lib/web3/contracts";
 import {
   fetchUserPositions,
   getMonadPublicClient,
-  isUniswapSupportedChain,
+  isCapricornSupportedChain,
   type LpPosition,
-} from "@/lib/uniswap";
+} from "@/lib/capricorn";
 
 export function useFarmPositionCount(): { count: number; farmCount: number; isLoading: boolean } {
   const chainId = useChainId();
@@ -40,7 +40,7 @@ export function useFarmPositionCount(): { count: number; farmCount: number; isLo
 export function useClmmPositionCount(): { count: number; isLoading: boolean; positions: LpPosition[] } {
   const chainId = useChainId();
   const { address } = useAccount();
-  const supported = isUniswapSupportedChain(chainId);
+  const supported = isCapricornSupportedChain(chainId);
   const [positions, setPositions] = useState<LpPosition[]>([]);
   const [isLoading, setLoading] = useState(false);
 

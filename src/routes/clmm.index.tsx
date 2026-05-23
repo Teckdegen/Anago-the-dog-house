@@ -8,14 +8,14 @@ import { PositionCards } from "@/components/clmm/PositionCards";
 import { PoolsExploreTable } from "@/components/clmm/PoolsExploreTable";
 import { clmm } from "@/components/clmm/clmmTheme";
 import { useClmmPoolsPage } from "@/hooks/useClmmPoolsPage";
-import { isUniswapSupportedChain, fetchUserPositions, type LpPosition } from "@/lib/uniswap";
+import { isCapricornSupportedChain, fetchUserPositions, type LpPosition } from "@/lib/capricorn";
 
 export const Route = createFileRoute("/clmm/")({
   component: CLMMExplorePage,
   head: () => ({
     meta: [
-      { title: "Explore Pools — Uniswap V4" },
-      { name: "description", content: "Explore Uniswap V4 concentrated liquidity pools on Monad." },
+      { title: "Explore Pools — Capricorn CL" },
+      { name: "description", content: "Explore Capricorn concentrated liquidity pools on Monad." },
     ],
   }),
 });
@@ -28,7 +28,7 @@ const POSITION_POLL_MS = 25_000;
 
 function CLMMExplorePage() {
   const chainId = useChainId();
-  const supported = isUniswapSupportedChain(chainId);
+  const supported = isCapricornSupportedChain(chainId);
   const { address } = useAccount();
   const publicClient = usePublicClient();
   const [view, setView] = useState<ClmmView>("explore");
@@ -99,7 +99,7 @@ function CLMMExplorePage() {
             Explore pools
           </h1>
           <p className="font-mono text-[11px] mt-1" style={{ color: clmm.textMuted }}>
-            Uniswap V4 on Monad · {total > 0 ? `${total.toLocaleString()} pools indexed` : "indexing via Supabase"}
+            Capricorn CL on Monad · {total > 0 ? `${total.toLocaleString()} pools` : "loading on-chain metrics"}
           </p>
         </header>
 
@@ -165,7 +165,7 @@ function ExplorePoolsView({
   total,
   onPageChange,
 }: {
-  rows: import("@/lib/uniswap/poolMetrics").EnrichedPool[];
+  rows: import("@/lib/capricorn/poolMetrics").EnrichedPool[];
   loading: boolean;
   error: string | null;
   onRetry: () => void;
@@ -184,8 +184,7 @@ function ExplorePoolsView({
           {error}
         </p>
         <p className="font-mono text-[10px] max-w-md mx-auto" style={{ color: clmm.textMuted }}>
-          Run the pool indexer (<code className="opacity-80">node script.js</code>) and set Supabase env vars on
-          Vercel.
+          Check your RPC connection and try again.
         </p>
         <button
           type="button"
@@ -202,7 +201,7 @@ function ExplorePoolsView({
   if (!loading && rows.length === 0) {
     return (
       <div className="py-20 text-center font-mono text-[11px]" style={{ color: clmm.textMuted }}>
-        No pools in database yet — start the indexer: <code className="opacity-80">node script.js</code>
+        No pools match your search.
       </div>
     );
   }

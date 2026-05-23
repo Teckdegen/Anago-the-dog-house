@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { ChevronDown } from "lucide-react";
 import { TokenIcon } from "@/components/TokenIcon";
-import { formatApr, formatUsdCompact, type EnrichedPool } from "@/lib/uniswap/poolMetrics";
+import { formatApr, formatUsdCompact, type EnrichedPool } from "@/lib/capricorn/poolMetrics";
 import { clmm } from "./clmmTheme";
 
 type SortKey = "tvl" | "apr" | "vol";

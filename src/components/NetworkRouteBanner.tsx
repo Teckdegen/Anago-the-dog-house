@@ -2,7 +2,7 @@ import { useLocation } from "@tanstack/react-router";
 import { useChainId, useSwitchChain } from "wagmi";
 import { Loader2, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { MONAD_CHAIN_ID, isUniswapSupportedChain } from "@/lib/uniswap";
+import { MONAD_CHAIN_ID, isCapricornSupportedChain } from "@/lib/capricorn";
 import { MONAD_TESTNET_CHAIN_ID } from "@/lib/web3/chains";
 
 function isClmmPath(pathname: string): boolean {
@@ -62,7 +62,7 @@ export function NetworkRouteBanner() {
   }, [pathname]);
 
   const onClmm = isClmmPath(pathname);
-  const onMainnet = isUniswapSupportedChain(chainId);
+  const onMainnet = isCapricornSupportedChain(chainId);
 
   const needsMainnet = onClmm && !onMainnet;
   const needsTestnet = !onClmm && onMainnet;
@@ -70,7 +70,7 @@ export function NetworkRouteBanner() {
   if (dismissed || (!needsMainnet && !needsTestnet)) return null;
 
   const message = needsMainnet
-    ? "Uniswap CLMM runs on Monad mainnet (143)."
+    ? "Capricorn CL runs on Monad mainnet (143)."
     : "Locks, farms & vesting run on Monad testnet (10143). Switch back from mainnet.";
 
   return (

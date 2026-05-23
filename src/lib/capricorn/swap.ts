@@ -1,5 +1,5 @@
 import type { PublicClient } from "viem";
-import { UNISWAP_V4 } from "./addresses";
+import { CAPRICORN_CL } from "./addresses";
 import { SWAP_ROUTER_ABI } from "./abis";
 
 export type ExactInputSingleParams = {
@@ -12,7 +12,6 @@ export type ExactInputSingleParams = {
   deadline?: bigint;
 };
 
-/** Build calldata args for V4 swap router (Universal Router 2.1.1) */
 export function buildExactInputSingleArgs(p: ExactInputSingleParams) {
   const deadline = p.deadline ?? BigInt(Math.floor(Date.now() / 1000) + 1200);
   return {
@@ -33,7 +32,7 @@ export async function simulateExactInputSingle(
   p: ExactInputSingleParams,
 ) {
   return client.simulateContract({
-    address: UNISWAP_V4.universalRouter211,
+    address: CAPRICORN_CL.swapRouter as `0x${string}`,
     abi: SWAP_ROUTER_ABI,
     functionName: "exactInputSingle",
     args: [buildExactInputSingleArgs(p)],

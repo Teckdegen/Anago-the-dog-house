@@ -29,7 +29,7 @@ function rowToPool(row) {
     token1: row.token1,
     fee: row.fee,
     tickSpacing: row.tick_spacing ?? 0,
-    protocol: "v4",
+    protocol: "v3",
     metrics: {
       poolAddress: address,
       displayId: poolDisplayId(address),

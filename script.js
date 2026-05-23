@@ -1,10 +1,14 @@
 /**
- * 24/7 CLMM pool indexer — The Graph subgraph → Supabase.
+ * 24/7 Capricorn CL pool indexer — on-chain factory → Supabase.
  *
  *   node script.js              # every 5 min (default)
  *   node script.js --once
  *
- * Env: .env or .env.local — THE_GRAPH_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+ * Env: .env or .env.local
+ *   RPC_URL=https://...
+ *   SUPABASE_URL=https://xxxx.supabase.co
+ *   SUPABASE_SERVICE_ROLE_KEY=...
+ *   CHAIN_ID=143
  */
 
 import { readFileSync, existsSync } from "fs";
@@ -39,8 +43,6 @@ loadEnv();
 const once = process.argv.includes("--once");
 const FIVE_MIN_MS = 300_000;
 const intervalMs = Math.max(60_000, parseInt(process.env.SYNC_INTERVAL_MS ?? String(FIVE_MIN_MS), 10) || FIVE_MIN_MS);
-const fullMetrics =
-  process.env.FULL_METRICS_SYNC === "true" || process.env.FULL_METRICS_SYNC === "1";
 
 let running = false;
 
@@ -51,10 +53,10 @@ async function tick() {
   }
   running = true;
   try {
-    console.log(`[${iso()}] Subgraph → Supabase sync starting…`);
-    const result = await syncClmmPoolsToSupabase({ fullMetrics });
+    console.log(`[${iso()}] Capricorn CL → Supabase sync starting…`);
+    const result = await syncClmmPoolsToSupabase();
     console.log(
-      `[${iso()}] Done: ${result.poolCount} pools, ${result.metricsUpdated} metrics updated`,
+      `[${iso()}] Done: ${result.poolCount} pools (${result.discovered} new from factory, ${result.failed} failed)`,
     );
   } catch (e) {
     console.error(`[${iso()}] Sync failed:`, e instanceof Error ? e.message : e);
@@ -70,9 +72,7 @@ function iso() {
 
 async function main() {
   const missing = [];
-  if (!process.env.THE_GRAPH_API_KEY || process.env.THE_GRAPH_API_KEY === "your_key_here") {
-    missing.push("THE_GRAPH_API_KEY");
-  }
+  if (!process.env.RPC_URL && !process.env.VITE_MONAD_RPC_URL) missing.push("RPC_URL");
   if (!process.env.SUPABASE_URL) missing.push("SUPABASE_URL");
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) missing.push("SUPABASE_SERVICE_ROLE_KEY");
 
@@ -82,10 +82,9 @@ async function main() {
     process.exit(1);
   }
 
-  console.log("CLMM pool indexer");
-  console.log(`  Subgraph → Supabase (UI reads Supabase only)`);
+  console.log("Capricorn CL pool indexer");
+  console.log(`  On-chain factory scan → Supabase (UI uses hardcoded pool list)`);
   console.log(`  Supabase: ${process.env.SUPABASE_URL?.replace(/\/+$/, "")}`);
-  console.log(`  Full metrics: ${fullMetrics ? "yes (all pools)" : "top 1500 by liquidity"}`);
   console.log(`  Interval: ${once ? "once" : `every ${Math.round(intervalMs / 60_000)} min`}`);
 
   console.log(`[${iso()}] Testing Supabase connection…`);
@@ -99,8 +98,7 @@ Fix checklist:
   1. Supabase Dashboard → Project Settings → API
   2. SUPABASE_URL = Project URL (https://xxxxx.supabase.co)
   3. SUPABASE_SERVICE_ROLE_KEY = service_role secret (not anon)
-  4. SQL Editor → run supabase/migrations/001_clmm_pools.sql
-  5. Project not paused (Dashboard home)
+  4. SQL Editor → run clmm.sql
 `);
     process.exit(1);
   }

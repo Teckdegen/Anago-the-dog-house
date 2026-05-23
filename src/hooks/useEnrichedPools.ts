@@ -1,18 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { CachedPool } from "@/lib/uniswap/types";
+import type { CachedPool } from "@/lib/capricorn/types";
 import {
   hydrateEnrichedPools,
   indexPoolMetricsBatched,
   enrichFromCache,
   type EnrichedPool,
-} from "@/lib/uniswap/poolMetrics";
-import { getCachedMetrics, isMetricsFresh } from "@/lib/uniswap/poolMetricsCache";
+} from "@/lib/capricorn/poolMetrics";
+import { getCachedMetrics, isMetricsFresh } from "@/lib/capricorn/poolMetricsCache";
+import { getMonadPublicClient } from "@/lib/capricorn";
 
 export function useEnrichedPools(pools: CachedPool[], enabled: boolean) {
   const [rows, setRows] = useState<EnrichedPool[]>(() => hydrateEnrichedPools(pools));
   const [indexing, setIndexing] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const runId = useRef(0);
+  const monadClient = getMonadPublicClient();
 
   const poolsKey = useMemo(() => pools.map((p) => p.address).join(","), [pools]);
 
@@ -22,8 +24,8 @@ export function useEnrichedPools(pools: CachedPool[], enabled: boolean) {
 
     setRows(hydrateEnrichedPools(pools));
 
-    const prefetchTotal = Math.min(pools.length, 200);
-    const needsWork = pools.slice(0, prefetchTotal).some((p) => {
+    const prefetchTotal = pools.length;
+    const needsWork = pools.some((p) => {
       const c = getCachedMetrics(p.address.toLowerCase());
       return !c || !isMetricsFresh(c);
     });
@@ -44,14 +46,14 @@ export function useEnrichedPools(pools: CachedPool[], enabled: boolean) {
         setProgress({ done, total });
         setRows(pools.map((p) => enrichFromCache(p)));
       },
-      { limit: prefetchTotal },
+      { limit: prefetchTotal, publicClient: monadClient },
     );
 
     if (runId.current === id) {
       setRows(hydrateEnrichedPools(pools));
       setIndexing(false);
     }
-  }, [pools, poolsKey, enabled]);
+  }, [pools, poolsKey, enabled, monadClient]);
 
   useEffect(() => {
     setRows(hydrateEnrichedPools(pools));

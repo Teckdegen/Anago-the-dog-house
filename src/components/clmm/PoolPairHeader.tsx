@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { ExternalLink } from "lucide-react";
 import { TokenIcon } from "@/components/TokenIcon";
 import { fetchPairFromDexScreener } from "@/lib/web3/dexscreener";
-import { feeToPercent, type PoolLiveState } from "@/lib/uniswap";
+import { feeToPercent, type PoolLiveState } from "@/lib/capricorn";
 
 export function PoolPairHeader({
   live,

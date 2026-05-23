@@ -1,7 +1,6 @@
-export type PoolProtocol = "v4";
+export type PoolProtocol = "v3";
 
 export type CachedPool = {
-  /** V4 poolId (bytes32 hex) */
   address: `0x${string}`;
   token0: `0x${string}`;
   token1: `0x${string}`;

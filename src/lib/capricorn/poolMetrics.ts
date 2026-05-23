@@ -1,10 +1,15 @@
 import type { PublicClient } from "viem";
-import { fetchTokenFromDexScreener } from "@/lib/web3/dexscreener";
-import { fetchTokenMeta } from "./poolState";
-import { fetchPoolMetricsBatch } from "./fetchPoolsApi";
-import { getPoolSymbols } from "./poolData";
-import { fetchV4PoolFromSubgraph } from "./subgraph";
-import { subgraphPoolToMetrics } from "./discoverPoolsSubgraph";
+import { formatUnits } from "viem";
+import { fetchPairFromDexScreener, fetchTokenFromDexScreener, batchGetTokenPrices } from "@/lib/web3/dexscreener";
+import { ERC20_ABI } from "@/lib/web3/tokens";
+import { fetchPoolMetadata, fetchTokenMeta } from "./poolState";
+import {
+  getCachedMetrics,
+  isMetricsFresh,
+  poolDisplayId,
+  saveMetrics,
+} from "./poolMetricsCache";
+import type { CachedPool } from "./types";
 
 function feeToPercent(fee: number): string {
   return `${(fee / 10_000).toFixed(fee % 100 === 0 ? 2 : 4)}%`;
@@ -43,11 +48,51 @@ export type PoolMetrics = {
 
 export type EnrichedPool = CachedPool & { metrics: PoolMetrics };
 
-async function fetchV4MetricsFromSubgraph(pool: CachedPool): Promise<PoolMetrics | null> {
+async function fetchPairVolumeUsd(pairAddress: string): Promise<number | null> {
   try {
-    const raw = await fetchV4PoolFromSubgraph(pool.address);
-    if (!raw) return null;
-    return subgraphPoolToMetrics(raw);
+    const res = await fetch(`https://api.dexscreener.com/latest/dex/pairs/monad/${pairAddress}`, {
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    const pair = json?.pair ?? json?.pairs?.[0];
+    const vol = parseFloat(pair?.volume?.h24 ?? "0");
+    return vol > 0 ? vol : null;
+  } catch {
+    return null;
+  }
+}
+
+async function computeTvlUsd(
+  client: PublicClient,
+  pool: CachedPool,
+): Promise<number | null> {
+  try {
+    const [bal0, bal1] = await Promise.all([
+      client.readContract({
+        address: pool.token0,
+        abi: ERC20_ABI,
+        functionName: "balanceOf",
+        args: [pool.address],
+      }),
+      client.readContract({
+        address: pool.token1,
+        abi: ERC20_ABI,
+        functionName: "balanceOf",
+        args: [pool.address],
+      }),
+    ]);
+    const prices = await batchGetTokenPrices([pool.token0, pool.token1]);
+    const [meta0, meta1] = await Promise.all([
+      fetchTokenMeta(client, pool.token0),
+      fetchTokenMeta(client, pool.token1),
+    ]);
+    const p0 = prices.get(pool.token0.toLowerCase()) ?? 0;
+    const p1 = prices.get(pool.token1.toLowerCase()) ?? 0;
+    const human0 = Number(formatUnits(bal0 as bigint, meta0.decimals));
+    const human1 = Number(formatUnits(bal1 as bigint, meta1.decimals));
+    const tvl = human0 * p0 + human1 * p1;
+    return tvl > 0 ? tvl : null;
   } catch {
     return null;
   }
@@ -62,50 +107,52 @@ export async function fetchPoolMetrics(
   const cached = getCachedMetrics(key);
   if (!force && cached && isMetricsFresh(cached)) return cached;
 
-  const fromSubgraph = await fetchV4MetricsFromSubgraph(pool);
-  if (fromSubgraph) {
-    saveMetrics(fromSubgraph);
-    return fromSubgraph;
+  let resolved = pool;
+  if (publicClient && (!pool.token0 || pool.token0 === "0x0000000000000000000000000000000000000000")) {
+    const meta = await fetchPoolMetadata(publicClient, pool.address);
+    if (meta) resolved = meta;
   }
 
-  const [meta0, meta1] = await Promise.all([
-    fetchTokenFromDexScreener(pool.token0, publicClient),
-    fetchTokenFromDexScreener(pool.token1, publicClient),
+  const [meta0, meta1, pairDex, volume24hUsd, tvlUsd] = await Promise.all([
+    fetchTokenFromDexScreener(resolved.token0, publicClient),
+    fetchTokenFromDexScreener(resolved.token1, publicClient),
+    fetchPairFromDexScreener(resolved.address),
+    fetchPairVolumeUsd(resolved.address),
+    publicClient ? computeTvlUsd(publicClient, resolved) : Promise.resolve(cached?.tvlUsd ?? null),
   ]);
 
-  let symbol0 = meta0?.symbol || pool.token0.slice(0, 6);
-  let symbol1 = meta1?.symbol || pool.token1.slice(0, 6);
+  let symbol0 = meta0?.symbol || resolved.token0.slice(0, 6);
+  let symbol1 = meta1?.symbol || resolved.token1.slice(0, 6);
 
   if ((!symbol0 || symbol0.length > 12) && publicClient) {
-    const m = await fetchTokenMeta(publicClient, pool.token0);
+    const m = await fetchTokenMeta(publicClient, resolved.token0);
     symbol0 = m.symbol;
   }
   if ((!symbol1 || symbol1.length > 12) && publicClient) {
-    const m = await fetchTokenMeta(publicClient, pool.token1);
+    const m = await fetchTokenMeta(publicClient, resolved.token1);
     symbol1 = m.symbol;
   }
 
-  const tvlUsd = cached?.tvlUsd ?? null;
-  const volume24hUsd = cached?.volume24hUsd ?? null;
-  const fees24hUsd = estimateFees24h(volume24hUsd, pool.fee);
+  const fee = resolved.fee || 3000;
+  const fees24hUsd = estimateFees24h(volume24hUsd, fee);
   const aprPercent = estimateApr(fees24hUsd, tvlUsd);
 
   const metrics: PoolMetrics = {
     poolAddress: key,
-    displayId: poolDisplayId(key),
+    displayId: poolDisplayId(resolved.address),
     symbol0,
     symbol1,
-    token0: pool.token0,
-    token1: pool.token1,
+    token0: resolved.token0,
+    token1: resolved.token1,
     logo0: meta0?.logoURI ?? null,
     logo1: meta1?.logoURI ?? null,
-    pairImageUrl: null,
-    feePercent: feeToPercent(pool.fee),
+    pairImageUrl: pairDex?.imageUrl ?? null,
+    feePercent: feeToPercent(fee),
     tvlUsd,
     volume24hUsd,
     fees24hUsd,
     aprPercent,
-    priceUsd: cached?.priceUsd ?? null,
+    priceUsd: meta0?.priceUsd ?? null,
     priceChange24h: null,
     priceNative: null,
     updatedAt: Date.now(),
@@ -118,12 +165,11 @@ export async function fetchPoolMetrics(
 export function enrichFromCache(pool: CachedPool): EnrichedPool {
   const key = pool.address.toLowerCase();
   const cached = getCachedMetrics(key);
-  const symbols = getPoolSymbols(key);
   const base: PoolMetrics = cached ?? {
     poolAddress: key,
     displayId: poolDisplayId(pool.address),
-    symbol0: symbols?.symbol0 ?? pool.token0.slice(0, 6),
-    symbol1: symbols?.symbol1 ?? pool.token1.slice(0, 6),
+    symbol0: pool.token0.slice(0, 6),
+    symbol1: pool.token1.slice(0, 6),
     token0: pool.token0,
     token1: pool.token1,
     logo0: null,
@@ -148,9 +194,7 @@ export function hydrateEnrichedPools(pools: CachedPool[]): EnrichedPool[] {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-const METRICS_BATCH_SIZE = 40;
-/** Max pools to prefetch stats for on explore (rest show pair names only until scrolled) */
-const METRICS_PREFETCH_LIMIT = 200;
+const METRICS_BATCH_SIZE = 8;
 
 function chunk<T>(arr: T[], size: number): T[][] {
   const out: T[][] = [];
@@ -158,13 +202,13 @@ function chunk<T>(arr: T[], size: number): T[][] {
   return out;
 }
 
-/** Lazy batch metrics — avoids indexing thousands of pools at once */
 export async function indexPoolMetricsBatched(
   pools: CachedPool[],
   onProgress: (done: number, total: number) => void,
-  options?: { limit?: number },
+  options?: { limit?: number; publicClient?: PublicClient | null },
 ): Promise<void> {
-  const limit = options?.limit ?? METRICS_PREFETCH_LIMIT;
+  const limit = options?.limit ?? pools.length;
+  const client = options?.publicClient ?? null;
   const targets = pools.slice(0, limit).filter((p) => {
     const c = getCachedMetrics(p.address.toLowerCase());
     return !c || !isMetricsFresh(c);
@@ -178,54 +222,16 @@ export async function indexPoolMetricsBatched(
     return;
   }
 
-  const batches = chunk(
-    targets.map((p) => p.address.toLowerCase()),
-    METRICS_BATCH_SIZE,
-  );
+  const batches = chunk(targets, METRICS_BATCH_SIZE);
 
-  for (const ids of batches) {
-    try {
-      await fetchPoolMetricsBatch(ids);
-    } catch (e) {
-      console.warn("[poolMetrics] batch failed:", e);
-    }
-    done += ids.length;
+  for (const batch of batches) {
+    await Promise.all(
+      batch.map((p) => fetchPoolMetrics(p, client, true).catch(() => enrichFromCache(p).metrics)),
+    );
+    done += batch.length;
     onProgress(Math.min(done, total), total);
-    await new Promise((r) => setTimeout(r, 80));
+    await sleep(100);
   }
-}
-
-/** @deprecated Prefer indexPoolMetricsBatched */
-export async function indexPoolMetricsIncremental(
-  pools: CachedPool[],
-  publicClient: PublicClient | null | undefined,
-  onProgress: (done: number, total: number, latest?: EnrichedPool) => void,
-  options?: { delayMs?: number; onlyStale?: boolean },
-): Promise<EnrichedPool[]> {
-  const delayMs = options?.delayMs ?? 40;
-  const onlyStale = options?.onlyStale ?? true;
-  const result: EnrichedPool[] = [];
-  let done = 0;
-
-  for (const pool of pools) {
-    const cached = getCachedMetrics(pool.address.toLowerCase());
-    if (onlyStale && cached && isMetricsFresh(cached)) {
-      const row = enrichFromCache(pool);
-      result.push(row);
-      done++;
-      onProgress(done, pools.length, row);
-      continue;
-    }
-
-    const metrics = await fetchPoolMetrics(pool, publicClient, true);
-    const row: EnrichedPool = { ...pool, metrics };
-    result.push(row);
-    done++;
-    onProgress(done, pools.length, row);
-    if (delayMs > 0) await sleep(delayMs);
-  }
-
-  return result;
 }
 
 export function formatUsdCompact(n: number | null | undefined): string {

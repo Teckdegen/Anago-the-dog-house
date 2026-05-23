@@ -3,12 +3,12 @@ import { Plus } from "lucide-react";
 import { useAccount } from "wagmi";
 import { parseUnits } from "viem";
 import { useToast } from "@/components/Toast";
-import { UNISWAP_V4, type PoolLiveState } from "@/lib/uniswap";
+import { CAPRICORN_CL, type PoolLiveState } from "@/lib/capricorn";
 
 export function AddLiquidityPanel({ live }: { live: PoolLiveState }) {
   const { address } = useAccount();
   const { toast } = useToast();
-  const positionManager = UNISWAP_V4.positionManager;
+  const positionManager = CAPRICORN_CL.positionManager;
 
   const [amount0, setAmount0] = useState("");
   const [amount1, setAmount1] = useState("");
@@ -18,7 +18,7 @@ export function AddLiquidityPanel({ live }: { live: PoolLiveState }) {
 
   const handleAdd = () => {
     if (!address) return;
-    toast("error", "V4 liquidity", "Use the Uniswap LP API with a server-side key on Monad 143.");
+    toast("error", "Add liquidity", "Use the add-liquidity wizard with tick range on Monad 143.");
   };
 
   if (!address) {
@@ -32,7 +32,7 @@ export function AddLiquidityPanel({ live }: { live: PoolLiveState }) {
   return (
     <div className="space-y-4">
       <p className="font-mono text-[10px]" style={{ color: "rgba(196,168,240,0.5)" }}>
-        Uniswap V4 · Position Manager {positionManager.slice(0, 10)}… · add via LP API
+        Capricorn CL · Position Manager {positionManager.slice(0, 10)}…
       </p>
       <AmountField label={live.token0Symbol} value={amount0} onChange={setAmount0} />
       <AmountField label={live.token1Symbol} value={amount1} onChange={setAmount1} />
@@ -43,10 +43,10 @@ export function AddLiquidityPanel({ live }: { live: PoolLiveState }) {
         className="w-full rounded-xl py-3 font-grotesk text-[11px] uppercase tracking-wider disabled:opacity-40"
         style={{ background: "rgba(155,127,212,0.22)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.5)" }}
       >
-        Add Liquidity (LP API)
+        Add Liquidity
       </button>
       <p className="font-mono text-[8px] flex items-center gap-1" style={{ color: "rgba(196,168,240,0.35)" }}>
-        <Plus className="w-3 h-3" /> V4 PM {positionManager.slice(0, 10)}…
+        <Plus className="w-3 h-3" /> NPM {positionManager.slice(0, 10)}…
       </p>
     </div>
   );

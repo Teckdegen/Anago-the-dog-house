@@ -15,9 +15,9 @@ import {
   type LpPosition,
   buildCollectArgs,
   buildDecreaseArgs,
-  UNISWAP_V4,
-} from "@/lib/uniswap";
-import { NPM_ABI } from "@/lib/uniswap/abis";
+  CAPRICORN_CL,
+} from "@/lib/capricorn";
+import { NPM_ABI } from "@/lib/capricorn/abis";
 import { clmm } from "./clmmTheme";
 
 export function PositionCards({
@@ -85,7 +85,7 @@ function PositionCard({ position: pos }: { position: LpPosition }) {
   const publicClient = usePublicClient();
   const { toast } = useToast();
   const [busy, setBusy] = useState(false);
-  const positionManager = UNISWAP_V4.positionManager;
+  const positionManager = CAPRICORN_CL.positionManager as `0x${string}`;
 
   const collectTx = useWriteContract();
   const decreaseTx = useWriteContract();

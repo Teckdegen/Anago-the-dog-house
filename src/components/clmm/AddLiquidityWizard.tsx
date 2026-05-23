@@ -4,8 +4,8 @@ import { ArrowLeft, Check, RotateCcw, Settings } from "lucide-react";
 import { AddLiquidityPanel } from "./AddLiquidityPanel";
 import { ClmmTxGate } from "@/components/clmm/SwitchToMonadMainnet";
 import { TokenIcon } from "@/components/TokenIcon";
-import { feeToPercent, type PoolLiveState } from "@/lib/uniswap";
-import type { PoolMetrics } from "@/lib/uniswap/poolMetrics";
+import { feeToPercent, type PoolLiveState } from "@/lib/capricorn";
+import type { PoolMetrics } from "@/lib/capricorn/poolMetrics";
 import { clmm } from "./clmmTheme";
 
 type Step = 1 | 2;

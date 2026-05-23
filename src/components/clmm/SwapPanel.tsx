@@ -6,13 +6,13 @@ import { useToast } from "@/components/Toast";
 import { ERC20_ABI } from "@/lib/web3/tokens";
 import { prepareTransactionWithGas } from "@/lib/web3/gasUtils";
 import {
-  UNISWAP_V4,
+  CAPRICORN_CL,
   quoteExactInputSingle,
   buildExactInputSingleArgs,
   type CachedPool,
   type PoolLiveState,
-} from "@/lib/uniswap";
-import { SWAP_ROUTER_ABI } from "@/lib/uniswap/abis";
+} from "@/lib/capricorn";
+import { SWAP_ROUTER_ABI } from "@/lib/capricorn/abis";
 
 export function SwapPanel({
   pool,
@@ -79,7 +79,7 @@ export function SwapPanel({
     address: tokenIn,
     abi: ERC20_ABI,
     functionName: "allowance",
-    args: address && tokenIn ? [address, UNISWAP_V4.universalRouter211] : undefined,
+    args: address && tokenIn ? [address, CAPRICORN_CL.swapRouter as `0x${string}`] : undefined,
     query: { enabled: !!address && !!tokenIn },
   });
   const needsApproval = parsedIn > 0n && ((allowanceQ.data as bigint | undefined) ?? 0n) < parsedIn;
@@ -88,7 +88,7 @@ export function SwapPanel({
     if (!address || !publicClient || parsedIn === 0n) return;
     const gas = await prepareTransactionWithGas(publicClient);
     swapTx.writeContract({
-      address: UNISWAP_V4.universalRouter211,
+      address: CAPRICORN_CL.swapRouter as `0x${string}`,
       abi: SWAP_ROUTER_ABI,
       functionName: "exactInputSingle",
       args: [
@@ -166,7 +166,7 @@ export function SwapPanel({
                     address: tokenIn,
                     abi: ERC20_ABI,
                     functionName: "approve",
-                    args: [UNISWAP_V4.universalRouter211, maxUint256],
+                    args: [CAPRICORN_CL.swapRouter as `0x${string}`, maxUint256],
                     ...gas,
                   }),
                 );

@@ -1,5 +1,5 @@
 /**
- * Cron: sync subgraph → Supabase.
+ * Cron: Capricorn factory scan → Supabase.
  * Vercel cron + manual: Authorization: Bearer <CRON_SECRET>
  */
 

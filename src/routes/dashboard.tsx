@@ -211,7 +211,7 @@ function DashboardPage() {
       sub: !isConnected
         ? "connect wallet"
         : clmmStats.count > 0
-          ? `${clmmStats.count} V4 LP position${clmmStats.count === 1 ? "" : "s"} on Monad`
+          ? `${clmmStats.count} Capricorn LP position${clmmStats.count === 1 ? "" : "s"} on Monad`
           : "explore pools · add liquidity",
       color: "#4A2D7A",
       icon: BarChart2,

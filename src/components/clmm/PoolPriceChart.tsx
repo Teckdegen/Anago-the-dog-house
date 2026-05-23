@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { formatUsdCompact } from "@/lib/uniswap/poolMetrics";
+import { formatUsdCompact } from "@/lib/capricorn/poolMetrics";
 import { clmm } from "./clmmTheme";
 
 function formatPrice(price: number): string {

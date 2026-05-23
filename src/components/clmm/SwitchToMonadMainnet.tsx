@@ -1,14 +1,14 @@
 import type { ReactNode } from "react";
 import { useChainId, useSwitchChain } from "wagmi";
 import { Loader2 } from "lucide-react";
-import { MONAD_CHAIN_ID, isUniswapSupportedChain } from "@/lib/uniswap";
+import { MONAD_CHAIN_ID, isCapricornSupportedChain } from "@/lib/capricorn";
 import { clmm } from "./clmmTheme";
 
 export function SwitchToMonadMainnetButton({ className = "" }: { className?: string }) {
   const chainId = useChainId();
   const { switchChain, isPending, error } = useSwitchChain();
 
-  if (isUniswapSupportedChain(chainId)) return null;
+  if (isCapricornSupportedChain(chainId)) return null;
 
   return (
     <div className={className}>
@@ -49,7 +49,7 @@ export function ClmmNetworkGate({
   allowBrowse?: boolean;
 }) {
   const chainId = useChainId();
-  if (isUniswapSupportedChain(chainId)) return <>{children}</>;
+  if (isCapricornSupportedChain(chainId)) return <>{children}</>;
   if (allowBrowse) return <>{children}</>;
 
   return (
@@ -58,7 +58,7 @@ export function ClmmNetworkGate({
         Monad Mainnet required
       </p>
       <p className="font-mono text-[11px] mt-3 leading-relaxed" style={{ color: clmm.textMuted }}>
-        Uniswap CLMM (V3/V4) runs on Monad mainnet (chain <strong>143</strong>). You are on chain{" "}
+        Capricorn CL runs on Monad mainnet (chain <strong>143</strong>). You are on chain{" "}
         <strong>{chainId}</strong>.
       </p>
       <SwitchToMonadMainnetButton className="mt-8" />
@@ -68,7 +68,7 @@ export function ClmmNetworkGate({
 
 export function ClmmTxGate({ children }: { children: ReactNode }) {
   const chainId = useChainId();
-  if (isUniswapSupportedChain(chainId)) return <>{children}</>;
+  if (isCapricornSupportedChain(chainId)) return <>{children}</>;
 
   return (
     <div

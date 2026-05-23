@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { getAddress } from "viem";
-import { isPoolRef, isV4PoolId } from "@/lib/uniswap/addresses";
+import { isPoolRef } from "@/lib/capricorn/addresses";
 import { useAccount } from "wagmi";
 import {
   fetchPoolLiveState,
@@ -14,7 +14,7 @@ import {
   type PoolLiveState,
   type LpPosition,
   type PoolMetrics,
-} from "@/lib/uniswap";
+} from "@/lib/capricorn";
 
 const LIVE_POLL_MS = 8_000;
 const METRICS_POLL_MS = 30_000;
@@ -23,7 +23,6 @@ export function usePoolAddressParam(poolParam: string | undefined): `0x${string}
   if (!poolParam) return undefined;
   const raw = poolParam.startsWith("0x") ? poolParam : `0x${poolParam}`;
   if (!isPoolRef(raw)) return undefined;
-  if (isV4PoolId(raw)) return raw.toLowerCase() as `0x${string}`;
   try {
     return getAddress(raw) as `0x${string}`;
   } catch {
@@ -101,17 +100,23 @@ export function usePoolPositions(poolAddress: `0x${string}` | undefined, enabled
   const monadClient = getMonadPublicClient();
   const [positions, setPositions] = useState<LpPosition[]>([]);
   const [loading, setLoading] = useState(false);
+  const [pool, setPool] = useState<CachedPool | null>(null);
+
+  useEffect(() => {
+    if (!poolAddress) return;
+    resolvePoolByAddress(monadClient, poolAddress).then(setPool);
+  }, [poolAddress, monadClient]);
 
   const load = useCallback(async () => {
     if (!address || !poolAddress) return;
     setLoading(true);
     try {
       const all = await fetchUserPositions(monadClient, address);
-      setPositions(all.filter((p) => positionMatchesPool(p, poolAddress)));
+      setPositions(all.filter((p) => positionMatchesPool(p, poolAddress, pool)));
     } finally {
       setLoading(false);
     }
-  }, [monadClient, address, poolAddress]);
+  }, [monadClient, address, poolAddress, pool]);
 
   useEffect(() => {
     if (!enabled || !address) return;

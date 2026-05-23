@@ -1,7 +1,7 @@
 import type { PoolMetrics } from "./poolMetrics";
 
-const CACHE_KEY = "uniswap_v3_pool_metrics_v2";
-const METRICS_TTL_MS = 10 * 60 * 1000; // 10 min before background refresh
+const CACHE_KEY = "capricorn_cl_pool_metrics_v1";
+const METRICS_TTL_MS = 10 * 60 * 1000;
 
 let memory: Record<string, PoolMetrics> | null = null;
 
@@ -52,6 +52,6 @@ export function isMetricsFresh(m: PoolMetrics | null | undefined): boolean {
 }
 
 export function poolDisplayId(address: string): string {
-  const n = parseInt(address.slice(2, 10), 16) % 100000;
-  return `#${String(n).padStart(5, "0")}`;
+  const a = address.toLowerCase();
+  return a.length >= 10 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a;
 }

@@ -29,7 +29,7 @@ export const monadTestnet = defineChain({
   testnet: true,
 });
 
-/** Monad mainnet — Uniswap V3 official deployments (chainId 143) */
+/** Monad mainnet — Capricorn CL deployments (chainId 143) */
 export const monad = defineChain({
   id: 143,
   name: "Monad",

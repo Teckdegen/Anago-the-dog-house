@@ -76,30 +76,24 @@ export const POOL_ABI = [
   },
 ] as const;
 
-/** Uniswap V4 StateView — read pool state by poolId (bytes32). */
-export const STATE_VIEW_ABI = [
-  {
-    type: "function",
-    name: "getSlot0",
-    stateMutability: "view",
-    inputs: [{ name: "poolId", type: "bytes32" }],
-    outputs: [
-      { name: "sqrtPriceX96", type: "uint160" },
-      { name: "tick", type: "int24" },
-      { name: "protocolFee", type: "uint24" },
-      { name: "lpFee", type: "uint24" },
-    ],
-  },
-  {
-    type: "function",
-    name: "getLiquidity",
-    stateMutability: "view",
-    inputs: [{ name: "poolId", type: "bytes32" }],
-    outputs: [{ name: "liquidity", type: "uint128" }],
-  },
-] as const;
-
 export const NPM_ABI = [
+  {
+    type: "function",
+    name: "balanceOf",
+    stateMutability: "view",
+    inputs: [{ name: "owner", type: "address" }],
+    outputs: [{ type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "tokenOfOwnerByIndex",
+    stateMutability: "view",
+    inputs: [
+      { name: "owner", type: "address" },
+      { name: "index", type: "uint256" },
+    ],
+    outputs: [{ type: "uint256" }],
+  },
   {
     type: "function",
     name: "positions",
@@ -198,15 +192,6 @@ export const NPM_ABI = [
     outputs: [
       { name: "amount0", type: "uint256" },
       { name: "amount1", type: "uint256" },
-    ],
-  },
-  {
-    type: "event",
-    name: "Transfer",
-    inputs: [
-      { name: "from", type: "address", indexed: true },
-      { name: "to", type: "address", indexed: true },
-      { name: "tokenId", type: "uint256", indexed: true },
     ],
   },
 ] as const;
