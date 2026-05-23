@@ -99,7 +99,7 @@ function CLMMExplorePage() {
             Explore pools
           </h1>
           <p className="font-mono text-[11px] mt-1" style={{ color: clmm.textMuted }}>
-            Capricorn CL on Monad · {total > 0 ? `${total.toLocaleString()} pools` : "loading on-chain metrics"}
+            Capricorn CL on Monad · {total > 0 ? `${total.toLocaleString()} pools` : "loading pools…"}
           </p>
         </header>
 
@@ -183,9 +183,6 @@ function ExplorePoolsView({
         <p className="font-mono text-[11px]" style={{ color: "rgba(255,120,120,0.9)" }}>
           {error}
         </p>
-        <p className="font-mono text-[10px] max-w-md mx-auto" style={{ color: clmm.textMuted }}>
-          Check your RPC connection and try again.
-        </p>
         <button
           type="button"
           onClick={onRetry}
@@ -201,7 +198,7 @@ function ExplorePoolsView({
   if (!loading && rows.length === 0) {
     return (
       <div className="py-20 text-center font-mono text-[11px]" style={{ color: clmm.textMuted }}>
-        No pools match your search.
+        No pools found.
       </div>
     );
   }

@@ -1,7 +1,4 @@
-/**
- * Paginated CLMM pools from Supabase only.
- * Subgraph is indexed by script.js — not used here.
- */
+/** Paginated CLMM pools for the explore page. */
 
 import { getSupabaseAdmin } from "../../lib/supabase-admin.mjs";
 

@@ -110,11 +110,7 @@ export async function resolvePoolByAddress(
   client: PublicClient,
   poolAddress: `0x${string}`,
 ): Promise<CachedPool | null> {
-  const key = poolAddress.toLowerCase() as `0x${string}`;
-  if (!isKnownPoolAddress(key)) {
-    return fetchPoolMetadata(client, key);
-  }
-  return fetchPoolMetadata(client, key);
+  return fetchPoolMetadata(client, poolAddress.toLowerCase() as `0x${string}`);
 }
 
 export async function hydratePools(

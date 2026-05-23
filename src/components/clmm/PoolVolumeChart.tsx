@@ -64,7 +64,7 @@ export function PoolVolumeChart({
         ))}
       </div>
       <p className="font-mono text-[9px] mt-3" style={{ color: clmm.textDim }}>
-        Estimated bars from 24h volume (no historical indexer on Monad yet)
+        Estimated bars from 24h volume
       </p>
     </div>
   );

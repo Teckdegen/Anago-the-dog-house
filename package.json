@@ -11,9 +11,8 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "pool-indexer": "node script.js",
-    "pool-indexer:once": "node script.js --once",
-    "sync:supabase": "node script.js --once"
+    "pool-indexer": "node bot/index.js",
+    "pool-indexer:once": "node bot/index.js --once"
   },
   "dependencies": {
     "@cloudflare/vite-plugin": "^1.25.5",
