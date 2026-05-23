@@ -10,6 +10,8 @@ import {
 import { useAccount, useBalance } from "wagmi";
 import { AppShell } from "@/components/AppShell";
 import { useUserLocks, useUserVestings } from "@/lib/web3/hooks";
+import { useClmmPositionCount, useFarmPositionCount } from "@/hooks/useDashboardPositions";
+import { useAllTokenBalances } from "@/lib/web3/hooks";
 
 export const Route = createFileRoute("/dashboard")({
   component: DashboardPage,
@@ -78,6 +80,10 @@ function DashboardPage() {
   const { vestings } = useUserVestings();
 
   const monBal = useBalance({ address, query: { enabled: !!address, refetchInterval: 10_000 } });
+  const { balances: walletTokens } = useAllTokenBalances();
+  const monFromBv = walletTokens.find(
+    (t) => t.symbol.toUpperCase() === "MON" || t.address === "0x0000000000000000000000000000000000000000",
+  );
 
   const [monPrice, setMonPrice] = useState<number>(0);
   const [priceLoading, setPriceLoading] = useState(true);
@@ -98,9 +104,12 @@ function DashboardPage() {
   }, []);
 
   const monAmount = useMemo(() => {
+    if (monFromBv && monFromBv.balance > 0n) {
+      return Number(monFromBv.balance) / 1e18;
+    }
     if (!monBal.data) return null;
     return Number(monBal.data.value) / 1e18;
-  }, [monBal.data]);
+  }, [monBal.data, monFromBv]);
 
   const monUsd = useMemo(() => {
     if (monAmount === null || monPrice === 0) return null;
@@ -154,6 +163,9 @@ function DashboardPage() {
     return totalAmount > 0 && claimed < totalAmount && !v.revoked;
   });
 
+  const farmStats = useFarmPositionCount();
+  const clmmStats = useClmmPositionCount();
+
   const POSITIONS = [
     {
       label: "Token Locks",
@@ -173,16 +185,34 @@ function DashboardPage() {
     },
     {
       label: "Stream Farms",
-      value: "—",
-      sub: "deposit to earn",
+      value: !isConnected
+        ? "—"
+        : farmStats.isLoading
+          ? "…"
+          : `${farmStats.count} active`,
+      sub: !isConnected
+        ? "connect wallet"
+        : farmStats.farmCount === 0
+          ? "no farms deployed yet"
+          : farmStats.count > 0
+            ? `${farmStats.count} deposit${farmStats.count === 1 ? "" : "s"} · ${farmStats.farmCount} farm${farmStats.farmCount === 1 ? "" : "s"} live`
+            : `${farmStats.farmCount} farm${farmStats.farmCount === 1 ? "" : "s"} · deposit to earn`,
       color: "#6B4FA8",
       icon: Sprout,
       href: "/farm",
     },
     {
       label: "CLMM",
-      value: "—",
-      sub: "0 open positions",
+      value: !isConnected
+        ? "—"
+        : clmmStats.isLoading
+          ? "…"
+          : `${clmmStats.count} open`,
+      sub: !isConnected
+        ? "connect wallet"
+        : clmmStats.count > 0
+          ? `${clmmStats.count} V4 LP position${clmmStats.count === 1 ? "" : "s"} on Monad`
+          : "explore pools · add liquidity",
       color: "#4A2D7A",
       icon: BarChart2,
       href: "/clmm",

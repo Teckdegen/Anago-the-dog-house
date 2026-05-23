@@ -11,6 +11,7 @@ import { shortAddr } from "@/lib/web3/format";
 import { prepareTransactionWithGas } from "@/lib/web3/gasUtils";
 import { LIVE_CHAIN_QUERY } from "@/lib/web3/nftImage";
 import { NftImage } from "@/components/NftImage";
+import { TokenPicker } from "@/components/TokenPicker";
 
 export const Route = createFileRoute("/otc")({
   component: OTCPage,
@@ -325,7 +326,8 @@ function SellTab() {
   const autoListRef = useRef(false);
 
   const [selected, setSelected] = useState<{ contract: `0x${string}`; tokenId: string; label: string } | null>(null);
-  const [paymentToken, setPaymentToken] = useState("");
+  const [paymentToken, setPaymentToken] = useState<`0x${string}` | "">("");
+  const [paymentTokenMeta, setPaymentTokenMeta] = useState<{ symbol: string; decimals: number } | null>(null);
   const [price, setPrice] = useState("");
 
   const approveTx = useWriteContract();
@@ -333,8 +335,13 @@ function SellTab() {
   const listTx = useWriteContract();
   const listRcpt = useWaitForTransactionReceipt({ hash: listTx.data });
 
-  const payDecQ = useReadContract({ address: (paymentToken || "0x0000000000000000000000000000000000000000") as `0x${string}`, abi: ERC20_ABI, functionName: "decimals", query: { enabled: paymentToken.length === 42 } });
-  const payDec = (payDecQ.data as number) ?? 18;
+  const payDecQ = useReadContract({
+    address: (paymentToken || "0x0000000000000000000000000000000000000000") as `0x${string}`,
+    abi: ERC20_ABI,
+    functionName: "decimals",
+    query: { enabled: !!paymentToken && paymentToken.length === 42 && !paymentTokenMeta },
+  });
+  const payDec = paymentTokenMeta?.decimals ?? (payDecQ.data as number) ?? 18;
 
   // Check NFT approval
   const nftAddr = (selected?.contract ?? "0x0000000000000000000000000000000000000000") as `0x${string}`;
@@ -420,10 +427,26 @@ function SellTab() {
 
           <div className="space-y-4">
             <div>
-              <label className="font-mono text-[9px] uppercase tracking-wider mb-1.5 block" style={{ color: "rgba(196,168,240,0.55)" }}>Payment Token Address</label>
-              <input type="text" value={paymentToken} onChange={(e) => setPaymentToken(e.target.value)} placeholder="0x... (token buyers pay with)"
-                className="w-full rounded-xl px-4 py-2.5 font-mono text-[12px] outline-none"
-                style={{ background: "rgba(155,127,212,0.06)", border: "1px solid rgba(155,127,212,0.3)", color: "#EDE0FF" }} />
+              <label className="font-mono text-[9px] uppercase tracking-wider mb-1.5 block" style={{ color: "rgba(196,168,240,0.55)" }}>
+                Payment token (buyers pay with)
+              </label>
+              <TokenPicker
+                compact
+                selected={
+                  paymentToken
+                    ? {
+                        address: paymentToken as `0x${string}`,
+                        symbol: paymentTokenMeta?.symbol ?? "…",
+                        name: paymentTokenMeta?.symbol ?? "",
+                        decimals: payDec,
+                      }
+                    : undefined
+                }
+                onSelect={(t) => {
+                  setPaymentToken(t.address);
+                  setPaymentTokenMeta({ symbol: t.symbol, decimals: t.decimals });
+                }}
+              />
             </div>
             <div>
               <label className="font-mono text-[9px] uppercase tracking-wider mb-1.5 block" style={{ color: "rgba(196,168,240,0.55)" }}>Price</label>

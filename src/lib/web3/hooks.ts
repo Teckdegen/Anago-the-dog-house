@@ -550,7 +550,7 @@ export function useAllTokenBalances(): {
     // Initialize from cache
     if (!address) return [];
     try {
-      const cached = localStorage.getItem(`token_balances_v6_${address}_${chainId}`);
+      const cached = localStorage.getItem(`token_balances_v7_${address}_${chainId}`);
       if (cached) {
         const { data } = JSON.parse(cached);
         // Restore bigints
@@ -581,7 +581,7 @@ export function useAllTokenBalances(): {
           // Cache results (serialize bigints as strings)
           try {
             const serializable = results.map(t => ({ ...t, balance: t.balance.toString() }));
-            localStorage.setItem(`token_balances_v6_${address}_${chainId}`, JSON.stringify({ data: serializable, timestamp: Date.now() }));
+            localStorage.setItem(`token_balances_v7_${address}_${chainId}`, JSON.stringify({ data: serializable, timestamp: Date.now() }));
           } catch {}
         } else if (!cancelled) {
           // Don't clear existing data on empty results (RPC failure)

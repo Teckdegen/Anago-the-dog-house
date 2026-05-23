@@ -78,8 +78,7 @@ function CLMMExplorePage() {
         r.address.toLowerCase().includes(q) ||
         r.metrics.symbol0.toLowerCase().includes(q) ||
         r.metrics.symbol1.toLowerCase().includes(q) ||
-        r.metrics.displayId.toLowerCase().includes(q) ||
-        (r.protocol ?? "v4").includes(q),
+        r.metrics.displayId.toLowerCase().includes(q),
     );
   }, [rows, poolSearch]);
 
@@ -102,11 +101,20 @@ function CLMMExplorePage() {
 
   return (
     <AppShell>
-      <div className="w-full px-5 sm:px-8 lg:px-14 pt-8 pb-20">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-          <div className="flex gap-6 border-b sm:border-b-0" style={{ borderColor: clmm.border }}>
+      <div className="w-full px-5 sm:px-8 lg:px-14 pt-8 pb-20 min-h-screen" style={{ background: clmm.bg }}>
+        <header className="mb-8">
+          <h1 className="font-grotesk text-[26px] sm:text-[32px] font-medium" style={{ color: clmm.text }}>
+            Explore pools
+          </h1>
+          <p className="font-mono text-[11px] mt-1" style={{ color: clmm.textMuted }}>
+            Uniswap V4 on Monad · {pools.length > 0 ? `${pools.length} pools` : "run npm run sync:pools for full list"}
+          </p>
+        </header>
+
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div className="flex gap-6">
             <TabBtn active={view === "explore"} onClick={() => setView("explore")}>
-              Explore pools{pools.length > 0 ? ` (${pools.length})` : ""}
+              Pools
             </TabBtn>
             <TabBtn active={view === "positions"} onClick={() => setView("positions")}>
               Your positions
@@ -114,20 +122,18 @@ function CLMMExplorePage() {
           </div>
 
           {view === "explore" && (
-            <div className="flex items-center gap-2 flex-1 sm:max-w-md sm:ml-auto">
-              <div
-                className="flex-1 flex items-center gap-2 px-4 py-2.5 rounded-full"
-                style={{ border: `1px solid ${clmm.border}`, background: clmm.purpleBg }}
-              >
-                <Search className="w-4 h-4 shrink-0" style={{ color: clmm.textDim }} />
-                <input
-                  value={poolSearch}
-                  onChange={(e) => setPoolSearch(e.target.value)}
-                  placeholder="Search pools"
-                  className="flex-1 bg-transparent font-mono text-[11px] outline-none"
-                  style={{ color: clmm.text }}
-                />
-              </div>
+            <div
+              className="flex items-center gap-2 px-4 py-2.5 rounded-full sm:max-w-xs w-full sm:w-auto"
+              style={{ border: `1px solid ${clmm.border}`, background: clmm.panel }}
+            >
+              <Search className="w-4 h-4 shrink-0" style={{ color: clmm.textDim }} />
+              <input
+                value={poolSearch}
+                onChange={(e) => setPoolSearch(e.target.value)}
+                placeholder="Search pools"
+                className="flex-1 bg-transparent font-mono text-[11px] outline-none"
+                style={{ color: clmm.text }}
+              />
             </div>
           )}
         </div>
@@ -154,29 +160,13 @@ function CLMMExplorePage() {
 
 function PositionsView({ positions, loading }: { positions: LpPosition[]; loading: boolean }) {
   return (
-    <div className="w-full space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-        <div>
-          <h2 className="font-grotesk text-[22px] font-medium" style={{ color: clmm.text }}>
-            Your LP positions
-          </h2>
-          <p className="font-mono text-[10px] mt-1" style={{ color: clmm.textDim }}>
-            {positions.length} position{positions.length === 1 ? "" : "s"} · auto-updates every 25s
-          </p>
-        </div>
-      </div>
-
-      <div
-        className="rounded-2xl p-5 sm:p-8 min-h-[420px]"
-        style={{ border: `1px solid ${clmm.border}`, background: clmm.panel }}
-      >
-        <PositionCards
-          positions={positions}
-          loading={loading}
-          emptyLabel="No LP positions yet — explore pools and add liquidity"
-          layout="grid"
-        />
-      </div>
+    <div className="rounded-2xl p-5 sm:p-8 min-h-[420px]" style={{ border: `1px solid ${clmm.border}`, background: clmm.panel }}>
+      <PositionCards
+        positions={positions}
+        loading={loading}
+        emptyLabel="No LP positions yet — explore pools and add liquidity"
+        layout="grid"
+      />
     </div>
   );
 }
@@ -194,10 +184,10 @@ function TabBtn({
     <button
       type="button"
       onClick={onClick}
-      className="font-grotesk text-[15px] sm:text-[17px] pb-3 sm:pb-0 transition relative"
+      className="font-grotesk text-[15px] pb-2 transition relative"
       style={{
         color: active ? clmm.text : clmm.textMuted,
-        borderBottom: active ? `2px solid ${clmm.accent}` : "2px solid transparent",
+        borderBottom: active ? `2px solid ${clmm.purple}` : "2px solid transparent",
       }}
     >
       {children}

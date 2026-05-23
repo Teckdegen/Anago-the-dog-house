@@ -9,7 +9,6 @@ import { parseUnits, formatUnits } from "viem";
 import { AppShell } from "@/components/AppShell";
 import { useToast } from "@/components/Toast";
 import { STREAM_FARM_ABI, CONTRACTS, ERC20_ABI } from "@/lib/web3/contracts";
-import { TokenPicker } from "@/components/TokenPicker";
 import type { TokenInfo } from "@/lib/web3/tokens";
 
 export const Route = createFileRoute("/farm")({

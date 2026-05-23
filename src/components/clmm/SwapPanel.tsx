@@ -18,10 +18,13 @@ export function SwapPanel({
   pool,
   live,
   onClose,
+  compact,
 }: {
   pool: CachedPool;
   live: PoolLiveState;
-  onClose: () => void;
+  onClose?: () => void;
+  /** Sidebar layout on pool page */
+  compact?: boolean;
 }) {
   const { address } = useAccount();
   const publicClient = usePublicClient();
@@ -125,9 +128,11 @@ export function SwapPanel({
         <p className="font-grotesk text-[12px] uppercase" style={{ color: clmm.text }}>
           Swap
         </p>
-        <button type="button" onClick={onClose} className="font-mono text-[9px]" style={{ color: clmm.accent }}>
-          Close
-        </button>
+        {onClose && !compact && (
+          <button type="button" onClick={onClose} className="font-mono text-[9px]" style={{ color: clmm.accent }}>
+            Close
+          </button>
+        )}
       </div>
       {!address ? (
         <p className="font-mono text-[11px]" style={{ color: clmm.textMuted }}>
@@ -168,8 +173,12 @@ export function SwapPanel({
               } else runSwap().catch((e) => toast("error", "Swap failed", (e as Error).message));
             }}
             disabled={busy || parsedIn === 0n || quoteOut == null}
-            className="w-full py-3 rounded-full font-grotesk text-[11px] uppercase disabled:opacity-40"
-            style={{ background: clmm.purpleSolid, color: clmm.text, border: `1px solid ${clmm.borderStrong}` }}
+            className="w-full py-3.5 rounded-2xl font-grotesk text-[11px] uppercase disabled:opacity-40"
+            style={{
+              background: compact ? clmm.purpleBtn : clmm.purpleSolid,
+              color: compact ? "#06040F" : clmm.text,
+              border: compact ? "none" : `1px solid ${clmm.borderStrong}`,
+            }}
           >
             {busy ? "Working…" : needsApproval ? "Approve & Swap" : "Swap"}
           </button>

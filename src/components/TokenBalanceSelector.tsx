@@ -2,35 +2,45 @@ import { useState, useMemo } from "react";
 import { Search, Coins, RefreshCw } from "lucide-react";
 import { useAllTokenBalances } from "@/lib/web3/hooks";
 import type { TokenBalance } from "@/lib/web3/tokenBalances";
+import { TokenIcon } from "./TokenIcon";
 
 type TokenBalanceSelectorProps = {
   onSelect: (token: TokenBalance) => void;
   selectedAddress?: `0x${string}`;
   className?: string;
+  excludeNative?: boolean;
 };
 
-/**
- * Component that displays all user token balances with search
- * Automatically discovers tokens from Monad Explorer - no manual entry needed!
- */
+const ZERO = "0x0000000000000000000000000000000000000000" as `0x${string}`;
+
+function formatUsd(n: number | null | undefined): string | null {
+  if (n == null || !Number.isFinite(n) || n <= 0) return null;
+  if (n >= 1_000) return `$${(n / 1_000).toFixed(2)}K`;
+  return `$${n.toFixed(2)}`;
+}
+
+/** Wallet token list with balances from BlockVision */
 export function TokenBalanceSelector({
   onSelect,
   selectedAddress,
   className = "",
+  excludeNative,
 }: TokenBalanceSelectorProps) {
-  const { balances, isLoading, error, refetch, addToken } = useAllTokenBalances();
+  const { balances, isLoading, error, refetch } = useAllTokenBalances();
   const [search, setSearch] = useState("");
 
   const filtered = useMemo(() => {
-    if (!search) return balances;
+    let list = balances;
+    if (excludeNative) list = list.filter((t) => t.address !== ZERO);
+    if (!search) return list;
     const s = search.toLowerCase();
-    return balances.filter(
+    return list.filter(
       (token) =>
         token.symbol.toLowerCase().includes(s) ||
         token.name.toLowerCase().includes(s) ||
         token.address.toLowerCase().includes(s),
     );
-  }, [balances, search]);
+  }, [balances, search, excludeNative]);
 
   if (error) {
     return (
@@ -42,6 +52,7 @@ export function TokenBalanceSelector({
           Failed to load token balances
         </p>
         <button
+          type="button"
           onClick={refetch}
           className="mt-3 px-4 py-2 rounded-full font-grotesk text-[10px] uppercase tracking-wider"
           style={{ background: "rgba(155,127,212,0.25)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.6)" }}
@@ -54,7 +65,6 @@ export function TokenBalanceSelector({
 
   return (
     <div className={className}>
-      {/* Search & Refresh */}
       <div className="flex items-center gap-2 mb-3">
         <div
           className="flex-1 flex items-center gap-2 px-3 py-2 rounded-full"
@@ -63,7 +73,7 @@ export function TokenBalanceSelector({
           <Search className="w-3.5 h-3.5" style={{ color: "rgba(196,168,240,0.5)" }} strokeWidth={1.5} />
           <input
             type="text"
-            placeholder="Search tokens..."
+            placeholder="Search tokens…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="flex-1 bg-transparent font-mono text-[11px] outline-none"
@@ -71,6 +81,7 @@ export function TokenBalanceSelector({
           />
         </div>
         <button
+          type="button"
           onClick={refetch}
           disabled={isLoading}
           className="p-2 rounded-full transition-colors disabled:opacity-50"
@@ -85,7 +96,6 @@ export function TokenBalanceSelector({
         </button>
       </div>
 
-      {/* Token List */}
       <div
         className="rounded-xl overflow-hidden max-h-[400px] overflow-y-auto"
         style={{ border: "1px solid rgba(155,127,212,0.35)" }}
@@ -97,30 +107,24 @@ export function TokenBalanceSelector({
               style={{ borderColor: "rgba(155,127,212,0.2)", borderTopColor: "rgba(155,127,212,0.8)" }}
             />
             <p className="font-mono text-[10px]" style={{ color: "rgba(196,168,240,0.6)" }}>
-              Discovering your tokens...
+              Loading wallet tokens…
             </p>
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12">
-            <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center mb-3"
-              style={{ background: "rgba(155,127,212,0.12)", border: "1px solid rgba(155,127,212,0.3)" }}
-            >
-              <Coins className="w-5 h-5" style={{ color: "rgba(196,168,240,0.6)" }} strokeWidth={1.5} />
-            </div>
+            <Coins className="w-5 h-5 mb-2" style={{ color: "rgba(196,168,240,0.6)" }} strokeWidth={1.5} />
             <p className="font-grotesk uppercase text-[12px] tracking-wider" style={{ color: "#EDE0FF" }}>
               {search ? "No tokens found" : "No tokens yet"}
-            </p>
-            <p className="font-mono text-[10px] mt-1 max-w-[220px] text-center" style={{ color: "rgba(196,168,240,0.55)" }}>
-              {search ? "Try a different search term" : "Get some tokens to get started"}
             </p>
           </div>
         ) : (
           filtered.map((token, i) => {
             const isSelected = selectedAddress?.toLowerCase() === token.address.toLowerCase();
+            const usd = formatUsd(token.usdValue);
             return (
               <button
                 key={token.address}
+                type="button"
                 onClick={() => onSelect(token)}
                 className="w-full flex items-center justify-between px-4 py-3 hover:bg-[rgba(155,127,212,0.08)] transition-colors"
                 style={{
@@ -129,16 +133,7 @@ export function TokenBalanceSelector({
                 }}
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <div
-                    className="w-8 h-8 rounded-full flex items-center justify-center font-grotesk text-[11px] shrink-0"
-                    style={{
-                      background: "rgba(155,127,212,0.15)",
-                      border: "1px solid rgba(155,127,212,0.35)",
-                      color: "rgba(196,168,240,0.85)",
-                    }}
-                  >
-                    {token.symbol[0]}
-                  </div>
+                  <TokenIcon address={token.address} symbol={token.symbol} size={32} logoUrl={token.logoURI} />
                   <div className="text-left min-w-0">
                     <p className="font-grotesk uppercase text-[12px] tracking-wider truncate" style={{ color: "#EDE0FF" }}>
                       {token.symbol}
@@ -153,7 +148,7 @@ export function TokenBalanceSelector({
                     {token.balanceFormatted}
                   </p>
                   <p className="font-mono text-[9px]" style={{ color: "rgba(196,168,240,0.5)" }}>
-                    Balance
+                    {usd ?? "Balance"}
                   </p>
                 </div>
               </button>
@@ -164,7 +159,7 @@ export function TokenBalanceSelector({
 
       {!isLoading && balances.length > 0 && (
         <p className="font-mono text-[9px] mt-2 text-center" style={{ color: "rgba(196,168,240,0.45)" }}>
-          {balances.length} token{balances.length !== 1 ? "s" : ""} found
+          {balances.length} token{balances.length !== 1 ? "s" : ""} · BlockVision
         </p>
       )}
     </div>

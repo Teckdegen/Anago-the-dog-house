@@ -1,9 +1,13 @@
 import { Link } from "@tanstack/react-router";
-import { ArrowLeft, ExternalLink } from "lucide-react";
+import { Copy, ExternalLink, MoreHorizontal, Share2 } from "lucide-react";
+import { useState, type ReactNode } from "react";
 import { TokenIcon } from "@/components/TokenIcon";
 import { formatApr, formatUsdCompact, truncateAddress, type PoolMetrics } from "@/lib/uniswap/poolMetrics";
-import { feeToPercent, type PoolLiveState } from "@/lib/uniswap";
-import { PoolPriceChart } from "./PoolPriceChart";
+import { feeToPercent, type CachedPool, type PoolLiveState } from "@/lib/uniswap";
+import { PoolVolumeChart } from "./PoolVolumeChart";
+import { PoolTransactionsTable } from "./PoolTransactionsTable";
+import { SwapPanel } from "./SwapPanel";
+import { ClmmTxGate } from "./SwitchToMonadMainnet";
 import { clmm } from "./clmmTheme";
 
 function formatPrice(price: number): string {
@@ -13,172 +17,254 @@ function formatPrice(price: number): string {
   return price.toFixed(4);
 }
 
-function secondsAgo(ts: number): string {
-  if (!ts) return "—";
-  const s = Math.max(0, Math.floor((Date.now() - ts) / 1000));
-  if (s < 5) return "just now";
-  if (s < 60) return `${s}s ago`;
-  return `${Math.floor(s / 60)}m ago`;
-}
-
 export function PoolDetailView({
   poolAddress,
+  pool,
   live,
   metrics,
-  liveUpdatedAt,
-  onTrade,
-  onPositions,
 }: {
   poolAddress: `0x${string}`;
+  pool: CachedPool;
   live: PoolLiveState;
   metrics: PoolMetrics;
-  liveUpdatedAt?: number;
-  onTrade: () => void;
-  onPositions: () => void;
 }) {
   const m = metrics;
-  const priceLabel = formatPrice(live.price);
+  const feeLabel = feeToPercent(live.pool.fee);
+  const volChange = m.priceChange24h != null ? m.priceChange24h : 0;
 
   return (
-    <div className="space-y-4">
-      <Link
-        to="/clmm"
-        className="inline-flex items-center gap-2 font-mono text-[10px] hover:underline"
-        style={{ color: clmm.textMuted }}
-      >
-        <ArrowLeft className="w-3.5 h-3.5" /> Explore pools
-      </Link>
+    <div className="max-w-[1280px] mx-auto space-y-6">
+      <nav className="font-mono text-[11px] flex items-center gap-2" style={{ color: clmm.textMuted }}>
+        <Link to="/clmm" className="hover:underline" style={{ color: clmm.textMuted }}>
+          Pools
+        </Link>
+        <span style={{ color: clmm.textDim }}>›</span>
+        <span style={{ color: clmm.text }}>
+          {m.symbol0} / {m.symbol1}
+        </span>
+      </nav>
 
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="relative flex">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="relative flex shrink-0">
             <TokenIcon address={live.pool.token0} symbol={live.token0Symbol} size={40} logoUrl={m.logo0} />
-            <div className="absolute -right-2 top-3">
+            <div className="absolute -right-2 top-4 rounded-full" style={{ boxShadow: `0 0 0 2px ${clmm.bg}` }}>
               <TokenIcon address={live.pool.token1} symbol={live.token1Symbol} size={40} logoUrl={m.logo1} />
             </div>
           </div>
-          <div>
-            <h1 className="font-grotesk text-[22px] font-medium" style={{ color: clmm.text }}>
-              {m.symbol0} / {m.symbol1}
-            </h1>
-            <p className="font-mono text-[10px]" style={{ color: clmm.textDim }}>
-              {m.displayId} · {feeToPercent(live.pool.fee)} · Uniswap V4
-            </p>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="font-grotesk text-[24px] sm:text-[28px] font-medium" style={{ color: clmm.text }}>
+                {m.symbol0} / {m.symbol1}
+              </h1>
+              <Badge>v4</Badge>
+              <Badge>{feeLabel}</Badge>
+            </div>
+            <PoolIdCopy id={m.displayId} />
           </div>
         </div>
-        <div className="flex gap-2">
-          <button type="button" onClick={onTrade} className="px-4 py-2 rounded-full font-grotesk text-[10px] uppercase" style={{ border: `1px solid ${clmm.border}`, color: clmm.text }}>
-            Swap
-          </button>
-          <button type="button" onClick={onPositions} className="px-4 py-2 rounded-full font-grotesk text-[10px] uppercase" style={{ border: `1px solid ${clmm.border}`, color: clmm.textMuted }}>
-            Positions
-          </button>
-          <Link to="/clmm/pool/$poolAddress/add" params={{ poolAddress }} className="px-5 py-2 rounded-full font-grotesk text-[10px] uppercase" style={{ background: clmm.purpleSolid, color: clmm.text, border: `1px solid ${clmm.borderStrong}` }}>
-            Add liquidity
+        <div className="flex items-center gap-2">
+          <IconBtn icon={Share2} label="Share" />
+          <a
+            href={`https://monadexplorer.com/address/${poolAddress}`}
+            target="_blank"
+            rel="noreferrer"
+            className="p-2 rounded-lg transition hover:bg-[rgba(155,127,212,0.1)]"
+            style={{ color: clmm.textMuted }}
+            aria-label="Explorer"
+          >
+            <ExternalLink className="w-4 h-4" />
+          </a>
+          <IconBtn icon={MoreHorizontal} label="More" />
+        </div>
+      </div>
+
+      <div className="grid lg:grid-cols-[1fr_340px] gap-6 items-start">
+        <div>
+          <PoolVolumeChart
+            volume24hUsd={m.volume24hUsd}
+            livePrice={live.price}
+            symbol0={m.symbol0}
+            symbol1={m.symbol1}
+            tvlUsd={m.tvlUsd}
+          />
+          <PoolTransactionsTable symbol0={m.symbol0} symbol1={m.symbol1} />
+        </div>
+
+        <aside className="space-y-3 lg:sticky lg:top-6">
+          <div className="rounded-2xl p-4" style={{ background: clmm.panel, border: `1px solid ${clmm.border}` }}>
+            <ClmmTxGate>
+              <SwapPanel pool={pool} live={live} compact />
+            </ClmmTxGate>
+          </div>
+
+          <Link
+            to="/clmm/pool/$poolAddress/add"
+            params={{ poolAddress }}
+            className="flex items-center justify-center gap-2 w-full py-3.5 rounded-2xl font-grotesk text-[12px] uppercase tracking-wider transition hover:opacity-90"
+            style={{
+              border: `1px solid ${clmm.purple}`,
+              color: clmm.accent,
+              background: "transparent",
+            }}
+          >
+            + Add liquidity
           </Link>
-        </div>
+
+          <SidebarCard title="Total APR">
+            <p className="font-grotesk text-[28px] font-medium" style={{ color: clmm.text }}>
+              {formatApr(m.aprPercent)}
+            </p>
+          </SidebarCard>
+
+          <SidebarCard title="Stats">
+            <StatRow label="TVL" value={formatUsdCompact(m.tvlUsd)} sub="0.00%" />
+            <StatRow
+              label="24H volume"
+              value={formatUsdCompact(m.volume24hUsd)}
+              sub={volChange !== 0 ? `${volChange >= 0 ? "+" : ""}${volChange.toFixed(1)}%` : undefined}
+              subNegative={volChange < 0}
+            />
+            <StatRow label="24H fees" value={formatUsdCompact(m.fees24hUsd)} />
+            <div className="mt-4 pt-4" style={{ borderTop: `1px solid ${clmm.border}` }}>
+              <p className="font-mono text-[9px] uppercase mb-2" style={{ color: clmm.textDim }}>
+                Pool balances
+              </p>
+              <p className="font-mono text-[11px]" style={{ color: clmm.text }}>
+                On-chain via StateView · tick {live.tick}
+              </p>
+              <p className="font-mono text-[10px] mt-1" style={{ color: clmm.textMuted }}>
+                1 {live.token0Symbol} ≈ {formatPrice(live.price)} {live.token1Symbol}
+              </p>
+            </div>
+          </SidebarCard>
+
+          <SidebarCard title="Links">
+            <TokenLinkRow symbol={m.symbol0} address={live.pool.token0} logo={m.logo0} />
+            <TokenLinkRow symbol={m.symbol1} address={live.pool.token1} logo={m.logo1} />
+          </SidebarCard>
+        </aside>
       </div>
+    </div>
+  );
+}
 
-      <div className="grid lg:grid-cols-[1fr_280px] gap-4">
-        <PoolPriceChart livePrice={live.price} priceUsd={m.priceUsd} priceChange24h={m.priceChange24h} symbol0={m.symbol0} symbol1={m.symbol1} volume24hUsd={m.volume24hUsd} />
-        <PoolLivePanel live={live} liveUpdatedAt={liveUpdatedAt} symbol0={m.symbol0} symbol1={m.symbol1} />
-      </div>
+function Badge({ children }: { children: ReactNode }) {
+  return (
+    <span
+      className="font-mono text-[10px] px-2 py-0.5 rounded-md lowercase"
+      style={{ background: clmm.purpleBg, color: clmm.textMuted, border: `1px solid ${clmm.border}` }}
+    >
+      {children}
+    </span>
+  );
+}
 
-      <StatsBar metrics={m} />
+function PoolIdCopy({ id }: { id: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      className="flex items-center gap-1.5 font-mono text-[10px] mt-1 hover:opacity-80"
+      style={{ color: clmm.textDim }}
+      onClick={() => {
+        void navigator.clipboard.writeText(id);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }}
+    >
+      {truncateAddress(id, 8, 6)}
+      <Copy className="w-3 h-3" />
+      {copied && <span style={{ color: clmm.green }}>copied</span>}
+    </button>
+  );
+}
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <InfoCard label="Pool address" value={truncateAddress(poolAddress)} href={`https://monadexplorer.com/address/${poolAddress}`} />
-        <InfoCard label="Market ID" value={m.displayId} />
-        <InfoCard label={m.symbol0} value={truncateAddress(live.pool.token0)} href={`https://monadexplorer.com/address/${live.pool.token0}`} />
-        <InfoCard label={m.symbol1} value={truncateAddress(live.pool.token1)} href={`https://monadexplorer.com/address/${live.pool.token1}`} />
-      </div>
+function IconBtn({ icon: Icon, label }: { icon: typeof Share2; label: string }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      className="p-2 rounded-lg transition hover:bg-[rgba(155,127,212,0.1)]"
+      style={{ color: clmm.textMuted }}
+    >
+      <Icon className="w-4 h-4" />
+    </button>
+  );
+}
 
-      <div className="rounded-xl p-5" style={{ border: `1px solid ${clmm.border}`, background: clmm.panel }}>
-        <p className="font-grotesk text-[11px] uppercase tracking-wider mb-4" style={{ color: clmm.textMuted }}>Market info</p>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-3 font-mono text-[11px]">
-          <InfoRow label="On-chain price" value={`1 ${live.token0Symbol} ≈ ${priceLabel} ${live.token1Symbol}`} />
-          <InfoRow label="Current tick" value={String(live.tick)} />
-          <InfoRow label="Tick spacing" value={String(live.pool.tickSpacing)} />
-          <InfoRow label="Active liquidity" value={live.liquidity.toString()} />
-          <InfoRow label="Fee tier" value={feeToPercent(live.pool.fee)} />
-          <InfoRow label="Pool APR (est.)" value={formatApr(m.aprPercent)} />
-          <InfoRow label="TVL" value={formatUsdCompact(m.tvlUsd)} />
-          <InfoRow label="Volume 24h" value={formatUsdCompact(m.volume24hUsd)} />
-        </div>
-      </div>
-
-      <p className="font-mono text-[9px]" style={{ color: clmm.textDim }}>
-        On-chain price & tick refresh every 8s ({secondsAgo(liveUpdatedAt ?? 0)}) · TVL/volume from Uniswap V4 subgraph every 30s
+function SidebarCard({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="rounded-2xl p-4" style={{ background: clmm.panel, border: `1px solid ${clmm.border}` }}>
+      <p className="font-mono text-[10px] uppercase mb-3" style={{ color: clmm.textDim }}>
+        {title}
       </p>
+      {children}
     </div>
   );
 }
 
-function PoolLivePanel({ live, liveUpdatedAt, symbol0, symbol1 }: { live: PoolLiveState; liveUpdatedAt?: number; symbol0: string; symbol1: string }) {
+function StatRow({
+  label,
+  value,
+  sub,
+  subNegative,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  subNegative?: boolean;
+}) {
   return (
-    <div className="rounded-xl p-4 flex flex-col min-h-[220px] font-mono text-[10px]" style={{ border: `1px solid ${clmm.border}`, background: clmm.purpleBg }}>
-      <p className="uppercase text-[9px] mb-3" style={{ color: clmm.textDim }}>Live on-chain · Monad</p>
-      <div className="space-y-3 flex-1">
-        <LiveRow label="Mid price" value={`${formatPrice(live.price)} ${symbol1}/${symbol0}`} />
-        <LiveRow label="Current tick" value={String(live.tick)} />
-        <LiveRow label="sqrtPriceX96" value={`${live.sqrtPriceX96.toString().slice(0, 22)}…`} />
-        <LiveRow label="Liquidity" value={live.liquidity.toString()} />
-        <LiveRow label="Last update" value={secondsAgo(liveUpdatedAt ?? 0)} />
+    <div className="mb-4 last:mb-0">
+      <p className="font-mono text-[10px] mb-1" style={{ color: clmm.textDim }}>
+        {label}
+      </p>
+      <div className="flex items-baseline gap-2">
+        <p className="font-grotesk text-[22px] font-medium" style={{ color: clmm.text }}>
+          {value}
+        </p>
+        {sub && (
+          <span className="font-mono text-[11px]" style={{ color: subNegative ? clmm.red : clmm.green }}>
+            {sub}
+          </span>
+        )}
       </div>
     </div>
   );
 }
 
-function LiveRow({ label, value }: { label: string; value: string }) {
+function TokenLinkRow({
+  symbol,
+  address,
+  logo,
+}: {
+  symbol: string;
+  address: `0x${string}`;
+  logo: string | null;
+}) {
   return (
-    <div>
-      <span style={{ color: clmm.textDim }}>{label}</span>
-      <p className="mt-0.5 break-all" style={{ color: clmm.text }}>{value}</p>
-    </div>
-  );
-}
-
-function StatsBar({ metrics: m }: { metrics: PoolMetrics }) {
-  const items = [
-    { label: "APR (24h est.)", value: formatApr(m.aprPercent) },
-    { label: "TVL", value: formatUsdCompact(m.tvlUsd) },
-    { label: "Fees earned 24h", value: formatUsdCompact(m.fees24hUsd) },
-    { label: "24h volume", value: formatUsdCompact(m.volume24hUsd) },
-  ];
-  return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 rounded-xl overflow-hidden" style={{ border: `1px solid ${clmm.border}` }}>
-      {items.map((item, i) => (
-        <div key={item.label} className="px-5 py-4" style={{ borderRight: i < items.length - 1 ? `1px solid ${clmm.border}` : undefined, background: clmm.purpleBg }}>
-          <p className="font-mono text-[9px] uppercase" style={{ color: clmm.textDim }}>{item.label}</p>
-          <p className="font-grotesk text-[20px] font-medium mt-1" style={{ color: clmm.text }}>{item.value}</p>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function InfoCard({ label, value, href }: { label: string; value: string; href?: string }) {
-  const inner = (
-    <>
-      <p className="font-mono text-[9px] uppercase" style={{ color: clmm.textDim }}>{label}</p>
-      <p className="font-mono text-[11px] mt-1 truncate flex items-center gap-1" style={{ color: clmm.text }}>
-        {value}
-        {href && <ExternalLink className="w-3 h-3 shrink-0 opacity-50" />}
-      </p>
-    </>
-  );
-  return (
-    <div className="rounded-xl p-4" style={{ border: `1px solid ${clmm.border}`, background: clmm.panel }}>
-      {href ? <a href={href} target="_blank" rel="noreferrer" className="block hover:opacity-80">{inner}</a> : inner}
-    </div>
-  );
-}
-
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <span style={{ color: clmm.textDim }}>{label}</span>
-      <p className="mt-0.5" style={{ color: clmm.text }}>{value}</p>
+    <div className="flex items-center justify-between gap-2 py-2 first:pt-0">
+      <div className="flex items-center gap-2 min-w-0">
+        <TokenIcon address={address} symbol={symbol} size={24} logoUrl={logo} />
+        <span className="font-grotesk text-[13px]" style={{ color: clmm.text }}>
+          {symbol}
+        </span>
+        <span className="font-mono text-[10px] truncate" style={{ color: clmm.textDim }}>
+          {truncateAddress(address)}
+        </span>
+      </div>
+      <div className="flex gap-1 shrink-0">
+        <a
+          href={`https://monadexplorer.com/address/${address}`}
+          target="_blank"
+          rel="noreferrer"
+          className="p-1.5 rounded-md hover:bg-[rgba(155,127,212,0.12)]"
+          style={{ color: clmm.textMuted }}
+        >
+          <ExternalLink className="w-3.5 h-3.5" />
+        </a>
+      </div>
     </div>
   );
 }

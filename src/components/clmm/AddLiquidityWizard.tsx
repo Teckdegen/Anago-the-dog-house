@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { ArrowLeft, Check } from "lucide-react";
+import { ArrowLeft, Check, RotateCcw, Settings } from "lucide-react";
 import { AddLiquidityPanel } from "./AddLiquidityPanel";
-import { PoolPriceChart } from "./PoolPriceChart";
 import { ClmmTxGate } from "@/components/clmm/SwitchToMonadMainnet";
+import { TokenIcon } from "@/components/TokenIcon";
 import { feeToPercent, type PoolLiveState } from "@/lib/uniswap";
 import type { PoolMetrics } from "@/lib/uniswap/poolMetrics";
 import { clmm } from "./clmmTheme";
@@ -20,65 +20,113 @@ export function AddLiquidityWizard({
   metrics: PoolMetrics;
 }) {
   const [step, setStep] = useState<Step>(1);
-  const strategy = `Spot · ${feeToPercent(live.pool.fee)}`;
+  const feeLabel = feeToPercent(live.pool.fee);
+
+  const reset = () => setStep(1);
 
   return (
-    <div className="max-w-[1200px] mx-auto">
-      <Link
-        to="/clmm/pool/$poolAddress"
-        params={{ poolAddress }}
-        className="inline-flex items-center gap-2 font-mono text-[10px] mb-6 hover:underline"
-        style={{ color: clmm.textMuted }}
-      >
-        <ArrowLeft className="w-3.5 h-3.5" /> Back to pool
-      </Link>
+    <div className="max-w-[1100px] mx-auto">
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
+        <h1 className="font-grotesk text-[28px] sm:text-[32px] font-medium" style={{ color: clmm.text }}>
+          New position
+        </h1>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={reset}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-full font-mono text-[10px] transition hover:bg-[rgba(155,127,212,0.1)]"
+            style={{ color: clmm.textMuted, border: `1px solid ${clmm.border}` }}
+          >
+            <RotateCcw className="w-3.5 h-3.5" /> Reset
+          </button>
+          <span
+            className="px-3 py-2 rounded-full font-mono text-[10px]"
+            style={{ background: clmm.purpleBg, color: clmm.text, border: `1px solid ${clmm.border}` }}
+          >
+            v4 position ▾
+          </span>
+          <button
+            type="button"
+            className="p-2 rounded-full"
+            style={{ border: `1px solid ${clmm.border}`, color: clmm.textMuted }}
+            aria-label="Settings"
+          >
+            <Settings className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
 
-      <div className="grid lg:grid-cols-[220px_1fr] gap-8">
-        <aside className="space-y-6">
-          <StepItem n={1} label="Select strategy and fee" done={step > 1} active={step === 1} />
-          <StepItem n={2} label="Set range and deposit" done={false} active={step === 2} />
-          <div className="rounded-xl p-4 hidden lg:block" style={{ border: `1px solid ${clmm.border}`, background: clmm.purpleBg }}>
-            <p className="font-grotesk text-[10px] uppercase mb-2" style={{ color: clmm.textMuted }}>
-              Learn more
-            </p>
-            <ul className="font-mono text-[9px] space-y-2" style={{ color: clmm.textDim }}>
-              <li>Wide range = less active management</li>
-              <li>Approvals go to Position Manager</li>
-              <li>Fees accrue to your LP NFT</li>
-            </ul>
+      <div className="grid lg:grid-cols-[240px_1fr] gap-8">
+        <aside>
+          <div
+            className="rounded-2xl p-5 space-y-0"
+            style={{ background: clmm.panel, border: `1px solid ${clmm.border}` }}
+          >
+            <StepItem n={1} label="Select token pair and fees" done={step > 1} active={step === 1} />
+            <div className="w-px h-6 ml-[13px]" style={{ background: clmm.border }} />
+            <StepItem n={2} label="Set price range and deposit amounts" done={false} active={step === 2} />
           </div>
         </aside>
 
-        <div className="space-y-5">
+        <div>
           {step === 1 && (
-            <div className="rounded-2xl p-6" style={{ border: `1px solid ${clmm.border}`, background: clmm.panel }}>
-              <h2 className="font-grotesk text-[18px] mb-2" style={{ color: clmm.text }}>
-                Select strategy
-              </h2>
-              <p className="font-mono text-[11px] mb-6" style={{ color: clmm.textMuted }}>
-                {metrics.symbol0} / {metrics.symbol1} · {metrics.displayId}
-              </p>
+            <div
+              className="rounded-2xl p-6 sm:p-8"
+              style={{ background: clmm.panel, border: `1px solid ${clmm.border}` }}
+            >
+              <section className="mb-8">
+                <h2 className="font-grotesk text-[16px] mb-1" style={{ color: clmm.text }}>
+                  Select pair
+                </h2>
+                <p className="font-mono text-[11px] mb-4 max-w-xl" style={{ color: clmm.textMuted }}>
+                  Choose the tokens you want to provide liquidity for on Monad mainnet.
+                </p>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <TokenSelect label={metrics.symbol0} address={live.pool.token0} logo={metrics.logo0} />
+                  <TokenSelect label={metrics.symbol1} address={live.pool.token1} logo={metrics.logo1} />
+                </div>
+              </section>
+
+              <section className="mb-8">
+                <h2 className="font-grotesk text-[16px] mb-1" style={{ color: clmm.text }}>
+                  Fee tier
+                </h2>
+                <p className="font-mono text-[11px] mb-4 max-w-xl" style={{ color: clmm.textMuted }}>
+                  The amount earned providing liquidity. Choose a tier that suits your strategy.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setStep(2)}
+                  className="w-full text-left rounded-2xl px-5 py-4 flex items-center justify-between gap-4 transition hover:bg-[rgba(155,127,212,0.06)]"
+                  style={{ border: `1px solid ${clmm.borderStrong}`, background: clmm.purpleBg }}
+                >
+                  <div>
+                    <p className="font-grotesk text-[15px]" style={{ color: clmm.text }}>
+                      {feeLabel} fee tier
+                    </p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span
+                        className="font-mono text-[9px] px-2 py-0.5 rounded-md"
+                        style={{ background: clmm.purpleBgHover, color: clmm.accent }}
+                      >
+                        V4 pool
+                      </span>
+                      <span className="font-mono text-[10px]" style={{ color: clmm.textDim }}>
+                        The % you will earn in fees
+                      </span>
+                    </div>
+                  </div>
+                  <span className="font-mono text-[10px]" style={{ color: clmm.textMuted }}>
+                    More ▾
+                  </span>
+                </button>
+              </section>
+
               <button
                 type="button"
                 onClick={() => setStep(2)}
-                className="w-full text-left rounded-xl p-4 mb-3 transition"
-                style={{
-                  border: `2px solid ${clmm.borderStrong}`,
-                  background: clmm.purpleSolid,
-                }}
-              >
-                <p className="font-grotesk text-[14px]" style={{ color: clmm.text }}>
-                  Spot — full range style
-                </p>
-                <p className="font-mono text-[10px] mt-1" style={{ color: clmm.textMuted }}>
-                  Fee tier {feeToPercent(live.pool.fee)} · wide tick band around current price
-                </p>
-              </button>
-              <button
-                type="button"
-                onClick={() => setStep(2)}
-                className="w-full rounded-full py-3 font-grotesk text-[11px] uppercase mt-4"
-                style={{ background: clmm.purpleSolid, color: clmm.text, border: `1px solid ${clmm.borderStrong}` }}
+                className="w-full py-4 rounded-2xl font-grotesk text-[13px] uppercase tracking-wider transition hover:opacity-90"
+                style={{ background: clmm.text, color: clmm.bg }}
               >
                 Continue
               </button>
@@ -86,13 +134,22 @@ export function AddLiquidityWizard({
           )}
 
           {step === 2 && (
-            <>
+            <div className="space-y-5">
+              <Link
+                to="/clmm/pool/$poolAddress"
+                params={{ poolAddress }}
+                className="inline-flex items-center gap-2 font-mono text-[10px] hover:underline"
+                style={{ color: clmm.textMuted }}
+              >
+                <ArrowLeft className="w-3.5 h-3.5" /> Back to pool
+              </Link>
+
               <div
                 className="flex flex-wrap items-center justify-between gap-3 rounded-xl px-4 py-3"
                 style={{ border: `1px solid ${clmm.border}`, background: clmm.purpleBg }}
               >
                 <span className="font-grotesk text-[13px]" style={{ color: clmm.text }}>
-                  {strategy}
+                  {metrics.symbol0}/{metrics.symbol1} · {feeLabel}
                 </span>
                 <button
                   type="button"
@@ -100,55 +157,66 @@ export function AddLiquidityWizard({
                   className="font-mono text-[10px] px-3 py-1 rounded-full"
                   style={{ border: `1px solid ${clmm.border}`, color: clmm.accent }}
                 >
-                  Modify
+                  Edit
                 </button>
               </div>
 
-              <div className="grid lg:grid-cols-2 gap-4">
-                <PoolPriceChart
-                  livePrice={live.price}
-                  priceUsd={metrics.priceUsd}
-                  priceChange24h={metrics.priceChange24h}
-                  symbol0={metrics.symbol0}
-                  symbol1={metrics.symbol1}
-                  volume24hUsd={metrics.volume24hUsd}
-                />
-                <div className="rounded-xl p-4" style={{ border: `1px solid ${clmm.border}`, background: clmm.panel }}>
-                  <p className="font-grotesk text-[11px] uppercase mb-3" style={{ color: clmm.textMuted }}>
-                    Price range (auto)
-                  </p>
-                  <div className="grid grid-cols-2 gap-3 font-mono text-[11px]">
-                    <div className="rounded-lg p-3" style={{ background: clmm.purpleBg }}>
-                      <span style={{ color: clmm.textDim }}>Min tick band</span>
-                      <p className="mt-1" style={{ color: clmm.text }}>
-                        ~{live.tick - live.pool.tickSpacing * 80}
-                      </p>
-                    </div>
-                    <div className="rounded-lg p-3" style={{ background: clmm.purpleBg }}>
-                      <span style={{ color: clmm.textDim }}>Max tick band</span>
-                      <p className="mt-1" style={{ color: clmm.text }}>
-                        ~{live.tick + live.pool.tickSpacing * 80}
-                      </p>
-                    </div>
-                  </div>
-                  <p className="font-mono text-[9px] mt-3" style={{ color: clmm.textDim }}>
-                    Wide range mint via NPM — centered on tick {live.tick}
-                  </p>
-                </div>
-              </div>
-
-              <div className="rounded-2xl p-6" style={{ border: `1px solid ${clmm.border}`, background: clmm.panel }}>
-                <h3 className="font-grotesk text-[14px] uppercase mb-4" style={{ color: clmm.text }}>
-                  Deposit liquidity
+              <div
+                className="rounded-2xl p-6 sm:p-8"
+                style={{ background: clmm.panel, border: `1px solid ${clmm.border}` }}
+              >
+                <h3 className="font-grotesk text-[16px] mb-4" style={{ color: clmm.text }}>
+                  Set price range and deposit amounts
                 </h3>
+                <div className="grid sm:grid-cols-2 gap-3 font-mono text-[11px] mb-6">
+                  <div className="rounded-xl p-4" style={{ background: clmm.purpleBg }}>
+                    <span style={{ color: clmm.textDim }}>Min tick</span>
+                    <p className="mt-1" style={{ color: clmm.text }}>
+                      ~{live.tick - live.pool.tickSpacing * 80}
+                    </p>
+                  </div>
+                  <div className="rounded-xl p-4" style={{ background: clmm.purpleBg }}>
+                    <span style={{ color: clmm.textDim }}>Max tick</span>
+                    <p className="mt-1" style={{ color: clmm.text }}>
+                      ~{live.tick + live.pool.tickSpacing * 80}
+                    </p>
+                  </div>
+                </div>
                 <ClmmTxGate>
                   <AddLiquidityPanel live={live} />
                 </ClmmTxGate>
               </div>
-            </>
+            </div>
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function TokenSelect({
+  label,
+  address,
+  logo,
+}: {
+  label: string;
+  address: `0x${string}`;
+  logo: string | null;
+}) {
+  return (
+    <div
+      className="flex items-center justify-between gap-3 rounded-2xl px-4 py-4"
+      style={{ border: `1px solid ${clmm.border}`, background: clmm.bg }}
+    >
+      <div className="flex items-center gap-3 min-w-0">
+        <TokenIcon address={address} symbol={label} size={32} logoUrl={logo} />
+        <span className="font-grotesk text-[16px]" style={{ color: clmm.text }}>
+          {label}
+        </span>
+      </div>
+      <span className="font-mono text-[10px]" style={{ color: clmm.textDim }}>
+        ▾
+      </span>
     </div>
   );
 }
@@ -165,18 +233,21 @@ function StepItem({
   active: boolean;
 }) {
   return (
-    <div className="flex gap-3 items-start">
+    <div className="flex gap-3 items-start py-2">
       <div
         className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 font-mono text-[11px]"
         style={{
-          background: done ? clmm.green : active ? clmm.purpleSolid : "transparent",
-          border: `1px solid ${done ? clmm.green : clmm.border}`,
-          color: done ? "#0a0a0a" : clmm.text,
+          background: done ? clmm.green : active ? clmm.text : "transparent",
+          border: `1px solid ${done ? clmm.green : active ? clmm.text : clmm.border}`,
+          color: done || active ? clmm.bg : clmm.textDim,
         }}
       >
-        {done ? <Check className="w-4 h-4" /> : n}
+        {done ? <Check className="w-4 h-4" style={{ color: clmm.bg }} /> : n}
       </div>
-      <p className="font-mono text-[10px] pt-1" style={{ color: active ? clmm.text : clmm.textDim }}>
+      <p
+        className="font-mono text-[10px] leading-snug pt-1"
+        style={{ color: active ? clmm.text : clmm.textDim }}
+      >
         {label}
       </p>
     </div>

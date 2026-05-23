@@ -1,8 +1,11 @@
+import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Loader2 } from "lucide-react";
+import { ChevronDown, Loader2 } from "lucide-react";
 import { TokenIcon } from "@/components/TokenIcon";
 import { formatApr, formatUsdCompact, type EnrichedPool } from "@/lib/uniswap/poolMetrics";
 import { clmm } from "./clmmTheme";
+
+type SortKey = "tvl" | "apr" | "vol1d";
 
 export function PoolsExploreTable({
   rows,
@@ -13,174 +16,204 @@ export function PoolsExploreTable({
   indexing: boolean;
   progress: { done: number; total: number };
 }) {
+  const [sortKey, setSortKey] = useState<SortKey>("tvl");
+  const [sortDesc, setSortDesc] = useState(true);
+
+  const sorted = useMemo(() => {
+    const copy = [...rows];
+    copy.sort((a, b) => {
+      const ma = a.metrics;
+      const mb = b.metrics;
+      let va = 0;
+      let vb = 0;
+      if (sortKey === "tvl") {
+        va = ma.tvlUsd ?? -1;
+        vb = mb.tvlUsd ?? -1;
+      } else if (sortKey === "apr") {
+        va = ma.aprPercent ?? -1;
+        vb = mb.aprPercent ?? -1;
+      } else {
+        va = ma.volume24hUsd ?? -1;
+        vb = mb.volume24hUsd ?? -1;
+      }
+      return sortDesc ? vb - va : va - vb;
+    });
+    return copy;
+  }, [rows, sortKey, sortDesc]);
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) setSortDesc((d) => !d);
+    else {
+      setSortKey(key);
+      setSortDesc(true);
+    }
+  };
+
   return (
-    <div
-      className="rounded-2xl overflow-hidden"
-      style={{ border: `1px solid ${clmm.border}`, background: clmm.panel }}
-    >
+    <div className="w-full">
       {indexing && progress.total > 0 && (
         <div
-          className="px-4 py-2 flex items-center justify-between font-mono text-[9px]"
-          style={{ borderBottom: `1px solid ${clmm.border}`, color: clmm.textMuted }}
+          className="px-1 py-2 flex items-center gap-2 font-mono text-[9px] mb-2"
+          style={{ color: clmm.textMuted }}
         >
-          <span className="flex items-center gap-2">
-            <Loader2 className="w-3 h-3 animate-spin" style={{ color: clmm.accent }} />
-            Loading stats {progress.done}/{progress.total}
-          </span>
+          <Loader2 className="w-3 h-3 animate-spin" style={{ color: clmm.purple }} />
+          Loading stats {progress.done}/{progress.total}
         </div>
       )}
 
-      <div
-        className="hidden sm:grid px-4 py-3 font-mono text-[9px] uppercase tracking-wider gap-4"
-        style={{
-          gridTemplateColumns: "minmax(220px,2fr) repeat(4,1fr) 120px",
-          color: clmm.textDim,
-          borderBottom: `1px solid ${clmm.border}`,
-        }}
-      >
-        <span>Market</span>
-        <span>TVL</span>
-        <span>Volume (24h)</span>
-        <span>Fees (24h)</span>
-        <span>Pool APR</span>
-        <span className="text-right">Action</span>
-      </div>
-
-      <div className="divide-y" style={{ borderColor: clmm.border }}>
-        {rows.map((row) => (
-          <PoolTableRow key={row.address} row={row} loading={indexing && !row.metrics.updatedAt} />
-        ))}
+      <div className="overflow-x-auto -mx-2 px-2">
+        <table className="w-full min-w-[900px] border-collapse">
+          <thead>
+            <tr className="font-mono text-[10px] uppercase tracking-wide" style={{ color: clmm.textDim }}>
+              <th className="text-left py-3 pr-3 font-normal w-10">#</th>
+              <th className="text-left py-3 pr-4 font-normal min-w-[200px]">Pool</th>
+              <th className="text-left py-3 pr-3 font-normal">Protocol</th>
+              <th className="text-left py-3 pr-3 font-normal">Fee tier</th>
+              <SortHeader label="TVL" active={sortKey === "tvl"} desc={sortDesc} onClick={() => toggleSort("tvl")} />
+              <SortHeader label="Pool APR" active={sortKey === "apr"} desc={sortDesc} onClick={() => toggleSort("apr")} />
+              <th className="text-right py-3 pr-3 font-normal">Reward APR</th>
+              <SortHeader label="1D vol" active={sortKey === "vol1d"} desc={sortDesc} onClick={() => toggleSort("vol1d")} align="right" />
+              <th className="text-right py-3 pr-3 font-normal">30D vol</th>
+              <th className="text-right py-3 font-normal">1D vol/TVL</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((row, i) => (
+              <PoolRow key={row.address} row={row} rank={i + 1} loading={indexing && !row.metrics.updatedAt} />
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
 }
 
-function PoolTableRow({ row, loading }: { row: EnrichedPool; loading?: boolean }) {
+function SortHeader({
+  label,
+  active,
+  desc,
+  onClick,
+  align = "right",
+}: {
+  label: string;
+  active: boolean;
+  desc: boolean;
+  onClick: () => void;
+  align?: "left" | "right";
+}) {
+  return (
+    <th className={`py-3 pr-3 font-normal ${align === "right" ? "text-right" : "text-left"}`}>
+      <button
+        type="button"
+        onClick={onClick}
+        className="inline-flex items-center gap-1 hover:opacity-90 transition"
+        style={{ color: active ? clmm.text : clmm.textDim }}
+      >
+        {label}
+        {active && (
+          <ChevronDown
+            className="w-3 h-3 transition-transform"
+            style={{ transform: desc ? undefined : "rotate(180deg)" }}
+          />
+        )}
+      </button>
+    </th>
+  );
+}
+
+function PoolRow({ row, rank, loading }: { row: EnrichedPool; rank: number; loading?: boolean }) {
   const m = row.metrics;
-  const pairLabel = `${m.symbol0} / ${m.symbol1}`;
+  const pairLabel = `${m.symbol0}/${m.symbol1}`;
+  const volTvl =
+    m.volume24hUsd != null && m.tvlUsd != null && m.tvlUsd > 0
+      ? (m.volume24hUsd / m.tvlUsd).toFixed(2)
+      : "—";
 
   return (
-    <div
-      className="group relative px-4 py-4 sm:py-3.5 transition-colors hover:bg-[rgba(155,127,212,0.08)]"
+    <tr
+      className="group border-t transition-colors"
       style={{ borderColor: clmm.border }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = clmm.purpleBgHover;
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = "transparent";
+      }}
     >
-      <Link
-        to="/clmm/pool/$poolAddress"
-        params={{ poolAddress: row.address }}
-        className="absolute inset-0 z-0"
-        aria-label={`Open ${pairLabel}`}
-      />
-      <div
-        className="relative z-[1] pointer-events-none sm:grid sm:items-center sm:gap-4"
-        style={{ gridTemplateColumns: "minmax(220px,2fr) repeat(4,1fr) 120px" }}
-      >
-        <div className="flex items-center gap-3 min-w-0">
+      <td className="py-4 pr-3 font-mono text-[12px]" style={{ color: clmm.textDim }}>
+        {rank}
+      </td>
+      <td className="py-4 pr-4">
+        <Link
+          to="/clmm/pool/$poolAddress"
+          params={{ poolAddress: row.address }}
+          className="flex items-center gap-3 min-w-0"
+        >
           <PoolPairAvatar row={row} />
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span
-                className="font-grotesk text-[14px] sm:text-[15px] font-medium truncate"
-                style={{ color: clmm.text }}
-              >
-                {pairLabel}
-              </span>
-              <ProtocolBadge />
-            </div>
-            <p className="font-mono text-[10px] mt-0.5" style={{ color: clmm.textDim }}>
-              {m.displayId} · {m.feePercent}
-            </p>
-          </div>
-        </div>
-
-        <div className="hidden sm:contents font-mono text-[12px]" style={{ color: clmm.text }}>
-          <MetricCell value={loading && m.tvlUsd == null ? "…" : formatUsdCompact(m.tvlUsd)} />
-          <MetricCell value={loading && m.volume24hUsd == null ? "…" : formatUsdCompact(m.volume24hUsd)} />
-          <MetricCell value={loading && m.fees24hUsd == null ? "…" : formatUsdCompact(m.fees24hUsd)} />
-          <MetricCell
-            value={loading && m.aprPercent == null ? "…" : formatApr(m.aprPercent)}
-            highlight={m.aprPercent != null && m.aprPercent > 1}
-          />
-        </div>
-
-        <div className="sm:hidden grid grid-cols-2 gap-2 font-mono text-[11px] mt-1">
-          <MiniStat label="TVL" value={formatUsdCompact(m.tvlUsd)} />
-          <MiniStat label="Vol 24h" value={formatUsdCompact(m.volume24hUsd)} />
-          <MiniStat label="Fees 24h" value={formatUsdCompact(m.fees24hUsd)} />
-          <MiniStat label="APR" value={formatApr(m.aprPercent)} />
-        </div>
-
-        <div className="flex sm:justify-end mt-2 sm:mt-0 pointer-events-auto">
-          <Link
-            to="/clmm/pool/$poolAddress/add"
-            params={{ poolAddress: row.address }}
-            className="px-4 py-2 rounded-full font-grotesk text-[10px] uppercase tracking-wider transition shrink-0"
-            style={{
-              border: `1px solid ${clmm.borderStrong}`,
-              color: clmm.text,
-              background: "rgba(8,4,18,0.85)",
-            }}
-          >
-            Add liquidity
-          </Link>
-        </div>
-      </div>
-    </div>
+          <span className="font-grotesk text-[15px] font-medium truncate" style={{ color: clmm.text }}>
+            {pairLabel}
+          </span>
+        </Link>
+      </td>
+      <td className="py-4 pr-3">
+        <span className="font-mono text-[11px] lowercase" style={{ color: clmm.textMuted }}>
+          v4
+        </span>
+      </td>
+      <td className="py-4 pr-3 font-mono text-[12px]" style={{ color: clmm.text }}>
+        {m.feePercent}
+      </td>
+      <td className="py-4 pr-3 text-right font-mono text-[12px]" style={{ color: clmm.text }}>
+        {loading && m.tvlUsd == null ? "…" : formatUsdCompact(m.tvlUsd)}
+      </td>
+      <td className="py-4 pr-3 text-right font-mono text-[12px]" style={{ color: clmm.text }}>
+        {loading && m.aprPercent == null ? "…" : formatApr(m.aprPercent)}
+      </td>
+      <td className="py-4 pr-3 text-right font-mono text-[12px]" style={{ color: clmm.textDim }}>
+        —
+      </td>
+      <td className="py-4 pr-3 text-right font-mono text-[12px]" style={{ color: clmm.text }}>
+        {loading && m.volume24hUsd == null ? "…" : formatUsdCompact(m.volume24hUsd)}
+      </td>
+      <td className="py-4 pr-3 text-right font-mono text-[12px]" style={{ color: clmm.textDim }}>
+        —
+      </td>
+      <td className="py-4 text-right font-mono text-[12px]" style={{ color: clmm.textMuted }}>
+        {volTvl}
+      </td>
+    </tr>
   );
 }
 
 function PoolPairAvatar({ row }: { row: EnrichedPool }) {
   const m = row.metrics;
-  const size = 36;
+  const size = 28;
 
   if (m.pairImageUrl) {
     return (
       <img
         src={m.pairImageUrl}
-        alt={`${m.symbol0}/${m.symbol1}`}
+        alt=""
         width={size}
         height={size}
-        className="rounded-xl shrink-0 object-cover"
-        style={{ width: size, height: size, border: `1px solid ${clmm.border}` }}
+        className="rounded-full shrink-0 object-cover"
+        style={{ border: `1px solid ${clmm.border}` }}
       />
     );
   }
 
   return (
-    <div className="relative flex shrink-0" style={{ width: size + 14, height: size }}>
+    <div className="relative flex shrink-0" style={{ width: size + 12, height: size }}>
       <TokenIcon address={row.token0} symbol={m.symbol0} size={size} logoUrl={m.logo0} />
-      <div className="absolute left-[18px] top-[10px]">
+      <div className="absolute left-[14px] top-[6px] ring-2 ring-[#06040F] rounded-full">
         <TokenIcon address={row.token1} symbol={m.symbol1} size={size} logoUrl={m.logo1} />
       </div>
-    </div>
-  );
-}
-
-function ProtocolBadge() {
-  return (
-    <span
-      className="font-mono text-[9px] px-1.5 py-0.5 rounded uppercase shrink-0"
-      style={{
-        background: "rgba(127,200,255,0.12)",
-        color: "#9BC8FF",
-        border: "1px solid rgba(127,200,255,0.35)",
-      }}
-    >
-      V4
-    </span>
-  );
-}
-
-function MetricCell({ value, highlight }: { value: string; highlight?: boolean }) {
-  return <span style={{ color: highlight ? clmm.green : clmm.text }}>{value}</span>;
-}
-
-function MiniStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <span className="text-[9px] uppercase block" style={{ color: clmm.textDim }}>
-        {label}
-      </span>
-      <span style={{ color: clmm.text }}>{value}</span>
+      <div
+        className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-sm flex items-center justify-center text-[7px] font-bold"
+        style={{ background: clmm.purpleSolid, color: clmm.text, border: `1px solid ${clmm.border}` }}
+      >
+        ◆
+      </div>
     </div>
   );
 }
