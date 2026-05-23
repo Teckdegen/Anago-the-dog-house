@@ -97,8 +97,69 @@ async function enrich(pools) {
   return out;
 }
 
+const FACTORY = "0x204faca1764b154221e35c0d20abb3c525710498";
+const FACTORY_START = 75_000_000n;
+const LOG_CHUNK = 100n;
+const POOL_CREATED = {
+  type: "event",
+  name: "PoolCreated",
+  inputs: [
+    { name: "token0", type: "address", indexed: true },
+    { name: "token1", type: "address", indexed: true },
+    { name: "fee", type: "uint24", indexed: true },
+    { name: "tickSpacing", type: "int24", indexed: false },
+    { name: "pool", type: "address", indexed: false },
+  ],
+};
+
+async function scanFactory(fromBlock, toBlock) {
+  const map = new Map();
+  let cursor = fromBlock;
+  let chunks = 0;
+  while (cursor <= toBlock && chunks < 3000) {
+    const end = cursor + LOG_CHUNK - 1n > toBlock ? toBlock : cursor + LOG_CHUNK - 1n;
+    if (chunks % 50 === 0) console.log(`Factory blocks ${cursor}–${end} · ${map.size} pools`);
+    try {
+      const logs = await client.getLogs({
+        address: FACTORY,
+        event: POOL_CREATED,
+        fromBlock: cursor,
+        toBlock: end,
+      });
+      for (const log of logs) {
+        const { token0, token1, fee, tickSpacing, pool } = log.args;
+        if (!pool) continue;
+        map.set(pool.toLowerCase(), {
+          address: pool,
+          token0,
+          token1,
+          fee: Number(fee),
+          tickSpacing: Number(tickSpacing),
+          protocol: "v3",
+        });
+      }
+    } catch (e) {
+      console.warn("Factory chunk failed", cursor, end, e.message);
+      break;
+    }
+    cursor = end + 1n;
+    chunks++;
+  }
+  return [...map.values()];
+}
+
+function mergeByAddress(a, b) {
+  const map = new Map();
+  for (const p of [...a, ...b]) map.set(p.address.toLowerCase(), p);
+  return [...map.values()];
+}
+
 const latest = await client.getBlockNumber();
+console.log("DexScreener discovery…");
 let pools = await discoverDex();
+console.log(`Factory scan from ${FACTORY_START}…`);
+const factoryPools = await scanFactory(FACTORY_START, latest);
+pools = mergeByAddress(pools, factoryPools);
 if (pools.length === 0) {
   console.error("No Uniswap V3/V4 pools from DexScreener");
   process.exit(1);

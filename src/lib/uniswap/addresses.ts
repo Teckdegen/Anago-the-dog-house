@@ -9,6 +9,7 @@ export const UNISWAP_V3 = {
   universalRouter: "0x0d97dc33264bfc1c226207428a79b26757fb9dc3",
   permit2: "0x000000000022D473030F116dDEE9F6B43aC78BA3",
   positionManager: "0x7197e214c0b767cfb76fb734ab638e2c192f4e53",
+  tickLens: "0xf025e0fe9e331a0ef05c2ad3c4e9c64b625cda6f",
   wmon: "0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A",
   multicall: "0xd1b797d92d87b688193a2b976efc8d577d204343",
 } as const;

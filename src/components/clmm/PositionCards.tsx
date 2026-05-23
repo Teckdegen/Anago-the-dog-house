@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Coins, Droplets, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import {
   useAccount,
   usePublicClient,
@@ -18,54 +18,69 @@ import {
   buildDecreaseArgs,
 } from "@/lib/uniswap";
 import { NPM_ABI } from "@/lib/uniswap/abis";
+import { clmm } from "./clmmTheme";
 
 export function PositionCards({
   positions,
   loading,
   emptyLabel,
-  onRefresh,
+  layout = "stack",
 }: {
   positions: LpPosition[];
   loading?: boolean;
   emptyLabel?: string;
-  onRefresh?: () => void;
+  layout?: "stack" | "grid";
 }) {
   const { address } = useAccount();
 
   if (!address) {
     return (
-      <p className="font-mono text-[11px] py-6 text-center" style={{ color: "rgba(196,168,240,0.55)" }}>
+      <p className="font-mono text-[12px] py-12 text-center" style={{ color: clmm.textMuted }}>
         Connect wallet to view positions
       </p>
     );
   }
 
-  if (loading) {
+  if (loading && positions.length === 0) {
     return (
-      <div className="py-10 flex justify-center">
-        <Loader2 className="w-6 h-6 animate-spin" style={{ color: "#C4A8F0" }} />
+      <div className="py-16 flex justify-center">
+        <Loader2 className="w-7 h-7 animate-spin" style={{ color: clmm.accent }} />
       </div>
     );
   }
 
   if (positions.length === 0) {
     return (
-      <p className="font-mono text-[11px] py-8 text-center" style={{ color: "rgba(196,168,240,0.5)" }}>
-        {emptyLabel ?? "No LP positions found — add liquidity or scan again"}
-      </p>
+      <div className="py-16 text-center space-y-4">
+        <p className="font-mono text-[12px]" style={{ color: clmm.textMuted }}>
+          {emptyLabel ?? "No LP positions found"}
+        </p>
+        <Link
+          to="/clmm"
+          className="inline-block font-grotesk text-[11px] uppercase px-5 py-2.5 rounded-full"
+          style={{ border: `1px solid ${clmm.borderStrong}`, color: clmm.text }}
+        >
+          Explore pools
+        </Link>
+      </div>
     );
   }
 
+  const gridClass =
+    layout === "grid"
+      ? "grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
+      : "space-y-3";
+
   return (
-    <div className="space-y-3">
+    <div className={gridClass}>
       {positions.map((pos) => (
-        <PositionCard key={pos.tokenId.toString()} position={pos} onDone={onRefresh} />
+        <PositionCard key={pos.tokenId.toString()} position={pos} />
       ))}
     </div>
   );
 }
 
-function PositionCard({ position: pos, onDone }: { position: LpPosition; onDone?: () => void }) {
+function PositionCard({ position: pos }: { position: LpPosition }) {
   const { address } = useAccount();
   const publicClient = usePublicClient();
   const { toast } = useToast();
@@ -119,7 +134,6 @@ function PositionCard({ position: pos, onDone }: { position: LpPosition; onDone?
     if (collectRcpt.isSuccess) {
       setBusy(false);
       toast("success", "Fees claimed", `#${pos.tokenId.toString()}`);
-      onDone?.();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [collectRcpt.isSuccess]);
@@ -128,7 +142,6 @@ function PositionCard({ position: pos, onDone }: { position: LpPosition; onDone?
     if (decreaseRcpt.isSuccess) {
       setBusy(false);
       toast("success", "Liquidity removed", `#${pos.tokenId.toString()}`);
-      onDone?.();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [decreaseRcpt.isSuccess]);
@@ -138,58 +151,67 @@ function PositionCard({ position: pos, onDone }: { position: LpPosition; onDone?
 
   return (
     <div
-      className="rounded-xl p-4"
-      style={{ border: "1px solid rgba(155,127,212,0.3)", background: "rgba(155,127,212,0.04)" }}
+      className="rounded-xl p-5 flex flex-col h-full"
+      style={{ border: `1px solid ${clmm.border}`, background: clmm.purpleBg }}
     >
-      <div className="flex items-center justify-between gap-2 mb-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <TokenIcon address={pos.token0} symbol={pos.token0Symbol} size={24} />
-          <span className="font-mono text-[10px]" style={{ color: "rgba(196,168,240,0.5)" }}>/</span>
-          <TokenIcon address={pos.token1} symbol={pos.token1Symbol} size={24} />
-          <span className="font-grotesk text-[12px] ml-1 truncate" style={{ color: "#EDE0FF" }}>
-            {pos.token0Symbol}/{pos.token1Symbol}
-          </span>
+      <div className="flex items-center gap-3 mb-3">
+        <div className="relative flex shrink-0">
+          <TokenIcon address={pos.token0} symbol={pos.token0Symbol} size={32} />
+          <div className="absolute -right-2 top-2">
+            <TokenIcon address={pos.token1} symbol={pos.token1Symbol} size={32} />
+          </div>
         </div>
-        <span className="font-mono text-[9px] shrink-0" style={{ color: "rgba(196,168,240,0.45)" }}>
-          NFT #{pos.tokenId.toString()}
-        </span>
+        <div className="min-w-0 flex-1">
+          <p className="font-grotesk text-[15px] font-medium truncate" style={{ color: clmm.text }}>
+            {pos.token0Symbol}/{pos.token1Symbol}
+          </p>
+          <p className="font-mono text-[9px]" style={{ color: clmm.textDim }}>
+            NFT #{pos.tokenId.toString()}
+          </p>
+        </div>
       </div>
-      <p className="font-mono text-[9px] mb-2" style={{ color: "rgba(196,168,240,0.4)" }}>
-        Ticks {pos.tickLower} → {pos.tickUpper} · Liq {pos.liquidity.toString()}
-      </p>
-      {hasOwed && (
-        <p className="font-mono text-[10px] mb-3 flex items-center gap-1" style={{ color: "#C4A8F0" }}>
-          <Coins className="w-3.5 h-3.5" />
-          Owed: {formatUnits(pos.tokensOwed0, pos.token0Decimals)} {pos.token0Symbol} +{" "}
-          {formatUnits(pos.tokensOwed1, pos.token1Decimals)} {pos.token1Symbol}
+
+      <div className="font-mono text-[10px] space-y-1 mb-4 flex-1" style={{ color: clmm.textMuted }}>
+        <p>
+          Ticks {pos.tickLower} → {pos.tickUpper}
         </p>
-      )}
-      <div className="flex flex-wrap gap-2">
+        <p>Liquidity {pos.liquidity.toString()}</p>
+        {hasOwed && (
+          <p style={{ color: clmm.accent }}>
+            Unclaimed: {formatUnits(pos.tokensOwed0, pos.token0Decimals)} {pos.token0Symbol} +{" "}
+            {formatUnits(pos.tokensOwed1, pos.token1Decimals)} {pos.token1Symbol}
+          </p>
+        )}
+      </div>
+
+      <div className="flex flex-wrap gap-2 pt-3" style={{ borderTop: `1px solid ${clmm.border}` }}>
         <button
+          type="button"
           onClick={runCollect}
-          disabled={pending}
-          className="px-3 py-1.5 rounded-lg font-grotesk text-[10px] uppercase tracking-wider disabled:opacity-40"
-          style={{ background: "rgba(155,127,212,0.2)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.45)" }}
+          disabled={pending || !hasOwed}
+          className="px-3 py-2 rounded-lg font-grotesk text-[10px] uppercase tracking-wider disabled:opacity-40"
+          style={{ background: clmm.purpleSolid, color: clmm.text, border: `1px solid ${clmm.borderStrong}` }}
         >
           {pending && collectTx.isPending ? "Claiming…" : "Claim fees"}
         </button>
         {canRemove && (
           <button
+            type="button"
             onClick={runDecrease}
             disabled={pending}
-            className="px-3 py-1.5 rounded-lg font-grotesk text-[10px] uppercase tracking-wider disabled:opacity-40"
-            style={{ border: "1px solid rgba(155,127,212,0.35)", color: "rgba(196,168,240,0.75)" }}
+            className="px-3 py-2 rounded-lg font-grotesk text-[10px] uppercase tracking-wider disabled:opacity-40"
+            style={{ border: `1px solid ${clmm.border}`, color: clmm.textMuted }}
           >
-            Remove all liquidity
+            Remove liquidity
           </button>
         )}
         <Link
           to="/clmm/pool/$poolAddress"
           params={{ poolAddress: pos.poolAddress }}
-          className="px-3 py-1.5 rounded-lg font-grotesk text-[10px] uppercase tracking-wider inline-flex items-center gap-1"
-          style={{ border: "1px solid rgba(155,127,212,0.25)", color: "rgba(196,168,240,0.55)" }}
+          className="px-3 py-2 rounded-lg font-grotesk text-[10px] uppercase tracking-wider ml-auto"
+          style={{ border: `1px solid ${clmm.border}`, color: clmm.accent }}
         >
-          <Droplets className="w-3 h-3" /> Pool
+          Manage pool
         </Link>
       </div>
     </div>
