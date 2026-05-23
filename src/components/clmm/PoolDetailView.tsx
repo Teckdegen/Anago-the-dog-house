@@ -46,7 +46,7 @@ export function PoolDetailView({
               {m.symbol0} / {m.symbol1}
             </h1>
             <p className="font-mono text-[10px]" style={{ color: clmm.textDim }}>
-              {m.displayId} · {feeToPercent(live.pool.fee)} · Uniswap V3
+              {m.displayId} · {feeToPercent(live.pool.fee)} · Uniswap {(live.pool.protocol ?? "v3").toUpperCase()}
             </p>
           </div>
         </div>

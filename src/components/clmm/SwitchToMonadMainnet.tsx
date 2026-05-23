@@ -52,7 +52,7 @@ export function ClmmNetworkGate({ children }: { children: ReactNode }) {
         Monad Mainnet required
       </p>
       <p className="font-mono text-[11px] mt-3 leading-relaxed" style={{ color: clmm.textMuted }}>
-        Uniswap V3 CLMM runs on Monad mainnet (chain <strong>143</strong>). You are on chain{" "}
+        Uniswap CLMM (V3/V4) runs on Monad mainnet (chain <strong>143</strong>). You are on chain{" "}
         <strong>{chainId}</strong>.
       </p>
       <SwitchToMonadMainnetButton className="mt-8" />

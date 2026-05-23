@@ -102,6 +102,7 @@ export async function resolvePoolByAddress(
       token1: token1 as `0x${string}`,
       fee: Number(fee),
       tickSpacing,
+      protocol: "v3",
     };
   } catch {
     return null;

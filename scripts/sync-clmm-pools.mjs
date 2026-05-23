@@ -1,5 +1,5 @@
 /**
- * Builds seedPools.generated.ts from DexScreener (Uniswap V3 on Monad).
+ * Builds seedPools.generated.ts from DexScreener (Uniswap V3/V4 on Monad).
  * No factory log scan — Monad RPC limits getLogs to 100 blocks.
  *
  * Usage: npm run sync:pools
@@ -31,8 +31,11 @@ const POOL_ABI = [
   { type: "function", name: "tickSpacing", stateMutability: "view", inputs: [], outputs: [{ type: "int24" }] },
 ];
 
-function isV3Uniswap(p) {
-  return p.chainId === "monad" && p.dexId === "uniswap" && p.labels?.includes("v3") && p.pairAddress;
+function uniswapProtocol(p) {
+  if (p.chainId !== "monad" || p.dexId !== "uniswap" || !p.pairAddress) return null;
+  if (p.labels?.includes("v4")) return "v4";
+  if (p.labels?.includes("v3")) return "v3";
+  return null;
 }
 
 async function fetchTokenPairs(addr) {
@@ -47,14 +50,15 @@ async function discoverDex() {
   const queue = new Set([WMON.toLowerCase()]);
   const done = new Set();
 
-  while (queue.size > 0 && done.size < 24) {
+  while (queue.size > 0 && done.size < 50) {
     const t = [...queue].find((x) => !done.has(x));
     if (!t) break;
     done.add(t);
-    console.log(`DexScreener token ${done.size}/24 · ${map.size} pools`);
+    console.log(`DexScreener token ${done.size}/50 · ${map.size} pools`);
     const pairs = await fetchTokenPairs(t);
     for (const p of pairs) {
-      if (!isV3Uniswap(p)) continue;
+      const protocol = uniswapProtocol(p);
+      if (!protocol) continue;
       const a = p.baseToken.address;
       const b = p.quoteToken.address;
       const [t0, t1] = a.toLowerCase() < b.toLowerCase() ? [a, b] : [b, a];
@@ -63,7 +67,8 @@ async function discoverDex() {
         token0: t0,
         token1: t1,
         fee: 3000,
-        tickSpacing: 60,
+        tickSpacing: protocol === "v4" ? 0 : 60,
+        protocol,
       });
       queue.add(t0.toLowerCase());
       queue.add(t1.toLowerCase());
@@ -75,6 +80,10 @@ async function discoverDex() {
 async function enrich(pools) {
   const out = [];
   for (const pool of pools) {
+    if (pool.protocol === "v4") {
+      out.push(pool);
+      continue;
+    }
     try {
       const [fee, tickSpacing] = await Promise.all([
         client.readContract({ address: pool.address, abi: POOL_ABI, functionName: "fee" }),
@@ -91,14 +100,14 @@ async function enrich(pools) {
 const latest = await client.getBlockNumber();
 let pools = await discoverDex();
 if (pools.length === 0) {
-  console.error("No Uniswap V3 pools from DexScreener");
+  console.error("No Uniswap V3/V4 pools from DexScreener");
   process.exit(1);
 }
 console.log(`Found ${pools.length} pools — enriching on-chain…`);
 pools = await enrich(pools);
 
 const body = `/**
- * AUTO-GENERATED — npm run sync:pools (DexScreener Uniswap V3 on Monad)
+ * AUTO-GENERATED — npm run sync:pools (DexScreener Uniswap V3/V4 on Monad)
  * ${new Date().toISOString()} · ${pools.length} pools
  */
 

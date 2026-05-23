@@ -5,12 +5,27 @@ import { fetchTokenFromDexScreener } from "@/lib/web3/dexscreener";
 /**
  * Token icon — DexScreener logo, then on-chain logoURI/tokenURI/contractURI, then letter fallback.
  */
-export function TokenIcon({ address, symbol, size = 28 }: { address: string; symbol?: string; size?: number }) {
+export function TokenIcon({
+  address,
+  symbol,
+  size = 28,
+  logoUrl: logoUrlProp,
+}: {
+  address: string;
+  symbol?: string;
+  size?: number;
+  logoUrl?: string | null;
+}) {
   const publicClient = usePublicClient();
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [logoUrl, setLogoUrl] = useState<string | null>(logoUrlProp ?? null);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
+    if (logoUrlProp) {
+      setLogoUrl(logoUrlProp);
+      setFailed(false);
+      return;
+    }
     if (!address || address === "0x0000000000000000000000000000000000000000") return;
     let cancelled = false;
     setFailed(false);
@@ -20,7 +35,7 @@ export function TokenIcon({ address, symbol, size = 28 }: { address: string; sym
     });
 
     return () => { cancelled = true; };
-  }, [address, publicClient]);
+  }, [address, publicClient, logoUrlProp]);
 
   const letter = (symbol || address?.slice(0, 2) || "?")[0].toUpperCase();
 

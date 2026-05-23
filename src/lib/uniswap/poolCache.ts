@@ -14,7 +14,11 @@ export type PoolIndexCache = {
 };
 
 export function getSeedPools(): CachedPool[] {
-  return SEED_POOLS.map((p) => ({ ...p }));
+  return SEED_POOLS.map((p) => normalizePool(p));
+}
+
+function normalizePool(p: CachedPool): CachedPool & { protocol: PoolProtocol } {
+  return { ...p, protocol: p.protocol ?? "v3" };
 }
 
 export function getSeedPoolIndex(): PoolIndexCache {
@@ -37,7 +41,7 @@ export function loadPoolCache(): PoolIndexCache {
         BigInt(cached.lastIndexedBlock || 0) > BigInt(seed.lastIndexedBlock)
           ? cached.lastIndexedBlock
           : seed.lastIndexedBlock,
-      pools: mergePools(seed.pools, cached.pools ?? []),
+      pools: mergePools(seed.pools, (cached.pools ?? []).map(normalizePool)),
       updatedAt: Math.max(cached.updatedAt ?? 0, seed.updatedAt),
     };
   } catch {
@@ -55,8 +59,8 @@ export function savePoolCache(cache: PoolIndexCache): void {
 
 export function mergePools(existing: CachedPool[], discovered: CachedPool[]): CachedPool[] {
   const map = new Map<string, CachedPool>();
-  for (const p of existing) map.set(poolKey(p), p);
-  for (const p of discovered) map.set(poolKey(p), p);
+  for (const p of existing) map.set(poolKey(p), normalizePool(p));
+  for (const p of discovered) map.set(poolKey(p), normalizePool(p));
   return Array.from(map.values());
 }
 

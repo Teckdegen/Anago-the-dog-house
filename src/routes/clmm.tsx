@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { RefreshCw, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { useAccount, useChainId, usePublicClient } from "wagmi";
 import { AppShell } from "@/components/AppShell";
 import { PositionCards } from "@/components/clmm/PositionCards";
@@ -15,7 +15,6 @@ import {
   getSeedPools,
   discoverPoolsIncremental,
   fetchUserPositions,
-  UNISWAP_V3,
   type LpPosition,
 } from "@/lib/uniswap";
 
@@ -23,7 +22,7 @@ export const Route = createFileRoute("/clmm")({
   component: CLMMPage,
   head: () => ({
     meta: [
-      { title: "Explore Pools — Uniswap V3 CLMM" },
+      { title: "Explore Pools — Uniswap CLMM" },
       { name: "description", content: "Explore concentrated liquidity pools on Monad." },
     ],
   }),
@@ -42,38 +41,23 @@ function CLMMPage() {
     return cached.pools.length > 0 ? cached.pools : getSeedPools();
   });
   const [syncing, setSyncing] = useState(false);
-  const [syncMsg, setSyncMsg] = useState("");
   const [poolSearch, setPoolSearch] = useState("");
   const [view, setView] = useState<ClmmView>("explore");
   const [positions, setPositions] = useState<LpPosition[]>([]);
   const [loadingPos, setLoadingPos] = useState(false);
 
-  const { rows, indexing, progress, allCachedFresh, refreshMetrics } = useEnrichedPools(
-    pools,
-    publicClient,
-    supported,
-  );
+  const { rows, indexing, progress } = useEnrichedPools(pools, publicClient, supported);
 
   const syncPools = useCallback(async () => {
     if (!publicClient || !supported) return;
     setSyncing(true);
     try {
-      const result = await discoverPoolsIncremental(publicClient, setSyncMsg);
+      const result = await discoverPoolsIncremental(publicClient);
       setPools(result.pools);
-      setSyncMsg(
-        result.newPools > 0
-          ? `+${result.newPools} pools · block ${result.lastIndexedBlock}`
-          : `Indexed · block ${result.lastIndexedBlock}`,
-      );
     } catch (e) {
       console.error("CLMM pool sync:", e);
       const fallback = loadPoolCache().pools;
       if (fallback.length > 0) setPools(fallback);
-      setSyncMsg(
-        fallback.length > 0
-          ? `${fallback.length} pools (DexScreener) · live tail skipped`
-          : "Could not load pools — connect Monad mainnet & retry",
-      );
     } finally {
       setSyncing(false);
     }
@@ -81,7 +65,7 @@ function CLMMPage() {
 
   useEffect(() => {
     if (supported && publicClient) syncPools();
-  }, [supported, publicClient]);
+  }, [supported, publicClient, syncPools]);
 
   const filteredRows = useMemo(() => {
     if (!poolSearch.trim()) return rows;
@@ -91,7 +75,8 @@ function CLMMPage() {
         r.address.toLowerCase().includes(q) ||
         r.metrics.symbol0.toLowerCase().includes(q) ||
         r.metrics.symbol1.toLowerCase().includes(q) ||
-        r.metrics.displayId.toLowerCase().includes(q),
+        r.metrics.displayId.toLowerCase().includes(q) ||
+        (r.protocol ?? "v3").includes(q),
     );
   }, [rows, poolSearch]);
 
@@ -123,8 +108,10 @@ function CLMMPage() {
             </TabBtn>
           </div>
 
-          <div className="flex items-center gap-2 flex-1 sm:max-w-md sm:ml-auto">
-            {view === "explore" && (
+          {view === "explore" && (
+            <div
+              className="flex items-center gap-2 flex-1 sm:max-w-md sm:ml-auto"
+            >
               <div
                 className="flex-1 flex items-center gap-2 px-4 py-2.5 rounded-full"
                 style={{ border: `1px solid ${clmm.border}`, background: clmm.purpleBg }}
@@ -138,33 +125,14 @@ function CLMMPage() {
                   style={{ color: clmm.text }}
                 />
               </div>
-            )}
-            <button
-              type="button"
-              onClick={() => {
-                syncPools().then(() => refreshMetrics());
-              }}
-              disabled={syncing}
-              title="Sync on-chain pool list"
-              className="p-2.5 rounded-full shrink-0 disabled:opacity-40"
-              style={{ border: `1px solid ${clmm.border}`, color: clmm.text }}
-            >
-              <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} />
-            </button>
-          </div>
+            </div>
+          )}
         </div>
-
-        {syncMsg && view === "explore" && (
-          <p className="font-mono text-[9px] mb-4 -mt-4" style={{ color: clmm.textDim }}>
-            {syncMsg} · {pools.length} pools
-            {allCachedFresh ? " · stats cache hot" : indexing ? ` · indexing ${progress.done}/${progress.total}` : ""}
-          </p>
-        )}
 
         {view === "explore" ? (
           filteredRows.length === 0 && !indexing ? (
             <div className="py-20 text-center font-mono text-[11px]" style={{ color: clmm.textMuted }}>
-              {syncing ? "Loading Uniswap V3 from DexScreener…" : "No pools — connect Monad mainnet (143) & refresh"}
+              {syncing ? "Loading pools…" : "No pools — connect Monad mainnet (143)"}
             </div>
           ) : (
             <PoolsExploreTable rows={filteredRows} indexing={indexing} progress={progress} />
@@ -175,9 +143,9 @@ function CLMMPage() {
               <button
                 type="button"
                 onClick={refreshPositions}
-                disabled={loadingPos || !address}
                 className="font-mono text-[9px] px-4 py-2 rounded-full uppercase disabled:opacity-40"
                 style={{ border: `1px solid ${clmm.border}`, color: clmm.accent }}
+                disabled={loadingPos || !address}
               >
                 {loadingPos ? "Scanning…" : "Refresh"}
               </button>
@@ -190,8 +158,6 @@ function CLMMPage() {
             />
           </div>
         )}
-
-        <ContractsFooter />
       </div>
       </ClmmNetworkGate>
     </AppShell>
@@ -219,18 +185,5 @@ function TabBtn({
     >
       {children}
     </button>
-  );
-}
-
-function ContractsFooter() {
-  return (
-    <div
-      className="rounded-xl p-4 mt-10 max-w-3xl font-mono text-[9px] space-y-1"
-      style={{ color: clmm.textDim, border: `1px solid ${clmm.border}`, background: clmm.purpleBg }}
-    >
-      <p className="uppercase tracking-wider">Uniswap V3 · Monad</p>
-        <p>Factory {UNISWAP_V3.factory}</p>
-        <p>Pools from DexScreener (Uniswap V3 · Monad) · fees from on-chain · npm run sync:pools to refresh seed</p>
-    </div>
   );
 }

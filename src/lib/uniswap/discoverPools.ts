@@ -25,7 +25,7 @@ export type DiscoverResult = {
 };
 
 /**
- * Primary: DexScreener lists Uniswap V3 pairs on Monad (works in browser + Vercel).
+ * Primary: DexScreener lists Uniswap V3/V4 pairs on Monad (works in browser + Vercel).
  * Secondary: small on-chain log tail for brand-new pools after last index.
  */
 export async function discoverPoolsIncremental(
@@ -36,7 +36,7 @@ export async function discoverPoolsIncremental(
   const cached = loadPoolCache();
   let existing = cached.pools.length > 0 ? cached.pools : getSeedPools();
 
-  onProgress?.("Loading Uniswap V3 pools from DexScreener…");
+  onProgress?.("Loading pools from DexScreener…");
   let dexPools = await discoverPoolsFromDexScreener(onProgress);
   if (dexPools.length > 0) {
     onProgress?.(`Enriching ${dexPools.length} pools on-chain…`);
@@ -92,6 +92,7 @@ export async function discoverPoolsIncremental(
           token1: args.token1,
           fee: Number(args.fee ?? 0),
           tickSpacing: Number(args.tickSpacing ?? 0),
+          protocol: "v3",
         });
       }
     } catch {

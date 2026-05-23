@@ -1,9 +1,12 @@
+export type PoolProtocol = "v3" | "v4";
+
 export type CachedPool = {
   address: `0x${string}`;
   token0: `0x${string}`;
   token1: `0x${string}`;
   fee: number;
   tickSpacing: number;
+  protocol?: PoolProtocol;
 };
 
 export type PoolLiveState = {

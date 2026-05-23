@@ -1,7 +1,7 @@
 import type { PublicClient } from "viem";
 import { UNISWAP_V3 } from "./addresses";
 import { POOL_ABI } from "./abis";
-import type { CachedPool } from "./types";
+import type { CachedPool, PoolProtocol } from "./types";
 
 const DEX_API = "https://api.dexscreener.com/latest/dex/tokens";
 
@@ -14,12 +14,13 @@ type DexPair = {
   quoteToken?: { address?: string };
 };
 
-function isUniswapV3MonadPair(p: DexPair): boolean {
-  if (p.chainId !== "monad") return false;
-  if (p.dexId !== "uniswap") return false;
-  if (!p.labels?.includes("v3")) return false;
-  if (!p.pairAddress || !p.baseToken?.address || !p.quoteToken?.address) return false;
-  return true;
+function uniswapProtocol(p: DexPair): PoolProtocol | null {
+  if (p.chainId !== "monad") return null;
+  if (p.dexId !== "uniswap") return null;
+  if (!p.pairAddress || !p.baseToken?.address || !p.quoteToken?.address) return null;
+  if (p.labels?.includes("v4")) return "v4";
+  if (p.labels?.includes("v3")) return "v3";
+  return null;
 }
 
 function sortTokens(a: string, b: string): [`0x${string}`, `0x${string}`] {
@@ -40,7 +41,8 @@ async function fetchPairsForToken(token: string): Promise<DexPair[]> {
 }
 
 function pairToCached(p: DexPair): CachedPool | null {
-  if (!isUniswapV3MonadPair(p)) return null;
+  const protocol = uniswapProtocol(p);
+  if (!protocol) return null;
   const a = p.baseToken!.address!;
   const b = p.quoteToken!.address!;
   const [token0, token1] = sortTokens(a, b);
@@ -49,18 +51,19 @@ function pairToCached(p: DexPair): CachedPool | null {
     token0,
     token1,
     fee: 3000,
-    tickSpacing: 60,
+    tickSpacing: protocol === "v4" ? 0 : 60,
+    protocol,
   };
 }
 
-/** Discover Uniswap V3 pools on Monad via DexScreener (no factory log scan). */
+/** Discover Uniswap V3/V4 pools on Monad via DexScreener (no factory log scan). */
 export async function discoverPoolsFromDexScreener(
   onProgress?: (msg: string) => void,
 ): Promise<CachedPool[]> {
   const map = new Map<string, CachedPool>();
   const tokenQueue = new Set<string>([UNISWAP_V3.wmon.toLowerCase()]);
   const scannedTokens = new Set<string>();
-  const maxTokens = 24;
+  const maxTokens = 50;
 
   while (tokenQueue.size > 0 && scannedTokens.size < maxTokens) {
     const token = [...tokenQueue].find((t) => !scannedTokens.has(t));
@@ -94,6 +97,7 @@ export async function enrichPoolsOnChain(
     onProgress?.(`On-chain enrich ${i + slice.length}/${pools.length}`);
     const enriched = await Promise.all(
       slice.map(async (pool) => {
+        if (pool.protocol === "v4") return pool;
         try {
           const [fee, tickSpacing] = await Promise.all([
             client.readContract({ address: pool.address, abi: POOL_ABI, functionName: "fee" }),
