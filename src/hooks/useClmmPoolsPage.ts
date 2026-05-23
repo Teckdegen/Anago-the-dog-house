@@ -1,14 +1,24 @@
 import { useCallback, useEffect, useState } from "react";
 import type { CachedPool, EnrichedPool } from "@/lib/capricorn";
 import {
-  feeToPercent,
   fetchPoolMetadata,
   fetchTokenMeta,
   getMonadPublicClient,
   hydratePools,
 } from "@/lib/capricorn";
-import { fetchPoolMetrics, type PoolMetrics } from "@/lib/capricorn/poolMetrics";
+import { fetchPoolMetrics } from "@/lib/capricorn/poolMetrics";
 import { fetchClmmPoolsPage, fetchPoolAddressList, type ClmmPoolsQuery } from "@/lib/clmm/api";
+
+function apiRowToCached(row: EnrichedPool): CachedPool {
+  return {
+    address: row.address,
+    token0: row.token0,
+    token1: row.token1,
+    fee: row.fee,
+    tickSpacing: row.tickSpacing,
+    protocol: "v3",
+  };
+}
 
 function sortRows(rows: EnrichedPool[], sort: string, order: "asc" | "desc"): EnrichedPool[] {
   const key =
@@ -36,6 +46,32 @@ function sortRows(rows: EnrichedPool[], sort: string, order: "asc" | "desc"): En
 function paginate<T>(items: T[], page: number, limit: number) {
   const from = (page - 1) * limit;
   return items.slice(from, from + limit);
+}
+
+/** Live fee, TVL, volume, APR from Monad RPC (+ DexScreener for volume). */
+async function enrichPoolsOnChain(rows: EnrichedPool[]): Promise<EnrichedPool[]> {
+  const client = getMonadPublicClient();
+  const batch = 12;
+  const out: EnrichedPool[] = [];
+
+  for (let i = 0; i < rows.length; i += batch) {
+    const slice = rows.slice(i, i + batch);
+    const chunk = await Promise.all(
+      slice.map(async (row) => {
+        try {
+          let pool = apiRowToCached(row);
+          const meta = await fetchPoolMetadata(client, pool.address);
+          if (meta) pool = meta;
+          const metrics = await fetchPoolMetrics(pool, client, true);
+          return { ...pool, metrics } satisfies EnrichedPool;
+        } catch {
+          return row;
+        }
+      }),
+    );
+    out.push(...chunk);
+  }
+  return out;
 }
 
 async function poolMatchesQuery(client: ReturnType<typeof getMonadPublicClient>, pool: CachedPool, q: string) {
@@ -75,14 +111,9 @@ async function searchPoolsOnChain(
     for (const p of results) if (p) matched.push(p);
   }
 
-  const enriched: EnrichedPool[] = [];
-  for (let i = 0; i < matched.length; i += batch) {
-    const slice = matched.slice(i, i + batch);
-    const metrics = await Promise.all(
-      slice.map((p) => fetchPoolMetrics(p, client, true)),
-    );
-    enriched.push(...slice.map((p, j) => ({ ...p, metrics: metrics[j] as PoolMetrics })));
-  }
+  const enriched = await enrichPoolsOnChain(
+    matched.map((p) => ({ ...p, metrics: { poolAddress: p.address } } as EnrichedPool)),
+  );
 
   const sorted = sortRows(enriched, sort, order);
   const total = sorted.length;
@@ -91,33 +122,6 @@ async function searchPoolsOnChain(
     total,
     totalPages: Math.ceil(total / limit) || 0,
   };
-}
-
-async function refreshFeesOnChain(rows: EnrichedPool[]): Promise<EnrichedPool[]> {
-  const client = getMonadPublicClient();
-  return Promise.all(
-    rows.map(async (row) => {
-      try {
-        const meta = await fetchPoolMetadata(client, row.address);
-        if (!meta) return row;
-        return {
-          ...row,
-          fee: meta.fee,
-          tickSpacing: meta.tickSpacing,
-          token0: meta.token0,
-          token1: meta.token1,
-          metrics: {
-            ...row.metrics,
-            feePercent: feeToPercent(meta.fee),
-            symbol0: row.metrics.symbol0 || (await fetchTokenMeta(client, meta.token0)).symbol,
-            symbol1: row.metrics.symbol1 || (await fetchTokenMeta(client, meta.token1)).symbol,
-          },
-        };
-      } catch {
-        return row;
-      }
-    }),
-  );
 }
 
 export function useClmmPoolsPage(query: ClmmPoolsQuery, enabled = true) {
@@ -133,13 +137,17 @@ export function useClmmPoolsPage(query: ClmmPoolsQuery, enabled = true) {
     setError(null);
     try {
       const q = query.q?.trim() ?? "";
-      const page = query.page ?? 1;
-      const limit = query.limit ?? 50;
       const sort = query.sort ?? "tvl";
       const order = query.order ?? "desc";
 
       if (q) {
-        const result = await searchPoolsOnChain(q, sort, order, page, limit);
+        const result = await searchPoolsOnChain(
+          q,
+          sort,
+          order,
+          query.page ?? 1,
+          query.limit ?? 50,
+        );
         setRows(result.rows);
         setTotal(result.total);
         setTotalPages(result.totalPages);
@@ -147,8 +155,8 @@ export function useClmmPoolsPage(query: ClmmPoolsQuery, enabled = true) {
         const data = await fetchClmmPoolsPage({ ...query, q: undefined });
         setTotal(data.total);
         setTotalPages(data.totalPages);
-        const withFees = await refreshFeesOnChain(data.pools);
-        setRows(withFees);
+        const enriched = await enrichPoolsOnChain(data.pools);
+        setRows(sortRows(enriched, sort, order));
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));

@@ -45,7 +45,9 @@ export const POOL_COUNT = POOL_ADDRESSES.length;
 );
 
 const header = readFileSync(join(ROOT, "clmm.sql"), "utf8").split("-- 2. Seed")[0].trim();
-const inserts = pools.map((a) => `  ('${a}', '', '', '', ''),`).join("\n");
+const inserts = pools
+  .map((a, i) => `  ('${a}', '', '', '', '')${i < pools.length - 1 ? "," : ""}`)
+  .join("\n");
 writeFileSync(
   join(ROOT, "clmm.sql"),
   `${header}

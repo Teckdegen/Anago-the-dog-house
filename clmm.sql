@@ -198,5 +198,5 @@ values
   ('0xf897c9bd82e274c36b20ef01f89a5c499efacc02', '', '', '', ''),
   ('0xfaa8bc7f1f4395cb0b4384d0f3a12dfc521a0b0a', '', '', '', ''),
   ('0xfcfe78084cefe851ff7fd462942a4d051b3b06b2', '', '', '', ''),
-  ('0xff2f697e073b8205952c9bfd1f6f102434b26262', '', '', '', ''),
+  ('0xff2f697e073b8205952c9bfd1f6f102434b26262', '', '', '', '')
 on conflict (address) do nothing;
