@@ -1,23 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, Search } from "lucide-react";
 import { useAccount, useChainId, usePublicClient } from "wagmi";
 import { AppShell } from "@/components/AppShell";
 import { PositionCards } from "@/components/clmm/PositionCards";
 import { PoolsExploreTable } from "@/components/clmm/PoolsExploreTable";
 import { clmm } from "@/components/clmm/clmmTheme";
-import { useEnrichedPools } from "@/hooks/useEnrichedPools";
-import {
-  isUniswapSupportedChain,
-  loadPoolCache,
-  getSeedPools,
-  discoverPoolsIncremental,
-  loadLocalV4Pools,
-  fetchUserPositions,
-  getMonadPublicClient,
-  type LpPosition,
-} from "@/lib/uniswap";
+import { useClmmPoolsPage } from "@/hooks/useClmmPoolsPage";
+import { isUniswapSupportedChain, fetchUserPositions, type LpPosition } from "@/lib/uniswap";
 
 export const Route = createFileRoute("/clmm/")({
   component: CLMMExplorePage,
@@ -30,7 +21,9 @@ export const Route = createFileRoute("/clmm/")({
 });
 
 type ClmmView = "explore" | "positions";
+type SortKey = "tvl" | "apr" | "vol";
 
+const PAGE_SIZE = 50;
 const POSITION_POLL_MS = 25_000;
 
 function CLMMExplorePage() {
@@ -38,49 +31,48 @@ function CLMMExplorePage() {
   const supported = isUniswapSupportedChain(chainId);
   const { address } = useAccount();
   const publicClient = usePublicClient();
-
-  const [pools, setPools] = useState(() => {
-    const local = loadLocalV4Pools();
-    return local.length > 0 ? local : getSeedPools();
-  });
-  const [syncing, setSyncing] = useState(false);
-  const [poolSearch, setPoolSearch] = useState("");
   const [view, setView] = useState<ClmmView>("explore");
   const [positions, setPositions] = useState<LpPosition[]>([]);
   const [loadingPos, setLoadingPos] = useState(false);
 
-  const { rows, indexing, progress } = useEnrichedPools(pools, publicClient, supported);
-
-  const syncPools = useCallback(async () => {
-    if (!supported) return;
-    setSyncing(true);
-    try {
-      const result = await discoverPoolsIncremental(getMonadPublicClient());
-      setPools(result.pools);
-    } catch (e) {
-      console.error("CLMM pool sync:", e);
-      const fallback = loadPoolCache().pools;
-      if (fallback.length > 0) setPools(fallback);
-    } finally {
-      setSyncing(false);
-    }
-  }, [supported]);
+  const [page, setPage] = useState(1);
+  const [poolSearch, setPoolSearch] = useState("");
+  const [searchDebounced, setSearchDebounced] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey>("tvl");
+  const [sortDesc, setSortDesc] = useState(true);
 
   useEffect(() => {
-    if (supported) syncPools();
-  }, [supported, syncPools]);
+    const t = setTimeout(() => {
+      setSearchDebounced(poolSearch);
+      setPage(1);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [poolSearch]);
 
-  const filteredRows = useMemo(() => {
-    if (!poolSearch.trim()) return rows;
-    const q = poolSearch.toLowerCase();
-    return rows.filter(
-      (r) =>
-        r.address.toLowerCase().includes(q) ||
-        r.metrics.symbol0.toLowerCase().includes(q) ||
-        r.metrics.symbol1.toLowerCase().includes(q) ||
-        r.metrics.displayId.toLowerCase().includes(q),
-    );
-  }, [rows, poolSearch]);
+  const poolsQuery = useMemo(
+    () => ({
+      page,
+      limit: PAGE_SIZE,
+      sort: sortKey,
+      order: (sortDesc ? "desc" : "asc") as "desc" | "asc",
+      q: searchDebounced,
+    }),
+    [page, sortKey, sortDesc, searchDebounced],
+  );
+
+  const { rows, total, totalPages, loading, error, reload } = useClmmPoolsPage(
+    poolsQuery,
+    view === "explore",
+  );
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) setSortDesc((d) => !d);
+    else {
+      setSortKey(key);
+      setSortDesc(true);
+    }
+    setPage(1);
+  };
 
   const loadPositions = useCallback(async () => {
     if (!publicClient || !address || !supported) return;
@@ -107,7 +99,7 @@ function CLMMExplorePage() {
             Explore pools
           </h1>
           <p className="font-mono text-[11px] mt-1" style={{ color: clmm.textMuted }}>
-            Uniswap V4 on Monad · {pools.length > 0 ? `${pools.length} pools` : "run npm run sync:pools for full list"}
+            Uniswap V4 on Monad · {total > 0 ? `${total.toLocaleString()} pools indexed` : "indexing via Supabase"}
           </p>
         </header>
 
@@ -139,22 +131,140 @@ function CLMMExplorePage() {
         </div>
 
         {view === "explore" ? (
-          filteredRows.length === 0 && !indexing ? (
-            <div className="py-20 text-center font-mono text-[11px]" style={{ color: clmm.textMuted }}>
-              {syncing
-                ? "Loading pools…"
-                : pools.length === 0
-                  ? "No pools loaded — add THE_GRAPH_API_KEY on Vercel (Settings → Environment Variables), then redeploy"
-                  : "No pools match your search"}
-            </div>
-          ) : (
-            <PoolsExploreTable rows={filteredRows} indexing={indexing} progress={progress} />
-          )
+          <ExplorePoolsView
+            rows={rows}
+            loading={loading}
+            error={error}
+            onRetry={reload}
+            sortKey={sortKey}
+            sortDesc={sortDesc}
+            onSort={handleSort}
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            onPageChange={setPage}
+          />
         ) : (
           <PositionsView positions={positions} loading={loadingPos} />
         )}
       </div>
     </AppShell>
+  );
+}
+
+function ExplorePoolsView({
+  rows,
+  loading,
+  error,
+  onRetry,
+  sortKey,
+  sortDesc,
+  onSort,
+  page,
+  totalPages,
+  total,
+  onPageChange,
+}: {
+  rows: import("@/lib/uniswap/poolMetrics").EnrichedPool[];
+  loading: boolean;
+  error: string | null;
+  onRetry: () => void;
+  sortKey: SortKey;
+  sortDesc: boolean;
+  onSort: (key: SortKey) => void;
+  page: number;
+  totalPages: number;
+  total: number;
+  onPageChange: (p: number) => void;
+}) {
+  if (error) {
+    return (
+      <div className="py-16 text-center space-y-3">
+        <p className="font-mono text-[11px]" style={{ color: "rgba(255,120,120,0.9)" }}>
+          {error}
+        </p>
+        <p className="font-mono text-[10px] max-w-md mx-auto" style={{ color: clmm.textMuted }}>
+          Run the pool indexer (<code className="opacity-80">node script.js</code>) and set Supabase env vars on
+          Vercel.
+        </p>
+        <button
+          type="button"
+          onClick={onRetry}
+          className="font-mono text-[10px] uppercase px-4 py-2 rounded-full"
+          style={{ border: `1px solid ${clmm.border}`, color: clmm.text }}
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  if (!loading && rows.length === 0) {
+    return (
+      <div className="py-20 text-center font-mono text-[11px]" style={{ color: clmm.textMuted }}>
+        No pools in database yet — start the indexer: <code className="opacity-80">node script.js</code>
+      </div>
+    );
+  }
+
+  const rankOffset = (page - 1) * PAGE_SIZE;
+
+  return (
+    <div className="space-y-4">
+      {loading && (
+        <div className="flex items-center gap-2 font-mono text-[9px]" style={{ color: clmm.textMuted }}>
+          <Loader2 className="w-3 h-3 animate-spin" style={{ color: clmm.purple }} />
+          Loading page {page}…
+        </div>
+      )}
+      <PoolsExploreTable
+        rows={rows}
+        sortKey={sortKey}
+        sortDesc={sortDesc}
+        onSort={onSort}
+        rankOffset={rankOffset}
+      />
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between pt-2">
+          <p className="font-mono text-[10px]" style={{ color: clmm.textDim }}>
+            Page {page} of {totalPages} · {total.toLocaleString()} pools
+          </p>
+          <div className="flex gap-2">
+            <PaginationBtn disabled={page <= 1 || loading} onClick={() => onPageChange(page - 1)}>
+              <ChevronLeft className="w-4 h-4" />
+            </PaginationBtn>
+            <PaginationBtn
+              disabled={page >= totalPages || loading}
+              onClick={() => onPageChange(page + 1)}
+            >
+              <ChevronRight className="w-4 h-4" />
+            </PaginationBtn>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PaginationBtn({
+  children,
+  disabled,
+  onClick,
+}: {
+  children: ReactNode;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className="p-2 rounded-lg transition disabled:opacity-30"
+      style={{ border: `1px solid ${clmm.border}`, color: clmm.text }}
+    >
+      {children}
+    </button>
   );
 }
 

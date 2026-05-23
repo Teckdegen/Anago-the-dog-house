@@ -1,8 +1,10 @@
 export * from "./addresses";
 export * from "./protocol";
 export * from "./types";
-export * from "./poolCache";
+export * from "./poolData";
+export { POOL_DATA, POOL_DATA_COUNT, POOL_DATA_UPDATED_AT } from "./poolData.generated";
 export { SEED_POOLS, SEED_POOLS_LAST_INDEXED_BLOCK } from "./seedPools.generated";
+export * from "./poolCache";
 export * from "./discoverPools";
 export * from "./discoverPoolsSubgraph";
 export * from "./subgraph";

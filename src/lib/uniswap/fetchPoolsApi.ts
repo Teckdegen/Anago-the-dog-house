@@ -3,20 +3,16 @@ import type { PoolMetrics } from "./poolMetrics";
 import { saveMetricsBatch } from "./poolMetricsCache";
 
 export type V4PoolsApiResponse = {
-  pools: CachedPool[];
-  metrics?: PoolMetrics[];
+  pools: Array<CachedPool & { symbol0?: string; symbol1?: string }>;
   count: number;
   expected?: number;
-  poolManager?: { poolCount?: string };
   updatedAt: number;
   error?: string;
-  hint?: string;
 };
 
-/** Load all V4 pools via Vercel `/api/v4-pools` (The Graph key stays on server). */
 export async function fetchPoolsFromApi(): Promise<V4PoolsApiResponse> {
   const res = await fetch("/api/v4-pools", {
-    signal: AbortSignal.timeout(60_000),
+    signal: AbortSignal.timeout(90_000),
   });
 
   const json = (await res.json()) as V4PoolsApiResponse & { error?: string };
@@ -29,9 +25,26 @@ export async function fetchPoolsFromApi(): Promise<V4PoolsApiResponse> {
     throw new Error(json.error ?? "Subgraph returned zero pools");
   }
 
-  if (json.metrics?.length) {
-    saveMetricsBatch(json.metrics);
+  return json;
+}
+
+export async function fetchPoolMetricsBatch(poolIds: string[]): Promise<PoolMetrics[]> {
+  if (poolIds.length === 0) return [];
+
+  const res = await fetch("/api/v4-pools-metrics", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ids: poolIds }),
+    signal: AbortSignal.timeout(30_000),
+  });
+
+  const json = (await res.json()) as { metrics?: PoolMetrics[]; error?: string };
+
+  if (!res.ok) {
+    throw new Error(json.error ?? `Metrics API HTTP ${res.status}`);
   }
 
-  return json;
+  const metrics = json.metrics ?? [];
+  if (metrics.length > 0) saveMetricsBatch(metrics);
+  return metrics;
 }

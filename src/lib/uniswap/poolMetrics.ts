@@ -1,13 +1,8 @@
 import type { PublicClient } from "viem";
 import { fetchTokenFromDexScreener } from "@/lib/web3/dexscreener";
 import { fetchTokenMeta } from "./poolState";
-import type { CachedPool } from "./types";
-import {
-  getCachedMetrics,
-  isMetricsFresh,
-  saveMetrics,
-  poolDisplayId,
-} from "./poolMetricsCache";
+import { fetchPoolMetricsBatch } from "./fetchPoolsApi";
+import { getPoolSymbols } from "./poolData";
 import { fetchV4PoolFromSubgraph } from "./subgraph";
 import { subgraphPoolToMetrics } from "./discoverPoolsSubgraph";
 
@@ -121,12 +116,14 @@ export async function fetchPoolMetrics(
 }
 
 export function enrichFromCache(pool: CachedPool): EnrichedPool {
-  const cached = getCachedMetrics(pool.address.toLowerCase());
+  const key = pool.address.toLowerCase();
+  const cached = getCachedMetrics(key);
+  const symbols = getPoolSymbols(key);
   const base: PoolMetrics = cached ?? {
-    poolAddress: pool.address.toLowerCase(),
+    poolAddress: key,
     displayId: poolDisplayId(pool.address),
-    symbol0: pool.token0.slice(0, 6),
-    symbol1: pool.token1.slice(0, 6),
+    symbol0: symbols?.symbol0 ?? pool.token0.slice(0, 6),
+    symbol1: symbols?.symbol1 ?? pool.token1.slice(0, 6),
     token0: pool.token0,
     token1: pool.token1,
     logo0: null,
@@ -151,7 +148,54 @@ export function hydrateEnrichedPools(pools: CachedPool[]): EnrichedPool[] {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/** First visit: enrich one-by-one with UI callback. Cached pools skip network. */
+const METRICS_BATCH_SIZE = 40;
+/** Max pools to prefetch stats for on explore (rest show pair names only until scrolled) */
+const METRICS_PREFETCH_LIMIT = 200;
+
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
+/** Lazy batch metrics — avoids indexing thousands of pools at once */
+export async function indexPoolMetricsBatched(
+  pools: CachedPool[],
+  onProgress: (done: number, total: number) => void,
+  options?: { limit?: number },
+): Promise<void> {
+  const limit = options?.limit ?? METRICS_PREFETCH_LIMIT;
+  const targets = pools.slice(0, limit).filter((p) => {
+    const c = getCachedMetrics(p.address.toLowerCase());
+    return !c || !isMetricsFresh(c);
+  });
+
+  const total = Math.min(pools.length, limit);
+  let done = pools.length - targets.length;
+
+  if (targets.length === 0) {
+    onProgress(total, total);
+    return;
+  }
+
+  const batches = chunk(
+    targets.map((p) => p.address.toLowerCase()),
+    METRICS_BATCH_SIZE,
+  );
+
+  for (const ids of batches) {
+    try {
+      await fetchPoolMetricsBatch(ids);
+    } catch (e) {
+      console.warn("[poolMetrics] batch failed:", e);
+    }
+    done += ids.length;
+    onProgress(Math.min(done, total), total);
+    await new Promise((r) => setTimeout(r, 80));
+  }
+}
+
+/** @deprecated Prefer indexPoolMetricsBatched */
 export async function indexPoolMetricsIncremental(
   pools: CachedPool[],
   publicClient: PublicClient | null | undefined,

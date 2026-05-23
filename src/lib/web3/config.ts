@@ -75,7 +75,7 @@ createAppKit({
   adapters: [wagmiAdapter],
   networks: [...networks],
   projectId,
-  defaultNetwork: monad,
+  defaultNetwork: monadTestnet,
   metadata: {
     name: "The Dog House",
     description: "Vesting, Locks, CLMM & Yield Farming on Monad",

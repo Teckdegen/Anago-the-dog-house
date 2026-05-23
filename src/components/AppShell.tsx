@@ -2,6 +2,7 @@ import { Link, useLocation } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { LayoutDashboard, Timer, LockKeyhole, Sprout, Send, ShoppingBag, BarChart2 } from "lucide-react";
 import { WalletStatusPill } from "./WalletStatusPill";
+import { NetworkRouteBanner } from "./NetworkRouteBanner";
 
 const NAV = [
   { label: "Dashboard",  href: "/dashboard" },
@@ -92,6 +93,8 @@ export function AppShell({ children }: { children: ReactNode }) {
         <WalletStatusPill />
       </header>
       )}
+
+      {!isLanding && <NetworkRouteBanner />}
 
       {/* page content */}
       <main className="relative z-10 pb-24 lg:pb-0">

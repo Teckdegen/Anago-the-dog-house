@@ -1,66 +1,28 @@
-import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { ChevronDown, Loader2 } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { TokenIcon } from "@/components/TokenIcon";
 import { formatApr, formatUsdCompact, type EnrichedPool } from "@/lib/uniswap/poolMetrics";
 import { clmm } from "./clmmTheme";
 
-type SortKey = "tvl" | "apr" | "vol1d";
+type SortKey = "tvl" | "apr" | "vol";
 
 export function PoolsExploreTable({
   rows,
-  indexing,
-  progress,
+  sortKey,
+  sortDesc,
+  onSort,
+  rankOffset = 0,
 }: {
   rows: EnrichedPool[];
-  indexing: boolean;
-  progress: { done: number; total: number };
+  sortKey: SortKey;
+  sortDesc: boolean;
+  onSort: (key: SortKey) => void;
+  rankOffset?: number;
 }) {
-  const [sortKey, setSortKey] = useState<SortKey>("tvl");
-  const [sortDesc, setSortDesc] = useState(true);
-
-  const sorted = useMemo(() => {
-    const copy = [...rows];
-    copy.sort((a, b) => {
-      const ma = a.metrics;
-      const mb = b.metrics;
-      let va = 0;
-      let vb = 0;
-      if (sortKey === "tvl") {
-        va = ma.tvlUsd ?? -1;
-        vb = mb.tvlUsd ?? -1;
-      } else if (sortKey === "apr") {
-        va = ma.aprPercent ?? -1;
-        vb = mb.aprPercent ?? -1;
-      } else {
-        va = ma.volume24hUsd ?? -1;
-        vb = mb.volume24hUsd ?? -1;
-      }
-      return sortDesc ? vb - va : va - vb;
-    });
-    return copy;
-  }, [rows, sortKey, sortDesc]);
-
-  const toggleSort = (key: SortKey) => {
-    if (sortKey === key) setSortDesc((d) => !d);
-    else {
-      setSortKey(key);
-      setSortDesc(true);
-    }
-  };
+  const volKey: SortKey = "vol";
 
   return (
     <div className="w-full">
-      {indexing && progress.total > 0 && (
-        <div
-          className="px-1 py-2 flex items-center gap-2 font-mono text-[9px] mb-2"
-          style={{ color: clmm.textMuted }}
-        >
-          <Loader2 className="w-3 h-3 animate-spin" style={{ color: clmm.purple }} />
-          Loading stats {progress.done}/{progress.total}
-        </div>
-      )}
-
       <div className="overflow-x-auto -mx-2 px-2">
         <table className="w-full min-w-[900px] border-collapse">
           <thead>
@@ -69,17 +31,33 @@ export function PoolsExploreTable({
               <th className="text-left py-3 pr-4 font-normal min-w-[200px]">Pool</th>
               <th className="text-left py-3 pr-3 font-normal">Protocol</th>
               <th className="text-left py-3 pr-3 font-normal">Fee tier</th>
-              <SortHeader label="TVL" active={sortKey === "tvl"} desc={sortDesc} onClick={() => toggleSort("tvl")} />
-              <SortHeader label="Pool APR" active={sortKey === "apr"} desc={sortDesc} onClick={() => toggleSort("apr")} />
+              <SortHeader
+                label="TVL"
+                active={sortKey === "tvl"}
+                desc={sortDesc}
+                onClick={() => onSort("tvl")}
+              />
+              <SortHeader
+                label="Pool APR"
+                active={sortKey === "apr"}
+                desc={sortDesc}
+                onClick={() => onSort("apr")}
+              />
               <th className="text-right py-3 pr-3 font-normal">Reward APR</th>
-              <SortHeader label="1D vol" active={sortKey === "vol1d"} desc={sortDesc} onClick={() => toggleSort("vol1d")} align="right" />
+              <SortHeader
+                label="1D vol"
+                active={sortKey === volKey}
+                desc={sortDesc}
+                onClick={() => onSort(volKey)}
+                align="right"
+              />
               <th className="text-right py-3 pr-3 font-normal">30D vol</th>
               <th className="text-right py-3 font-normal">1D vol/TVL</th>
             </tr>
           </thead>
           <tbody>
-            {sorted.map((row, i) => (
-              <PoolRow key={row.address} row={row} rank={i + 1} loading={indexing && !row.metrics.updatedAt} />
+            {rows.map((row, i) => (
+              <PoolRow key={row.address} row={row} rank={rankOffset + i + 1} />
             ))}
           </tbody>
         </table>
@@ -121,7 +99,7 @@ function SortHeader({
   );
 }
 
-function PoolRow({ row, rank, loading }: { row: EnrichedPool; rank: number; loading?: boolean }) {
+function PoolRow({ row, rank }: { row: EnrichedPool; rank: number }) {
   const m = row.metrics;
   const pairLabel = `${m.symbol0}/${m.symbol1}`;
   const volTvl =
@@ -164,16 +142,16 @@ function PoolRow({ row, rank, loading }: { row: EnrichedPool; rank: number; load
         {m.feePercent}
       </td>
       <td className="py-4 pr-3 text-right font-mono text-[12px]" style={{ color: clmm.text }}>
-        {loading && m.tvlUsd == null ? "…" : formatUsdCompact(m.tvlUsd)}
+        {formatUsdCompact(m.tvlUsd)}
       </td>
       <td className="py-4 pr-3 text-right font-mono text-[12px]" style={{ color: clmm.text }}>
-        {loading && m.aprPercent == null ? "…" : formatApr(m.aprPercent)}
+        {formatApr(m.aprPercent)}
       </td>
       <td className="py-4 pr-3 text-right font-mono text-[12px]" style={{ color: clmm.textDim }}>
         —
       </td>
       <td className="py-4 pr-3 text-right font-mono text-[12px]" style={{ color: clmm.text }}>
-        {loading && m.volume24hUsd == null ? "…" : formatUsdCompact(m.volume24hUsd)}
+        {formatUsdCompact(m.volume24hUsd)}
       </td>
       <td className="py-4 pr-3 text-right font-mono text-[12px]" style={{ color: clmm.textDim }}>
         —

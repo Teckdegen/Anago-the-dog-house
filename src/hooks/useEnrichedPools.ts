@@ -1,19 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { PublicClient } from "viem";
 import type { CachedPool } from "@/lib/uniswap/types";
 import {
   hydrateEnrichedPools,
-  indexPoolMetricsIncremental,
+  indexPoolMetricsBatched,
   enrichFromCache,
   type EnrichedPool,
 } from "@/lib/uniswap/poolMetrics";
-import { isMetricsFresh, getCachedMetrics } from "@/lib/uniswap/poolMetricsCache";
+import { getCachedMetrics, isMetricsFresh } from "@/lib/uniswap/poolMetricsCache";
 
-export function useEnrichedPools(
-  pools: CachedPool[],
-  publicClient: PublicClient | null | undefined,
-  enabled: boolean,
-) {
+export function useEnrichedPools(pools: CachedPool[], enabled: boolean) {
   const [rows, setRows] = useState<EnrichedPool[]>(() => hydrateEnrichedPools(pools));
   const [indexing, setIndexing] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
@@ -21,45 +16,42 @@ export function useEnrichedPools(
 
   const poolsKey = useMemo(() => pools.map((p) => p.address).join(","), [pools]);
 
-  const allCachedFresh = useMemo(() => {
-    if (pools.length === 0) return true;
-    return pools.every((p) => isMetricsFresh(getCachedMetrics(p.address.toLowerCase())));
-  }, [pools, poolsKey]);
-
   const runIndex = useCallback(async () => {
     if (!enabled || pools.length === 0) return;
     const id = ++runId.current;
+
     setRows(hydrateEnrichedPools(pools));
 
-    if (allCachedFresh) {
-      setProgress({ done: pools.length, total: pools.length });
+    const prefetchTotal = Math.min(pools.length, 200);
+    const needsWork = pools.slice(0, prefetchTotal).some((p) => {
+      const c = getCachedMetrics(p.address.toLowerCase());
+      return !c || !isMetricsFresh(c);
+    });
+
+    if (!needsWork) {
+      setProgress({ done: prefetchTotal, total: prefetchTotal });
       setIndexing(false);
       return;
     }
 
     setIndexing(true);
-    setProgress({ done: 0, total: pools.length });
+    setProgress({ done: 0, total: prefetchTotal });
 
-    const map = new Map<string, EnrichedPool>();
-    for (const p of pools) map.set(p.address.toLowerCase(), enrichFromCache(p));
-
-    await indexPoolMetricsIncremental(
+    await indexPoolMetricsBatched(
       pools,
-      publicClient,
-      (done, total, latest) => {
+      (done, total) => {
         if (runId.current !== id) return;
-        if (latest) map.set(latest.address.toLowerCase(), latest);
-        setRows(pools.map((p) => map.get(p.address.toLowerCase())!));
         setProgress({ done, total });
+        setRows(pools.map((p) => enrichFromCache(p)));
       },
-      { delayMs: 35, onlyStale: true },
+      { limit: prefetchTotal },
     );
 
     if (runId.current === id) {
       setRows(hydrateEnrichedPools(pools));
       setIndexing(false);
     }
-  }, [pools, poolsKey, publicClient, enabled, allCachedFresh]);
+  }, [pools, poolsKey, enabled]);
 
   useEffect(() => {
     setRows(hydrateEnrichedPools(pools));
@@ -69,5 +61,5 @@ export function useEnrichedPools(
     };
   }, [poolsKey, enabled, runIndex]);
 
-  return { rows, indexing, progress, allCachedFresh, refreshMetrics: runIndex };
+  return { rows, indexing, progress, refreshMetrics: runIndex };
 }
