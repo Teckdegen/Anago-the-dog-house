@@ -35,7 +35,7 @@ export function TokenPicker({ selected, onSelect, excludeNative, compact }: Prop
   const [showManual, setShowManual] = useState(false);
 
   const { balances, isLoading: loadingBalances, error, refetch, addToken } = useAllTokenBalances();
-  const hasBvKey = !!getBlockVisionApiKey() || import.meta.env.DEV;
+  const hasBvKey = import.meta.env.DEV || !!getBlockVisionApiKey() || import.meta.env.PROD;
 
   const filteredBalances = useMemo(() => {
     let tokens = balances;
@@ -148,9 +148,9 @@ export function TokenPicker({ selected, onSelect, excludeNative, compact }: Prop
         </p>
       )}
 
-      {wallet && !hasBvKey && !import.meta.env.PROD && (
+      {wallet && !hasBvKey && import.meta.env.DEV && (
         <p className="font-mono text-[9px] text-center" style={{ color: "rgba(196,168,240,0.45)" }}>
-          Add BLOCKVISION_API_KEY to .env.local for dev proxy
+          Add BLOCKVISION_API_KEY to .env.local (vite proxies /bv)
         </p>
       )}
 

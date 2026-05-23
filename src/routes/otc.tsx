@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect, useRef } from "react";
 import { ShoppingBag, Tag, X, Wallet } from "lucide-react";
 import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt, useChainId, usePublicClient } from "wagmi";
-import { parseUnits, formatUnits } from "viem";
+import { maxUint256, formatUnits, parseUnits } from "viem";
 import { AppShell } from "@/components/AppShell";
 import { useToast } from "@/components/Toast";
 import { SuccessModal } from "@/components/SuccessModal";
@@ -12,6 +12,7 @@ import { prepareTransactionWithGas } from "@/lib/web3/gasUtils";
 import { LIVE_CHAIN_QUERY } from "@/lib/web3/nftImage";
 import { NftImage } from "@/components/NftImage";
 import { TokenPicker } from "@/components/TokenPicker";
+import { parseListingTuple } from "@/lib/web3/parseOtc";
 
 export const Route = createFileRoute("/otc")({
   component: OTCPage,
@@ -111,8 +112,8 @@ function MyListingsTab() {
 
   // Filter to only active listings
   const activeMyIds = myIds.filter((_, i) => {
-    const d = detailsQ.data?.[i]?.result as any;
-    return d && d[5]; // d[5] is the 'active' field
+    const parsed = parseListingTuple(detailsQ.data?.[i]?.result);
+    return parsed?.active === true;
   });
 
   if (!address) {
@@ -153,12 +154,13 @@ function ListingCard({ listingId, showBuy, showUnlist, showInactive }: { listing
   const [successOpen, setSuccessOpen] = useState(false);
   const [successMsg, setSuccessMsg] = useState({ heading: "", subtext: "" });
   const autoBuyRef = useRef(false);
+  const pendingBuyHashRef = useRef<`0x${string}` | undefined>(undefined);
 
   const listingQ = useReadContract({ address: contracts.otcMarket, abi: OTC_MARKET_ABI, functionName: "getListing", args: [listingId], query: { refetchInterval: 10_000 } });
-  const data = listingQ.data as any;
+  const listing = parseListingTuple(listingQ.data);
 
-  const paymentToken = (data?.[3] ?? "0x0000000000000000000000000000000000000000") as `0x${string}`;
-  const hasPayment = !!data?.[3];
+  const paymentToken = listing?.paymentToken ?? ("0x0000000000000000000000000000000000000000" as `0x${string}`);
+  const hasPayment = !!listing?.paymentToken && listing.paymentToken !== "0x0000000000000000000000000000000000000000";
   const paySymQ = useReadContract({ address: paymentToken, abi: ERC20_ABI, functionName: "symbol", query: { enabled: hasPayment } });
   const payDecQ = useReadContract({ address: paymentToken, abi: ERC20_ABI, functionName: "decimals", query: { enabled: hasPayment } });
 
@@ -169,12 +171,67 @@ function ListingCard({ listingId, showBuy, showUnlist, showInactive }: { listing
   const approveTx = useWriteContract();
   const approveRcpt = useWaitForTransactionReceipt({ hash: approveTx.data });
 
-  // Check allowance for buying
-  const allowanceQ = useReadContract({ address: paymentToken, abi: ERC20_ABI, functionName: "allowance", args: address ? [address, contracts.otcMarket] : undefined, query: { enabled: !!address && hasPayment, refetchInterval: 5_000 } });
+  const allowanceQ = useReadContract({
+    address: paymentToken,
+    abi: ERC20_ABI,
+    functionName: "allowance",
+    args: address ? [address, contracts.otcMarket] : undefined,
+    query: { enabled: !!address && hasPayment, refetchInterval: 5_000 },
+  });
+
+  const balanceQ = useReadContract({
+    address: paymentToken,
+    abi: ERC20_ABI,
+    functionName: "balanceOf",
+    args: address ? [address] : undefined,
+    query: { enabled: !!address && hasPayment, refetchInterval: 5_000 },
+  });
 
   useEffect(() => {
-    if (buyRcpt.isSuccess) { setSuccessMsg({ heading: "Position Purchased", subtext: "The NFT position has been transferred to your wallet." }); setSuccessOpen(true); }
-  }, [buyRcpt.isSuccess]);
+    buyTx.reset();
+    approveTx.reset();
+    pendingBuyHashRef.current = undefined;
+    autoBuyRef.current = false;
+  }, [listingId]);
+
+  useEffect(() => {
+    if (!buyRcpt.isSuccess || !buyTx.data || buyRcpt.data?.transactionHash !== buyTx.data) return;
+    if (pendingBuyHashRef.current === buyTx.data) return;
+    pendingBuyHashRef.current = buyTx.data;
+
+    const verify = async () => {
+      if (!publicClient || !address || !listing) {
+        setSuccessMsg({ heading: "Position Purchased", subtext: "The NFT position has been transferred to your wallet." });
+        setSuccessOpen(true);
+        return;
+      }
+      try {
+        const owner = await publicClient.readContract({
+          address: listing.nftContract,
+          abi: ERC721_ABI,
+          functionName: "ownerOf",
+          args: [listing.tokenId],
+        });
+        if ((owner as string).toLowerCase() !== address.toLowerCase()) {
+          toast("error", "Purchase Incomplete", "Payment may have gone through but the NFT was not transferred. Contact support with your tx hash.");
+          return;
+        }
+        setSuccessMsg({ heading: "Position Purchased", subtext: "The NFT position has been transferred to your wallet." });
+        setSuccessOpen(true);
+      } catch {
+        setSuccessMsg({ heading: "Position Purchased", subtext: "The NFT position has been transferred to your wallet." });
+        setSuccessOpen(true);
+      }
+    };
+
+    verify();
+  }, [buyRcpt.isSuccess, buyRcpt.data?.transactionHash, buyTx.data, publicClient, address, listing?.nftContract, listing?.tokenId, toast]);
+
+  useEffect(() => {
+    if (buyTx.error) {
+      toast("error", "Purchase Failed", (buyTx.error as Error).message?.slice(0, 120) || "Buy transaction failed");
+    }
+  }, [buyTx.error, toast]);
 
   useEffect(() => {
     if (unlistRcpt.isSuccess) { setSuccessMsg({ heading: "Listing Cancelled", subtext: "Your position has been returned to your wallet." }); setSuccessOpen(true); }
@@ -182,6 +239,7 @@ function ListingCard({ listingId, showBuy, showUnlist, showInactive }: { listing
 
   useEffect(() => {
     if (!approveRcpt.isSuccess || !autoBuyRef.current || !publicClient) return;
+    if (approveRcpt.data?.transactionHash !== approveTx.data) return;
     autoBuyRef.current = false;
     prepareTransactionWithGas(publicClient)
       .then((gas) => {
@@ -195,18 +253,21 @@ function ListingCard({ listingId, showBuy, showUnlist, showInactive }: { listing
       })
       .catch(() => toast("error", "Transaction Failed", "Failed to buy after approval"));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [approveRcpt.isSuccess, publicClient]);
+  }, [approveRcpt.isSuccess, approveRcpt.data?.transactionHash, approveTx.data, publicClient]);
 
-  if (!data) return null;
+  if (!listing) return null;
 
-  const [seller, nftContract, tokenId, , price, active] = data;
+  const { seller, nftContract, tokenId, price, active } = listing;
   if (!active && !showInactive) return null;
 
   const paySym = (paySymQ.data as string) || "...";
   const payDec = (payDecQ.data as number) ?? 18;
   const priceFormatted = Number(formatUnits(price, payDec)).toLocaleString();
   const allowance = (allowanceQ.data as bigint) ?? 0n;
+  const payBalance = (balanceQ.data as bigint) ?? 0n;
   const needsApproval = price > 0n && allowance < price;
+  const insufficientBalance = price > 0n && payBalance < price;
+  const canBuy = !insufficientBalance && price > 0n;
   const isSeller = address?.toLowerCase() === seller?.toLowerCase();
 
   const nftLabel = (() => {
@@ -226,7 +287,7 @@ function ListingCard({ listingId, showBuy, showUnlist, showInactive }: { listing
         address: paymentToken,
         abi: ERC20_ABI,
         functionName: "approve",
-        args: [contracts.otcMarket, price],
+        args: [contracts.otcMarket, maxUint256],
         ...gas,
       });
     } catch {
@@ -261,7 +322,7 @@ function ListingCard({ listingId, showBuy, showUnlist, showInactive }: { listing
 
   return (
     <>
-    <SuccessModal open={successOpen} onClose={() => setSuccessOpen(false)} title="OTC Market" heading={successMsg.heading} subtext={successMsg.subtext} rows={[{ label: "Listing", value: `#${listingId.toString()}` }, { label: "Price", value: `${priceFormatted} ${paySym}` }]} />
+    <SuccessModal open={successOpen} onClose={() => { setSuccessOpen(false); buyTx.reset(); pendingBuyHashRef.current = undefined; }} title="OTC Market" heading={successMsg.heading} subtext={successMsg.subtext} rows={[{ label: "Listing", value: `#${listingId.toString()}` }, { label: "Price", value: `${priceFormatted} ${paySym}` }]} />
     <div className="rounded-xl p-5 flex items-center justify-between gap-4" style={{ border: "1px solid rgba(155,127,212,0.3)", background: "rgba(155,127,212,0.04)" }}>
       <div className="flex items-center gap-3 min-w-0">
         <NftImage
@@ -277,26 +338,36 @@ function ListingCard({ listingId, showBuy, showUnlist, showInactive }: { listing
           </div>
           <p className="font-mono text-[10px]" style={{ color: "rgba(196,168,240,0.5)" }}>
             Seller: {shortAddr(seller)} · Price: {priceFormatted} {paySym}
+            {showBuy && address && !isSeller && (
+              <> · Balance: {Number(formatUnits(payBalance, payDec)).toLocaleString()} {paySym}</>
+            )}
           </p>
         </div>
       </div>
 
       <div className="flex items-center gap-2 shrink-0">
         {showBuy && !isSeller && (
-          needsApproval ? (
+          insufficientBalance ? (
+            <span className="font-mono text-[9px] px-3 py-2 rounded-xl" style={{ color: "rgba(255,120,120,0.9)", border: "1px solid rgba(255,120,120,0.35)" }}>
+              Insufficient {paySym}
+            </span>
+          ) : needsApproval ? (
             <button
               onClick={handleApproveAndBuy}
-              disabled={approveTx.isPending || approveRcpt.isLoading || buyTx.isPending || buyRcpt.isLoading}
+              disabled={!canBuy || approveTx.isPending || approveRcpt.isLoading || buyTx.isPending || buyRcpt.isLoading}
               className="px-4 py-2 rounded-xl font-grotesk text-[10px] uppercase tracking-wider transition disabled:opacity-40"
               style={{ background: "rgba(155,127,212,0.2)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.5)" }}
             >
               {approveTx.isPending || approveRcpt.isLoading ? "Approving…" : buyTx.isPending || buyRcpt.isLoading ? "Buying…" : "Approve & Buy"}
             </button>
           ) : (
-            <button onClick={handleBuy} disabled={buyTx.isPending || buyRcpt.isLoading}
+            <button
+              onClick={handleBuy}
+              disabled={!canBuy || buyTx.isPending || buyRcpt.isLoading}
               className="px-4 py-2 rounded-xl font-grotesk text-[10px] uppercase tracking-wider transition disabled:opacity-40"
-              style={{ background: "rgba(155,127,212,0.2)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.5)" }}>
-              {buyTx.isPending ? "..." : "Buy"}
+              style={{ background: "rgba(155,127,212,0.2)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.5)" }}
+            >
+              {buyTx.isPending || buyRcpt.isLoading ? "Buying…" : "Buy"}
             </button>
           )
         )}

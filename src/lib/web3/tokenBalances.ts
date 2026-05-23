@@ -1,5 +1,5 @@
 /**
- * Token balances for connected wallets — BlockVision (primary) + RPC fallback
+ * Token balances for connected wallets — BlockVision (primary) + RPC fallback (merged)
  */
 
 import { parseUnits } from "viem";
@@ -7,7 +7,7 @@ import type { PublicClient } from "viem";
 import {
   blockVisionTokenToAddress,
   fetchBlockVisionAccountTokens,
-  getBlockVisionApiKey,
+  isBlockVisionAvailable,
   isNativeToken,
   parseBalanceRaw,
   NATIVE_TOKEN_ADDRESS,
@@ -66,7 +66,23 @@ function mapBlockVisionTokens(
     });
   }
 
-  return out.sort((a, b) => {
+  return out;
+}
+
+function mergeTokenBalances(...lists: TokenBalance[][]): TokenBalance[] {
+  const merged = new Map<string, TokenBalance>();
+
+  for (const list of lists) {
+    for (const t of list) {
+      const key = t.address.toLowerCase();
+      const existing = merged.get(key);
+      if (!existing || t.balance > existing.balance) {
+        merged.set(key, t);
+      }
+    }
+  }
+
+  return [...merged.values()].sort((a, b) => {
     const au = a.usdValue ?? 0;
     const bu = b.usdValue ?? 0;
     if (au !== bu) return bu - au;
@@ -112,18 +128,20 @@ export async function fetchNativeBalance(
   };
 }
 
-/** All wallet tokens — BlockVision when keyed, else RPC discovery + native balance */
+/** Wallet tokens — BlockVision + on-chain discovery merged (never drop RPC tokens). */
 export async function fetchAllBalances(
   address: `0x${string}`,
   chainId: number,
   publicClient: PublicClient,
 ): Promise<TokenBalance[]> {
-  if (getBlockVisionApiKey() || import.meta.env.DEV) {
+  const lists: TokenBalance[][] = [];
+
+  if (isBlockVisionAvailable()) {
     try {
       const fromBv = await fetchBalancesFromBlockVision(address);
-      if (fromBv.length > 0) return fromBv;
+      if (fromBv.length > 0) lists.push(fromBv);
     } catch (e) {
-      console.warn("[tokenBalances] BlockVision unavailable, using RPC:", e);
+      console.warn("[tokenBalances] BlockVision unavailable:", e);
     }
   }
 
@@ -132,18 +150,9 @@ export async function fetchAllBalances(
     fetchUserTokenBalances(address, chainId, publicClient),
   ]);
 
-  const merged = new Map<string, TokenBalance>();
-  merged.set(NATIVE_TOKEN_ADDRESS, nativeBalance);
-  for (const t of tokenBalances) {
-    if (t.address.toLowerCase() === NATIVE_TOKEN_ADDRESS) continue;
-    merged.set(t.address.toLowerCase(), t);
-  }
+  lists.push([nativeBalance, ...tokenBalances]);
 
-  return [...merged.values()].sort((a, b) => {
-    if (a.balance > b.balance) return -1;
-    if (a.balance < b.balance) return 1;
-    return 0;
-  });
+  return mergeTokenBalances(...lists);
 }
 
 /** Parse human amount string to bigint (utility for forms) */

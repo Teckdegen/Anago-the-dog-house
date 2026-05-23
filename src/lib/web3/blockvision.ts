@@ -1,9 +1,10 @@
 /**
  * BlockVision Monad indexing — account token balances
- * @see https://docs.blockvision.org/reference/retrieve-account-tokens
+ * @see https://docs.blockvision.org/reference/monad-indexing-api
  */
 
 const BV_HOST = "https://api.blockvision.org/v2";
+const PAGE_LIMIT = 50;
 
 export type BlockVisionAccountToken = {
   contractAddress: string;
@@ -24,16 +25,49 @@ type BlockVisionTokensResponse = {
     data?: BlockVisionAccountToken[];
     total?: number;
     usdValue?: number;
+    nextPageCursor?: string;
   };
 };
 
 const ZERO = "0x0000000000000000000000000000000000000000";
+const PLACEHOLDER_KEYS = new Set(["your_blockvision_api_key", "your_key_here", ""]);
 
-/** Browser: VITE_BLOCKVISION_API_KEY. Dev fallback: vite proxy `/bv` + BLOCKVISION_API_KEY in .env.local */
+/** Client-side key (optional). Prefer server proxy in production. */
 export function getBlockVisionApiKey(): string | undefined {
   const vite = import.meta.env.VITE_BLOCKVISION_API_KEY;
-  if (typeof vite === "string" && vite.trim()) return vite.trim();
+  if (typeof vite === "string" && vite.trim() && !PLACEHOLDER_KEYS.has(vite.trim())) {
+    return vite.trim();
+  }
   return undefined;
+}
+
+export function isBlockVisionAvailable(): boolean {
+  if (import.meta.env.DEV) return true;
+  return !!getBlockVisionApiKey() || true;
+}
+
+function buildAccountTokensPath(address: string, cursor?: string): string {
+  const qs = new URLSearchParams({ address, limit: String(PAGE_LIMIT) });
+  if (cursor) qs.set("cursor", cursor);
+  return `/monad/account/tokens?${qs.toString()}`;
+}
+
+/** Dev: vite `/bv` proxy. Prod: `/api/blockvision` serverless proxy. */
+function resolveFetchUrl(path: string): { url: string; headers: HeadersInit } {
+  const apiKey = getBlockVisionApiKey();
+  const headers: HeadersInit = {};
+
+  if (import.meta.env.DEV) {
+    return { url: `/bv${path}`, headers: apiKey ? { "x-api-key": apiKey } : headers };
+  }
+
+  const pathUrl = new URL(path, "http://local");
+  const proxyQs = new URLSearchParams({ path: pathUrl.pathname });
+  for (const [k, v] of pathUrl.searchParams.entries()) {
+    proxyQs.set(k, v);
+  }
+
+  return { url: `/api/blockvision?${proxyQs.toString()}`, headers };
 }
 
 function isNativeToken(t: BlockVisionAccountToken): boolean {
@@ -43,9 +77,10 @@ function isNativeToken(t: BlockVisionAccountToken): boolean {
   return false;
 }
 
-function parseBalanceRaw(balance: string, decimals: number): bigint {
+export function parseBalanceRaw(balance: string, decimals: number): bigint {
   const s = balance?.trim() ?? "";
   if (!s || s === "0") return 0n;
+
   if (s.includes(".")) {
     const [whole, frac = ""] = s.split(".");
     const padded = (frac + "0".repeat(decimals)).slice(0, decimals);
@@ -55,6 +90,7 @@ function parseBalanceRaw(balance: string, decimals: number): bigint {
       return 0n;
     }
   }
+
   try {
     return BigInt(s);
   } catch {
@@ -69,33 +105,46 @@ export function blockVisionTokenToAddress(t: BlockVisionAccountToken): `0x${stri
   return addr as `0x${string}`;
 }
 
-export async function fetchBlockVisionAccountTokens(
+async function fetchBlockVisionPage(
   address: `0x${string}`,
-): Promise<BlockVisionAccountToken[]> {
-  const apiKey = getBlockVisionApiKey();
-  const useDevProxy = import.meta.env.DEV && !apiKey;
-
-  const path = `/monad/account/tokens?address=${encodeURIComponent(address)}`;
-  const url = useDevProxy ? `/bv${path}` : `${BV_HOST}${path}`;
-
-  const headers: HeadersInit = {};
-  if (apiKey) headers["x-api-key"] = apiKey;
+  cursor?: string,
+): Promise<BlockVisionTokensResponse> {
+  const path = buildAccountTokensPath(address, cursor);
+  const { url, headers } = resolveFetchUrl(path);
 
   const res = await fetch(url, {
     headers,
-    signal: AbortSignal.timeout(20_000),
+    signal: AbortSignal.timeout(25_000),
   });
 
   if (!res.ok) {
     throw new Error(`BlockVision HTTP ${res.status}`);
   }
 
-  const json = (await res.json()) as BlockVisionTokensResponse;
-  if (json.code !== 0) {
-    throw new Error(json.reason || json.message || `BlockVision error ${json.code}`);
-  }
-
-  return json.result?.data ?? [];
+  return (await res.json()) as BlockVisionTokensResponse;
 }
 
-export { parseBalanceRaw, isNativeToken, ZERO as NATIVE_TOKEN_ADDRESS };
+export async function fetchBlockVisionAccountTokens(
+  address: `0x${string}`,
+): Promise<BlockVisionAccountToken[]> {
+  const all: BlockVisionAccountToken[] = [];
+  let cursor: string | undefined;
+
+  for (let page = 0; page < 40; page++) {
+    const json = await fetchBlockVisionPage(address, cursor);
+    if (json.code !== 0) {
+      throw new Error(json.reason || json.message || `BlockVision error ${json.code}`);
+    }
+
+    const batch = json.result?.data ?? [];
+    all.push(...batch);
+
+    const next = json.result?.nextPageCursor?.trim();
+    if (!next || batch.length === 0) break;
+    cursor = next;
+  }
+
+  return all;
+}
+
+export { isNativeToken, ZERO as NATIVE_TOKEN_ADDRESS };

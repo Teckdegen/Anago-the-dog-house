@@ -105,6 +105,9 @@ export function CreateVestingDialog({ open, onClose }: Props) {
   const contractUnset = vestingNFT === ZERO;
   const validBeneficiary = isAddress(beneficiary);
   const cliffInvalid = withCliff && cliff > duration;
+  const insufficientBalance = !!token && parsedAmount > 0n && parsedAmount > token.balance;
+  const canSubmit =
+    parsedAmount > 0n && validBeneficiary && !cliffInvalid && !insufficientBalance;
 
   const handleApproveAndCreate = async () => {
     if (!token || parsedAmount === 0n || !validBeneficiary || !publicClient) return;
@@ -358,11 +361,17 @@ export function CreateVestingDialog({ open, onClose }: Props) {
                 </div>
               )}
 
+              {insufficientBalance && token && (
+                <p className="font-mono text-[10px]" style={{ color: "rgba(255,120,120,0.9)" }}>
+                  Insufficient {token.symbol} balance (have {formatAmount(token.balance, token.decimals)})
+                </p>
+              )}
+
               {/* Action */}
               {needsApproval ? (
                 <ActionButton
                   onClick={handleApproveAndCreate}
-                  disabled={parsedAmount === 0n || !validBeneficiary || cliffInvalid || busy}
+                  disabled={!canSubmit || busy}
                   loading={busy}
                   label={`Approve & Create Vesting`}
                   loadingLabel={approving ? "Approving…" : "Creating…"}
@@ -370,7 +379,7 @@ export function CreateVestingDialog({ open, onClose }: Props) {
               ) : (
                 <ActionButton
                   onClick={handleCreate}
-                  disabled={parsedAmount === 0n || !validBeneficiary || cliffInvalid || busy}
+                  disabled={!canSubmit || busy}
                   loading={busy}
                   label="Create Vesting Schedule"
                   loadingLabel="Creating…"

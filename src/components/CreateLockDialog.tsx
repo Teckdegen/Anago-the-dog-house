@@ -140,9 +140,11 @@ export function CreateLockDialog({ open, onClose }: Props) {
   };
 
   const factoryUnset = tokenLock === ZERO;
+  const insufficientBalance = !!token && parsedAmount > 0n && parsedAmount > token.balance;
   const approving = approveTx.isPending || approveRcpt.isLoading;
   const locking = lockTx.isPending || lockRcpt.isLoading;
   const busy = approving || locking;
+  const canSubmit = parsedAmount > 0n && !insufficientBalance && !busy;
   const unlockDate = new Date(Date.now() + duration * 1000);
 
   return (
@@ -268,10 +270,16 @@ export function CreateLockDialog({ open, onClose }: Props) {
                 </div>
               )}
 
+              {insufficientBalance && (
+                <p className="font-mono text-[10px]" style={{ color: "rgba(255,120,120,0.9)" }}>
+                  Insufficient {token.symbol} balance (have {formatAmount(token.balance, token.decimals)})
+                </p>
+              )}
+
               {needsApproval ? (
                 <ActionButton
                   onClick={handleApproveAndLock}
-                  disabled={parsedAmount === 0n || busy}
+                  disabled={!canSubmit}
                   loading={busy}
                   label={`Approve & Lock ${token.symbol}`}
                   loadingLabel={approving ? "Approving…" : "Locking…"}
@@ -279,7 +287,7 @@ export function CreateLockDialog({ open, onClose }: Props) {
               ) : (
                 <ActionButton
                   onClick={handleLock}
-                  disabled={parsedAmount === 0n || busy}
+                  disabled={!canSubmit}
                   loading={busy}
                   label="Lock Tokens"
                   loadingLabel="Locking…"

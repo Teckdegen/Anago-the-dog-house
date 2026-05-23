@@ -575,18 +575,20 @@ export function useAllTokenBalances(): {
 
     fetchAllBalances(address, chainId, publicClient)
       .then((results) => {
-        if (!cancelled && results.length > 0) {
+        if (cancelled) return;
+        if (results.length > 0) {
           setBalances(results);
-          setIsLoading(false);
-          // Cache results (serialize bigints as strings)
           try {
-            const serializable = results.map(t => ({ ...t, balance: t.balance.toString() }));
-            localStorage.setItem(`token_balances_v7_${address}_${chainId}`, JSON.stringify({ data: serializable, timestamp: Date.now() }));
-          } catch {}
-        } else if (!cancelled) {
-          // Don't clear existing data on empty results (RPC failure)
-          setIsLoading(false);
+            const serializable = results.map((t) => ({ ...t, balance: t.balance.toString() }));
+            localStorage.setItem(
+              `token_balances_v7_${address}_${chainId}`,
+              JSON.stringify({ data: serializable, timestamp: Date.now() }),
+            );
+          } catch {
+            /* ignore cache errors */
+          }
         }
+        setIsLoading(false);
       })
       .catch((err) => {
         if (!cancelled) {
