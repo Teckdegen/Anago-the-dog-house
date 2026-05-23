@@ -144,7 +144,7 @@ function CLMMExplorePage() {
               {syncing
                 ? "Loading pools…"
                 : pools.length === 0
-                  ? "No pools in app — run npm run sync:pools (THE_GRAPH_API_KEY in .env.local)"
+                  ? "No pools loaded — add THE_GRAPH_API_KEY on Vercel (Settings → Environment Variables), then redeploy"
                   : "No pools match your search"}
             </div>
           ) : (

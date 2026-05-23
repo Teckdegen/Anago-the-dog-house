@@ -52,26 +52,25 @@ export type SubgraphPoolManager = {
   totalValueLockedUSD: string;
 };
 
-function getGraphApiKey(explicit?: string): string {
+function getGraphApiKey(explicit?: string): string | undefined {
   if (explicit) return explicit;
 
   if (typeof window !== "undefined") {
-    throw new Error(
-      "The Graph API key cannot be used in the browser. Run npm run sync:pools with THE_GRAPH_API_KEY in .env.local.",
-    );
+    return undefined;
   }
 
   const key = typeof process !== "undefined" ? process.env.THE_GRAPH_API_KEY : undefined;
-  if (!key || key === "your_key_here") {
-    throw new Error(
-      "Missing THE_GRAPH_API_KEY in .env.local (server/script only — do not use VITE_). Get one at https://thegraph.com/studio/apikeys/",
-    );
-  }
+  if (!key || key === "your_key_here") return undefined;
   return key;
 }
 
 export function subgraphQueryUrl(apiKey?: string): string {
   const key = getGraphApiKey(apiKey);
+  if (!key) {
+    throw new Error(
+      "Missing THE_GRAPH_API_KEY. Set it on Vercel or in .env.local for sync:pools.",
+    );
+  }
   return `https://gateway.thegraph.com/api/${key}/subgraphs/id/${UNISWAP_V4_MONAD_SUBGRAPH_ID}`;
 }
 
@@ -80,11 +79,29 @@ export async function queryV4Subgraph<T>(
   variables?: Record<string, unknown>,
   apiKey?: string,
 ): Promise<T> {
-  const res = await fetch(subgraphQueryUrl(apiKey), {
+  const key = getGraphApiKey(apiKey);
+
+  if (typeof window !== "undefined" && !key) {
+    const res = await fetch("/api/v4-subgraph", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query, variables }),
+      signal: AbortSignal.timeout(30_000),
+    });
+    const json = (await res.json()) as { data?: T; errors?: Array<{ message: string }> };
+    if (!res.ok || json.errors?.length) {
+      const msg = json.errors?.map((e) => e.message).join("; ") ?? `HTTP ${res.status}`;
+      throw new Error(`Subgraph proxy failed: ${msg}`);
+    }
+    if (!json.data) throw new Error("Subgraph returned no data");
+    return json.data;
+  }
+
+  const res = await fetch(subgraphQueryUrl(key), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${getGraphApiKey(apiKey)}`,
+      Authorization: `Bearer ${key}`,
     },
     body: JSON.stringify({ query, variables }),
   });

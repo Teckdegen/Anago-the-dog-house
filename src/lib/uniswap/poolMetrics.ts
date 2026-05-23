@@ -49,7 +49,6 @@ export type PoolMetrics = {
 export type EnrichedPool = CachedPool & { metrics: PoolMetrics };
 
 async function fetchV4MetricsFromSubgraph(pool: CachedPool): Promise<PoolMetrics | null> {
-  if (typeof window !== "undefined") return null;
   try {
     const raw = await fetchV4PoolFromSubgraph(pool.address);
     if (!raw) return null;

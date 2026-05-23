@@ -1,4 +1,5 @@
-import { getSeedPools, loadPoolCache, mergePools } from "./poolCache";
+import { fetchPoolsFromApi } from "./fetchPoolsApi";
+import { getSeedPools, loadPoolCache, mergePools, savePoolCache } from "./poolCache";
 import type { CachedPool } from "./types";
 
 export type DiscoverResult = {
@@ -7,7 +8,7 @@ export type DiscoverResult = {
   newPools: number;
 };
 
-/** Pools bundled in the app + anything saved in the browser from a prior visit. */
+/** Pools bundled in the app + browser cache from a prior subgraph fetch. */
 export function loadLocalV4Pools(): CachedPool[] {
   const seed = getSeedPools();
   const cached = loadPoolCache();
@@ -15,19 +16,40 @@ export function loadLocalV4Pools(): CachedPool[] {
 }
 
 /**
- * Browser-safe pool list — does not call The Graph (API key stays in .env.local for `npm run sync:pools` only).
- * Run `npm run sync:pools` to fetch all V4 pools from the subgraph into seedPools.generated.ts.
+ * Loads all Uniswap V4 Monad pools:
+ * 1. Seed file (from build-time sync) + localStorage cache
+ * 2. If empty → `/api/v4-pools` on Vercel (THE_GRAPH_API_KEY server-side)
  */
 export async function discoverPoolsIncremental(
   _client?: unknown,
   onProgress?: (msg: string) => void,
 ): Promise<DiscoverResult> {
-  const pools = loadLocalV4Pools();
+  let pools = loadLocalV4Pools();
 
   if (pools.length === 0) {
-    onProgress?.(
-      "No pools loaded — run npm run sync:pools with THE_GRAPH_API_KEY in .env.local (not VITE_)",
-    );
+    onProgress?.("Loading pools from Uniswap V4 subgraph…");
+    try {
+      const remote = await fetchPoolsFromApi();
+      pools = remote.pools.map((p) => ({ ...p, protocol: "v4" as const }));
+      savePoolCache({
+        pools,
+        lastIndexedBlock: String(Math.floor(Date.now() / 1000)),
+        updatedAt: remote.updatedAt,
+      });
+      const expected = remote.expected ?? Number(remote.poolManager?.poolCount ?? 0);
+      onProgress?.(
+        `Loaded ${pools.length} V4 pools` + (expected ? ` (subgraph reports ${expected})` : ""),
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      onProgress?.(`Pool load failed: ${msg}`);
+      console.error("[discoverPools]", e);
+      return {
+        pools: [],
+        lastIndexedBlock: 0n,
+        newPools: 0,
+      };
+    }
   } else {
     onProgress?.(`${pools.length} Uniswap V4 pools`);
   }
