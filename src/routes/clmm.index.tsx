@@ -23,7 +23,7 @@ export const Route = createFileRoute("/clmm/")({
 type ClmmView = "explore" | "positions";
 type SortKey = "tvl" | "apr" | "vol";
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 20;
 const POSITION_POLL_MS = 25_000;
 
 function CLMMExplorePage() {
@@ -60,7 +60,7 @@ function CLMMExplorePage() {
     [page, sortKey, sortDesc, searchDebounced],
   );
 
-  const { rows, total, totalPages, loading, error, reload } = useClmmPoolsPage(
+  const { rows, total, totalPages, loading, enriching, error, reload } = useClmmPoolsPage(
     poolsQuery,
     view === "explore",
   );
@@ -134,6 +134,7 @@ function CLMMExplorePage() {
           <ExplorePoolsView
             rows={rows}
             loading={loading}
+            enriching={enriching}
             error={error}
             onRetry={reload}
             sortKey={sortKey}
@@ -155,6 +156,7 @@ function CLMMExplorePage() {
 function ExplorePoolsView({
   rows,
   loading,
+  enriching,
   error,
   onRetry,
   sortKey,
@@ -167,6 +169,7 @@ function ExplorePoolsView({
 }: {
   rows: import("@/lib/capricorn/poolMetrics").EnrichedPool[];
   loading: boolean;
+  enriching: boolean;
   error: string | null;
   onRetry: () => void;
   sortKey: SortKey;
@@ -207,10 +210,10 @@ function ExplorePoolsView({
 
   return (
     <div className="space-y-4">
-      {loading && (
+      {(loading || enriching) && (
         <div className="flex items-center gap-2 font-mono text-[9px]" style={{ color: clmm.textMuted }}>
           <Loader2 className="w-3 h-3 animate-spin" style={{ color: clmm.purple }} />
-          Loading page {page}…
+          {loading ? `Loading page ${page}…` : "Refreshing live metrics…"}
         </div>
       )}
       <PoolsExploreTable

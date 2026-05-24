@@ -60,7 +60,7 @@ export default async function handler(req, res) {
 
   const url = new URL(req.url, `http://${req.headers.host ?? "localhost"}`);
   const page = Math.max(1, parseInt(url.searchParams.get("page") ?? "1", 10) || 1);
-  const limit = Math.min(100, Math.max(1, parseInt(url.searchParams.get("limit") ?? "50", 10) || 50));
+  const limit = Math.min(100, Math.max(1, parseInt(url.searchParams.get("limit") ?? "20", 10) || 20));
   const sortKey = url.searchParams.get("sort") ?? "tvl";
   const order = url.searchParams.get("order") === "asc" ? "asc" : "desc";
   const q = (url.searchParams.get("q") ?? "").trim();

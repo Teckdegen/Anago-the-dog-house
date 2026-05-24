@@ -1,13 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { CachedPool, EnrichedPool } from "@/lib/capricorn";
-import {
-  fetchPoolMetadata,
-  fetchTokenMeta,
-  getMonadPublicClient,
-  hydratePools,
-} from "@/lib/capricorn";
-import { fetchPoolMetrics } from "@/lib/capricorn/poolMetrics";
-import { fetchClmmPoolsPage, fetchPoolAddressList, type ClmmPoolsQuery } from "@/lib/clmm/api";
+import { fetchPoolMetadata, getMonadPublicClient } from "@/lib/capricorn";
+import { enrichFromCache, fetchPoolMetrics } from "@/lib/capricorn/poolMetrics";
+import { isMetricsFresh, getCachedMetrics } from "@/lib/capricorn/poolMetricsCache";
+import { mapInBatches } from "@/lib/capricorn/rpcQueue";
+import { fetchClmmPoolsPage, type ClmmPoolsQuery } from "@/lib/clmm/api";
 
 function apiRowToCached(row: EnrichedPool): CachedPool {
   return {
@@ -18,6 +15,22 @@ function apiRowToCached(row: EnrichedPool): CachedPool {
     tickSpacing: row.tickSpacing,
     protocol: "v3",
   };
+}
+
+function hasPoolTokens(pool: CachedPool): boolean {
+  const t0 = pool.token0?.toLowerCase() ?? "";
+  return t0.startsWith("0x") && t0.length === 42 && t0 !== "0x0000000000000000000000000000000000000000";
+}
+
+function rowFromApi(pool: EnrichedPool): EnrichedPool {
+  const cached = getCachedMetrics(pool.address);
+  if (cached && isMetricsFresh(cached)) {
+    return { ...apiRowToCached(pool), metrics: cached };
+  }
+  if (pool.metrics?.symbol0 || pool.metrics?.tvlUsd != null) {
+    return pool;
+  }
+  return enrichFromCache(apiRowToCached(pool));
 }
 
 function sortRows(rows: EnrichedPool[], sort: string, order: "asc" | "desc"): EnrichedPool[] {
@@ -43,85 +56,27 @@ function sortRows(rows: EnrichedPool[], sort: string, order: "asc" | "desc"): En
   });
 }
 
-function paginate<T>(items: T[], page: number, limit: number) {
-  const from = (page - 1) * limit;
-  return items.slice(from, from + limit);
-}
-
-/** Live fee, TVL, volume, APR from Monad RPC (+ DexScreener for volume). */
+/** Refresh metrics off-chain APIs first; minimal Monad RPC (metadata only when DB row is empty). */
 async function enrichPoolsOnChain(rows: EnrichedPool[]): Promise<EnrichedPool[]> {
   const client = getMonadPublicClient();
-  const batch = 12;
-  const out: EnrichedPool[] = [];
 
-  for (let i = 0; i < rows.length; i += batch) {
-    const slice = rows.slice(i, i + batch);
-    const chunk = await Promise.all(
-      slice.map(async (row) => {
-        try {
-          let pool = apiRowToCached(row);
+  return mapInBatches(
+    rows,
+    async (row) => {
+      try {
+        let pool = apiRowToCached(row);
+        if (!hasPoolTokens(pool)) {
           const meta = await fetchPoolMetadata(client, pool.address);
           if (meta) pool = meta;
-          const metrics = await fetchPoolMetrics(pool, client, true);
-          return { ...pool, metrics } satisfies EnrichedPool;
-        } catch {
-          return row;
         }
-      }),
-    );
-    out.push(...chunk);
-  }
-  return out;
-}
-
-async function poolMatchesQuery(client: ReturnType<typeof getMonadPublicClient>, pool: CachedPool, q: string) {
-  const needle = q.toLowerCase();
-  if (pool.address.toLowerCase().includes(needle)) return true;
-  try {
-    const [t0, t1] = await Promise.all([
-      fetchTokenMeta(client, pool.token0),
-      fetchTokenMeta(client, pool.token1),
-    ]);
-    return (
-      t0.symbol.toLowerCase().includes(needle) || t1.symbol.toLowerCase().includes(needle)
-    );
-  } catch {
-    return false;
-  }
-}
-
-async function searchPoolsOnChain(
-  q: string,
-  sort: string,
-  order: "asc" | "desc",
-  page: number,
-  limit: number,
-): Promise<{ rows: EnrichedPool[]; total: number; totalPages: number }> {
-  const client = getMonadPublicClient();
-  const addresses = await fetchPoolAddressList();
-  const hydrated = await hydratePools(client, addresses);
-
-  const matched: CachedPool[] = [];
-  const batch = 20;
-  for (let i = 0; i < hydrated.length; i += batch) {
-    const slice = hydrated.slice(i, i + batch);
-    const results = await Promise.all(
-      slice.map(async (p) => ((await poolMatchesQuery(client, p, q)) ? p : null)),
-    );
-    for (const p of results) if (p) matched.push(p);
-  }
-
-  const enriched = await enrichPoolsOnChain(
-    matched.map((p) => ({ ...p, metrics: { poolAddress: p.address } } as EnrichedPool)),
+        const metrics = await fetchPoolMetrics(pool, client, false, { light: true });
+        return { ...pool, metrics } satisfies EnrichedPool;
+      } catch {
+        return rowFromApi(row);
+      }
+    },
+    { concurrency: 2, delayMs: 300 },
   );
-
-  const sorted = sortRows(enriched, sort, order);
-  const total = sorted.length;
-  return {
-    rows: paginate(sorted, page, limit),
-    total,
-    totalPages: Math.ceil(total / limit) || 0,
-  };
 }
 
 export function useClmmPoolsPage(query: ClmmPoolsQuery, enabled = true) {
@@ -129,42 +84,42 @@ export function useClmmPoolsPage(query: ClmmPoolsQuery, enabled = true) {
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [enriching, setEnriching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const enrichGen = useRef(0);
 
   const load = useCallback(async () => {
     if (!enabled) return;
+    const gen = ++enrichGen.current;
     setLoading(true);
     setError(null);
     try {
-      const q = query.q?.trim() ?? "";
       const sort = query.sort ?? "tvl";
       const order = query.order ?? "desc";
+      const data = await fetchClmmPoolsPage(query);
+      if (gen !== enrichGen.current) return;
 
-      if (q) {
-        const result = await searchPoolsOnChain(
-          q,
-          sort,
-          order,
-          query.page ?? 1,
-          query.limit ?? 50,
-        );
-        setRows(result.rows);
-        setTotal(result.total);
-        setTotalPages(result.totalPages);
-      } else {
-        const data = await fetchClmmPoolsPage({ ...query, q: undefined });
-        setTotal(data.total);
-        setTotalPages(data.totalPages);
-        const enriched = await enrichPoolsOnChain(data.pools);
-        setRows(sortRows(enriched, sort, order));
-      }
+      const initial = data.pools.map(rowFromApi);
+      setRows(sortRows(initial, sort, order));
+      setTotal(data.total);
+      setTotalPages(data.totalPages);
+      setLoading(false);
+
+      setEnriching(true);
+      const enriched = await enrichPoolsOnChain(data.pools);
+      if (gen !== enrichGen.current) return;
+      setRows(sortRows(enriched, sort, order));
     } catch (e) {
+      if (gen !== enrichGen.current) return;
       setError(e instanceof Error ? e.message : String(e));
       setRows([]);
       setTotal(0);
       setTotalPages(0);
     } finally {
-      setLoading(false);
+      if (gen === enrichGen.current) {
+        setLoading(false);
+        setEnriching(false);
+      }
     }
   }, [enabled, query.page, query.limit, query.sort, query.order, query.q]);
 
@@ -172,5 +127,5 @@ export function useClmmPoolsPage(query: ClmmPoolsQuery, enabled = true) {
     load();
   }, [load]);
 
-  return { rows, total, totalPages, loading, error, reload: load };
+  return { rows, total, totalPages, loading, enriching, error, reload: load };
 }

@@ -2,6 +2,7 @@ import type { PublicClient } from "viem";
 import { ERC20_ABI } from "@/lib/web3/tokens";
 import { POOL_ABI } from "./abis";
 import { CAPRICORN_POOL_ADDRESSES } from "./pools";
+import { mapInBatches } from "./rpcQueue";
 import type { CachedPool, PoolLiveState, TokenMeta } from "./types";
 
 export function sqrtPriceX96ToPrice(
@@ -118,8 +119,10 @@ export async function hydratePools(
   addresses: readonly string[],
 ): Promise<CachedPool[]> {
   const unique = [...new Set(addresses.map((a) => a.toLowerCase()))];
-  const results = await Promise.all(
-    unique.map((a) => fetchPoolMetadata(client, a as `0x${string}`)),
+  const results = await mapInBatches(
+    unique,
+    (a) => fetchPoolMetadata(client, a as `0x${string}`),
+    { concurrency: 2, delayMs: 200 },
   );
   return results.filter((p): p is CachedPool => p != null);
 }

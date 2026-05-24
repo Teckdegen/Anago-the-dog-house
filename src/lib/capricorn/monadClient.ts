@@ -11,7 +11,10 @@ export function getMonadPublicClient(): PublicClient {
       monad.rpcUrls.default.http[0];
     client = createPublicClient({
       chain: monad,
-      transport: http(rpc),
+      transport: http(rpc, {
+        retryCount: 4,
+        retryDelay: ({ count }) => Math.min(500 * 2 ** count, 8_000),
+      }),
     });
   }
   return client;

@@ -21,7 +21,7 @@ export type ClmmPoolsQuery = {
 export async function fetchClmmPoolsPage(query: ClmmPoolsQuery = {}): Promise<ClmmPoolsPageResponse> {
   const params = new URLSearchParams();
   params.set("page", String(query.page ?? 1));
-  params.set("limit", String(query.limit ?? 50));
+  params.set("limit", String(query.limit ?? 20));
   if (query.sort) params.set("sort", query.sort);
   if (query.order) params.set("order", query.order);
   if (query.q?.trim()) params.set("q", query.q.trim());

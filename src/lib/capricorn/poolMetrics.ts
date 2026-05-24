@@ -48,18 +48,24 @@ export type PoolMetrics = {
 
 export type EnrichedPool = CachedPool & { metrics: PoolMetrics };
 
-async function fetchPairVolumeUsd(pairAddress: string): Promise<number | null> {
+type PairDexStats = { volume24hUsd: number | null; tvlUsd: number | null };
+
+async function fetchPairDexStats(pairAddress: string): Promise<PairDexStats> {
   try {
     const res = await fetch(`https://api.dexscreener.com/latest/dex/pairs/monad/${pairAddress}`, {
       signal: AbortSignal.timeout(5000),
     });
-    if (!res.ok) return null;
+    if (!res.ok) return { volume24hUsd: null, tvlUsd: null };
     const json = await res.json();
     const pair = json?.pair ?? json?.pairs?.[0];
     const vol = parseFloat(pair?.volume?.h24 ?? "0");
-    return vol > 0 ? vol : null;
+    const liq = parseFloat(pair?.liquidity?.usd ?? "0");
+    return {
+      volume24hUsd: vol > 0 ? vol : null,
+      tvlUsd: liq > 0 ? liq : null,
+    };
   } catch {
-    return null;
+    return { volume24hUsd: null, tvlUsd: null };
   }
 }
 
@@ -98,37 +104,56 @@ async function computeTvlUsd(
   }
 }
 
+export type FetchPoolMetricsOptions = {
+  /** DexScreener-only path — avoids on-chain balanceOf / symbol reads (list pages). */
+  light?: boolean;
+};
+
 export async function fetchPoolMetrics(
   pool: CachedPool,
   publicClient?: PublicClient | null,
   force = false,
+  options?: FetchPoolMetricsOptions,
 ): Promise<PoolMetrics> {
   const key = pool.address.toLowerCase();
   const cached = getCachedMetrics(key);
   if (!force && cached && isMetricsFresh(cached)) return cached;
 
+  const light = options?.light ?? false;
   let resolved = pool;
-  if (publicClient && (!pool.token0 || pool.token0 === "0x0000000000000000000000000000000000000000")) {
+  const missingTokens =
+    !pool.token0 ||
+    !pool.token0.startsWith("0x") ||
+    pool.token0 === "0x0000000000000000000000000000000000000000";
+
+  if (publicClient && missingTokens) {
     const meta = await fetchPoolMetadata(publicClient, pool.address);
     if (meta) resolved = meta;
   }
 
-  const [meta0, meta1, pairDex, volume24hUsd, tvlUsd] = await Promise.all([
-    fetchTokenFromDexScreener(resolved.token0, publicClient),
-    fetchTokenFromDexScreener(resolved.token1, publicClient),
+  const dexClient = light ? null : publicClient;
+  const [meta0, meta1, pairDex, pairStats] = await Promise.all([
+    fetchTokenFromDexScreener(resolved.token0, dexClient),
+    fetchTokenFromDexScreener(resolved.token1, dexClient),
     fetchPairFromDexScreener(resolved.address),
-    fetchPairVolumeUsd(resolved.address),
-    publicClient ? computeTvlUsd(publicClient, resolved) : Promise.resolve(cached?.tvlUsd ?? null),
+    fetchPairDexStats(resolved.address),
   ]);
+
+  let volume24hUsd = pairStats.volume24hUsd;
+  let tvlUsd = pairStats.tvlUsd;
+
+  if (!light && publicClient && tvlUsd == null) {
+    tvlUsd = await computeTvlUsd(publicClient, resolved);
+  }
 
   let symbol0 = meta0?.symbol || resolved.token0.slice(0, 6);
   let symbol1 = meta1?.symbol || resolved.token1.slice(0, 6);
 
-  if ((!symbol0 || symbol0.length > 12) && publicClient) {
+  if (!light && (!symbol0 || symbol0.length > 12) && publicClient) {
     const m = await fetchTokenMeta(publicClient, resolved.token0);
     symbol0 = m.symbol;
   }
-  if ((!symbol1 || symbol1.length > 12) && publicClient) {
+  if (!light && (!symbol1 || symbol1.length > 12) && publicClient) {
     const m = await fetchTokenMeta(publicClient, resolved.token1);
     symbol1 = m.symbol;
   }
@@ -194,7 +219,7 @@ export function hydrateEnrichedPools(pools: CachedPool[]): EnrichedPool[] {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-const METRICS_BATCH_SIZE = 8;
+const METRICS_BATCH_SIZE = 3;
 
 function chunk<T>(arr: T[], size: number): T[][] {
   const out: T[][] = [];
@@ -230,7 +255,7 @@ export async function indexPoolMetricsBatched(
     );
     done += batch.length;
     onProgress(Math.min(done, total), total);
-    await sleep(100);
+    await sleep(400);
   }
 }
 
