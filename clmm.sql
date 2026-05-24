@@ -1,8 +1,4 @@
--- ============================================================
---  clmm.sql  —  Capricorn CLMM pools  (fresh, 2026-05-23)
---  Run this in your Supabase SQL editor to recreate the table
---  and seed 142 curated pool addresses (run merge-pools.mjs to refresh).
--- ============================================================
+
 
 -- 1. Drop & recreate ----------------------------------------
 drop table if exists public.clmm_pools cascade;
