@@ -2,7 +2,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect, useRef } from "react";
 import { Send } from "lucide-react";
 import { HlsVideo } from "@/components/HlsVideo";
-import { useProtocolTVL } from "@/lib/web3/tvl";
+import { formatUsdHero } from "@/lib/capricorn/poolMetrics";
+import { useStableProtocolTVL } from "@/lib/web3/tvl";
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -73,12 +74,8 @@ function CyclingWord() {
 }
 
 function Index() {
-  const { usd: tvlUsd, isLoading: tvlLoading } = useProtocolTVL();
-  const tvlDisplay = tvlLoading
-    ? "…"
-    : `$${tvlUsd.toLocaleString(undefined, {
-        maximumFractionDigits: tvlUsd >= 1000 ? 0 : 2,
-      })}`;
+  const { displayUsd: tvlUsd } = useStableProtocolTVL();
+  const tvlDisplay = tvlUsd == null ? "…" : formatUsdHero(tvlUsd);
 
   return (
     <main className="text-cream min-h-screen overflow-x-hidden" style={{ background: "#06040F" }}>
@@ -179,7 +176,7 @@ function Index() {
               className="font-grotesk leading-none text-cream"
               style={{ fontSize: "clamp(40px, 5.5vw, 72px)", opacity: 0.55, fontWeight: 900 }}
             >
-              {tvlLoading ? "…" : `$${tvlDisplay}`}
+              {tvlDisplay}
             </span>
             <span className="font-mono text-[8px] sm:text-[9px] uppercase tracking-[0.2em] text-cream/25">
               across all products

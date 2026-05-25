@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useReadContract, useReadContracts } from "wagmi";
 import { useContractAddresses } from "./hooks";
 import { TOKEN_LOCK_ABI } from "./contracts";
@@ -202,4 +202,51 @@ export function useProtocolTVL(): { usd: number; isLoading: boolean } {
     usd: locks.usd + vesting.usd + clmm.usd + farm.usd,
     isLoading: locks.isLoading || vesting.isLoading || clmm.isLoading || farm.isLoading,
   };
+}
+
+const TVL_CACHE_KEY = "doghouse-protocol-tvl";
+
+function readTvlCache(): number | null {
+  try {
+    const raw = sessionStorage.getItem(TVL_CACHE_KEY);
+    if (raw == null) return null;
+    const n = Number(raw);
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeTvlCache(usd: number): void {
+  try {
+    sessionStorage.setItem(TVL_CACHE_KEY, String(usd));
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Stable TVL for UI — holds last value through refetches until a new total settles. */
+export function useStableProtocolTVL(): { displayUsd: number | null } {
+  const { usd, isLoading } = useProtocolTVL();
+  const [cached, setCached] = useState<number | null>(readTvlCache);
+  const settleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (isLoading) return;
+
+    if (settleRef.current) clearTimeout(settleRef.current);
+    settleRef.current = setTimeout(() => {
+      setCached((prev) => {
+        if (prev === usd) return prev;
+        writeTvlCache(usd);
+        return usd;
+      });
+    }, 600);
+
+    return () => {
+      if (settleRef.current) clearTimeout(settleRef.current);
+    };
+  }, [usd, isLoading]);
+
+  return { displayUsd: cached };
 }

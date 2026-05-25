@@ -327,6 +327,22 @@ export function formatUsdCompact(n: number | null | undefined): string {
   return `$${n.toFixed(4)}`;
 }
 
+function formatAbbrUnit(value: number): string {
+  if (value >= 100) return value.toFixed(0);
+  if (value >= 10) return value.toFixed(1).replace(/\.0$/, "");
+  return value.toFixed(2).replace(/\.?0+$/, "");
+}
+
+/** Headline USD — $921k, $10M, $1B (no full digit strings). */
+export function formatUsdHero(n: number | null | undefined): string {
+  if (n == null || Number.isNaN(n)) return "—";
+  if (n >= 1_000_000_000) return `$${formatAbbrUnit(n / 1_000_000_000)}B`;
+  if (n >= 1_000_000) return `$${formatAbbrUnit(n / 1_000_000)}M`;
+  if (n >= 1_000) return `$${formatAbbrUnit(n / 1_000)}k`;
+  if (n >= 1) return `$${n.toFixed(0)}`;
+  return `$${n.toFixed(2)}`;
+}
+
 export function formatApr(apr: number | null | undefined): string {
   if (apr == null || Number.isNaN(apr)) return "—";
   return `${apr.toFixed(2)}%`;
