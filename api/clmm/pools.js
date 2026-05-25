@@ -1,4 +1,4 @@
-/** Paginated CLMM pools for the explore page. */
+/** Paginated CLMM pools from Supabase (admin / legacy — explore UI uses hardcoded + /api/clmm/new-pools). */
 
 import { getSupabaseAdmin } from "../../lib/supabase-admin.mjs";
 
@@ -20,6 +20,8 @@ function feeToPercent(fee) {
 
 function rowToPool(row) {
   const address = row.address.toLowerCase();
+  const symbol0 = (row.symbol0 ?? "").trim() || poolDisplayId(address);
+  const symbol1 = (row.symbol1 ?? "").trim() || "???";
   return {
     address,
     token0: row.token0,
@@ -30,19 +32,19 @@ function rowToPool(row) {
     metrics: {
       poolAddress: address,
       displayId: poolDisplayId(address),
-      symbol0: row.symbol0,
-      symbol1: row.symbol1,
+      symbol0,
+      symbol1,
       token0: row.token0,
       token1: row.token1,
       logo0: null,
       logo1: null,
       pairImageUrl: null,
-      feePercent: feeToPercent(row.fee),
-      tvlUsd: row.tvl_usd,
-      volume24hUsd: row.volume_24h_usd,
-      fees24hUsd: row.fees_24h_usd,
-      aprPercent: row.apr_percent,
-      priceUsd: row.price_usd,
+      feePercent: feeToPercent(row.fee ?? 0),
+      tvlUsd: row.tvl_usd != null ? Number(row.tvl_usd) : null,
+      volume24hUsd: row.volume_24h_usd != null ? Number(row.volume_24h_usd) : null,
+      fees24hUsd: row.fees_24h_usd != null ? Number(row.fees_24h_usd) : null,
+      aprPercent: row.apr_percent != null ? Number(row.apr_percent) : null,
+      priceUsd: row.price_usd != null ? Number(row.price_usd) : null,
       priceChange24h: null,
       priceNative: null,
       updatedAt: row.metrics_at ? new Date(row.metrics_at).getTime() : 0,

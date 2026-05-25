@@ -11,6 +11,7 @@ export function v4ApiDevPlugin(): Plugin {
     name: "clmm-api-dev",
     configureServer(server) {
       let clmmPoolsHandler: ApiHandler | null = null;
+      let clmmNewPoolsHandler: ApiHandler | null = null;
       let clmmSwapsHandler: ApiHandler | null = null;
       let clmmSyncHandler: ApiHandler | null = null;
       let zerionHandler: ApiHandler | null = null;
@@ -20,6 +21,8 @@ export function v4ApiDevPlugin(): Plugin {
       const ready = (async () => {
         const root = process.cwd();
         clmmPoolsHandler = (await import(pathToFileURL(join(root, "api/clmm/pools.js")).href)).default;
+        clmmNewPoolsHandler = (await import(pathToFileURL(join(root, "api/clmm/new-pools.js")).href))
+          .default;
         clmmSwapsHandler = (await import(pathToFileURL(join(root, "api/clmm/swaps.js")).href)).default;
         clmmSyncHandler = (await import(pathToFileURL(join(root, "api/cron/sync-clmm-pools.js")).href))
           .default;
@@ -34,6 +37,11 @@ export function v4ApiDevPlugin(): Plugin {
 
         if (url === "/api/clmm/pools" && req.method === "GET" && clmmPoolsHandler) {
           await clmmPoolsHandler(req, res);
+          return;
+        }
+
+        if (url === "/api/clmm/new-pools" && req.method === "GET" && clmmNewPoolsHandler) {
+          await clmmNewPoolsHandler(req, res);
           return;
         }
 
