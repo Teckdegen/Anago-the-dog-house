@@ -49,24 +49,30 @@ export type PoolMetrics = {
 
 export type EnrichedPool = CachedPool & { metrics: PoolMetrics };
 
-type PairDexStats = { volume24hUsd: number | null; tvlUsd: number | null };
+type PairDexStats = {
+  volume24hUsd: number | null;
+  tvlUsd: number | null;
+  priceChange24h: number | null;
+};
 
 async function fetchPairDexStats(pairAddress: string): Promise<PairDexStats> {
   try {
     const res = await fetch(`https://api.dexscreener.com/latest/dex/pairs/monad/${pairAddress}`, {
       signal: AbortSignal.timeout(5000),
     });
-    if (!res.ok) return { volume24hUsd: null, tvlUsd: null };
+    if (!res.ok) return { volume24hUsd: null, tvlUsd: null, priceChange24h: null };
     const json = await res.json();
     const pair = json?.pair ?? json?.pairs?.[0];
     const vol = parseFloat(pair?.volume?.h24 ?? "0");
     const liq = parseFloat(pair?.liquidity?.usd ?? "0");
+    const pc = parseFloat(pair?.priceChange?.h24 ?? "");
     return {
       volume24hUsd: vol > 0 ? vol : null,
       tvlUsd: liq > 0 ? liq : null,
+      priceChange24h: Number.isFinite(pc) ? pc : null,
     };
   } catch {
-    return { volume24hUsd: null, tvlUsd: null };
+    return { volume24hUsd: null, tvlUsd: null, priceChange24h: null };
   }
 }
 
@@ -186,7 +192,7 @@ export async function fetchPoolMetrics(
     fees24hUsd,
     aprPercent,
     priceUsd: meta0?.priceUsd ?? null,
-    priceChange24h: null,
+    priceChange24h: pairStats.priceChange24h,
     priceNative: null,
     updatedAt: Date.now(),
   };

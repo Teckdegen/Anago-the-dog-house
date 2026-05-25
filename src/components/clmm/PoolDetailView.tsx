@@ -10,6 +10,11 @@ import { SwapPanel } from "./SwapPanel";
 import { ClmmTxGate } from "./SwitchToMonadMainnet";
 import { clmm } from "./clmmTheme";
 
+function formatDailyChangeSub(pct: number | null): string | undefined {
+  if (pct == null || !Number.isFinite(pct) || Math.abs(pct) < 0.005) return undefined;
+  return `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%`;
+}
+
 function formatPrice(price: number): string {
   if (price <= 0) return "—";
   if (price < 0.0001) return price.toExponential(4);
@@ -30,7 +35,11 @@ export function PoolDetailView({
 }) {
   const m = metrics;
   const feeLabel = feeToPercent(live.pool.fee);
-  const volChange = m.priceChange24h != null ? m.priceChange24h : 0;
+  const dailyChange = formatDailyChangeSub(m.priceChange24h);
+  const volChangeSub =
+    m.priceChange24h != null && Math.abs(m.priceChange24h) >= 0.005
+      ? `${m.priceChange24h >= 0 ? "+" : ""}${m.priceChange24h.toFixed(2)}%`
+      : undefined;
 
   return (
     <div className="max-w-[1280px] mx-auto space-y-6">
@@ -57,7 +66,7 @@ export function PoolDetailView({
               <h1 className="font-grotesk text-[24px] sm:text-[28px] font-medium" style={{ color: clmm.text }}>
                 {m.symbol0} / {m.symbol1}
               </h1>
-              <Badge>v4</Badge>
+              <Badge>v3</Badge>
               <Badge>{feeLabel}</Badge>
             </div>
             <PoolIdCopy id={m.displayId} />
@@ -87,6 +96,7 @@ export function PoolDetailView({
             symbol0={m.symbol0}
             symbol1={m.symbol1}
             tvlUsd={m.tvlUsd}
+            priceChange24h={m.priceChange24h}
           />
           <PoolTransactionsTable
             poolAddress={poolAddress}
@@ -124,12 +134,17 @@ export function PoolDetailView({
           </SidebarCard>
 
           <SidebarCard title="Stats">
-            <StatRow label="TVL" value={formatUsdCompact(m.tvlUsd)} sub="0.00%" />
+            <StatRow
+              label="TVL"
+              value={formatUsdCompact(m.tvlUsd)}
+              sub={dailyChange}
+              subNegative={m.priceChange24h != null && m.priceChange24h < 0}
+            />
             <StatRow
               label="24H volume"
               value={formatUsdCompact(m.volume24hUsd)}
-              sub={volChange !== 0 ? `${volChange >= 0 ? "+" : ""}${volChange.toFixed(1)}%` : undefined}
-              subNegative={volChange < 0}
+              sub={volChangeSub}
+              subNegative={m.priceChange24h != null && m.priceChange24h < 0}
             />
             <StatRow label="24H fees" value={formatUsdCompact(m.fees24hUsd)} />
             <div className="mt-4 pt-4" style={{ borderTop: `1px solid ${clmm.border}` }}>

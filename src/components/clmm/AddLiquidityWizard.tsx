@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { ArrowLeft, Check, RotateCcw, Settings } from "lucide-react";
+import { ArrowLeft, Check } from "lucide-react";
 import { AddLiquidityPanel } from "./AddLiquidityPanel";
 import { ClmmTxGate } from "@/components/clmm/SwitchToMonadMainnet";
 import { TokenIcon } from "@/components/TokenIcon";
@@ -22,38 +22,12 @@ export function AddLiquidityWizard({
   const [step, setStep] = useState<Step>(1);
   const feeLabel = feeToPercent(live.pool.fee);
 
-  const reset = () => setStep(1);
-
   return (
     <div className="max-w-[1100px] mx-auto">
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
+      <div className="mb-8">
         <h1 className="font-grotesk text-[28px] sm:text-[32px] font-medium" style={{ color: clmm.text }}>
           New position
         </h1>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={reset}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-full font-mono text-[10px] transition hover:bg-[rgba(155,127,212,0.1)]"
-            style={{ color: clmm.textMuted, border: `1px solid ${clmm.border}` }}
-          >
-            <RotateCcw className="w-3.5 h-3.5" /> Reset
-          </button>
-          <span
-            className="px-3 py-2 rounded-full font-mono text-[10px]"
-            style={{ background: clmm.purpleBg, color: clmm.text, border: `1px solid ${clmm.border}` }}
-          >
-            v4 position ▾
-          </span>
-          <button
-            type="button"
-            className="p-2 rounded-full"
-            style={{ border: `1px solid ${clmm.border}`, color: clmm.textMuted }}
-            aria-label="Settings"
-          >
-            <Settings className="w-4 h-4" />
-          </button>
-        </div>
       </div>
 
       <div className="grid lg:grid-cols-[240px_1fr] gap-8">
