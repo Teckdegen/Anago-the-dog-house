@@ -3,7 +3,7 @@
  */
 
 import type { PublicClient } from "viem";
-import { fetchBlockscoutTokenMeta } from "./blockscout";
+import { fetchZerionTokenMeta } from "./zerion";
 import { fetchTokenBasicsFromChain, fetchTokenLogoFromChain } from "./tokenOnChain";
 
 const DEXSCREENER_API = "https://api.dexscreener.com/latest/dex";
@@ -75,38 +75,38 @@ export async function fetchTokenFromDexScreener(
   if (dex?.logoURI && dex.symbol) return dex;
 
   const addr = key as `0x${string}`;
-  const scout = await fetchBlockscoutTokenMeta(addr).catch(() => null);
+  const zerion = await fetchZerionTokenMeta(key).catch(() => null);
 
   if (!publicClient || key === "0x0000000000000000000000000000000000000000") {
-    if (scout) {
+    if (zerion) {
       return {
         address: key,
-        name: scout.name,
-        symbol: scout.symbol,
-        logoURI: scout.logoURI ?? dex?.logoURI ?? null,
-        priceUsd: scout.priceUsd ?? dex?.priceUsd ?? null,
+        name: zerion.name,
+        symbol: zerion.symbol,
+        logoURI: zerion.logoURI ?? dex?.logoURI ?? null,
+        priceUsd: zerion.priceUsd ?? dex?.priceUsd ?? null,
       };
     }
     return dex;
   }
 
   const [logoURI, basics] = await Promise.all([
-    dex?.logoURI || scout?.logoURI
-      ? Promise.resolve(dex?.logoURI ?? scout?.logoURI ?? null)
+    dex?.logoURI || zerion?.logoURI
+      ? Promise.resolve(dex?.logoURI ?? zerion?.logoURI ?? null)
       : fetchTokenLogoFromChain(addr, publicClient),
     !dex?.symbol || !dex?.name
-      ? scout
-        ? Promise.resolve({ name: scout.name, symbol: scout.symbol })
+      ? zerion
+        ? Promise.resolve({ name: zerion.name, symbol: zerion.symbol })
         : fetchTokenBasicsFromChain(addr, publicClient)
       : Promise.resolve(null),
   ]);
 
   const merged: TokenData = {
     address: key,
-    name: dex?.name || basics?.name || "",
-    symbol: dex?.symbol || basics?.symbol || key.slice(0, 6),
-    logoURI: logoURI ?? dex?.logoURI ?? null,
-    priceUsd: dex?.priceUsd ?? null,
+    name: dex?.name || basics?.name || zerion?.name || "",
+    symbol: dex?.symbol || basics?.symbol || zerion?.symbol || key.slice(0, 6),
+    logoURI: logoURI ?? dex?.logoURI ?? zerion?.logoURI ?? null,
+    priceUsd: dex?.priceUsd ?? zerion?.priceUsd ?? null,
   };
 
   if (merged.symbol || merged.logoURI) {

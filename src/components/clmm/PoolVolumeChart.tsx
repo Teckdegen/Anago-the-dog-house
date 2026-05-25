@@ -1,5 +1,6 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { formatUsdCompact } from "@/lib/capricorn/poolMetrics";
+import { fetchZerionTokenChart } from "@/lib/web3/zerion";
 import { clmm } from "./clmmTheme";
 
 type Range = "1D" | "1W" | "1M";
@@ -14,6 +15,7 @@ export function PoolVolumeChart({
   symbol1,
   tvlUsd,
   priceChange24h,
+  chartTokenAddress,
 }: {
   volume24hUsd: number | null;
   livePrice: number;
@@ -21,14 +23,33 @@ export function PoolVolumeChart({
   symbol1: string;
   tvlUsd: number | null;
   priceChange24h: number | null;
+  /** Non-MON token — Zerion price chart when API key is set. */
+  chartTokenAddress?: `0x${string}`;
 }) {
   const [range, setRange] = useState<Range>("1D");
   const [metric, setMetric] = useState<Metric>("Volume");
+  const [zerionSeries, setZerionSeries] = useState<number[] | null>(null);
 
-  const bars = useMemo(
-    () => generateBars(metric, volume24hUsd, livePrice, tvlUsd, priceChange24h, range),
-    [metric, volume24hUsd, livePrice, tvlUsd, priceChange24h, range],
-  );
+  useEffect(() => {
+    if (!chartTokenAddress || metric !== "Price") {
+      setZerionSeries(null);
+      return;
+    }
+    const period = range === "1D" ? "hour" : range === "1W" ? "day" : "week";
+    let cancelled = false;
+    fetchZerionTokenChart(chartTokenAddress, period).then((pts) => {
+      if (!cancelled && pts.length >= 3) setZerionSeries(pts);
+      else if (!cancelled) setZerionSeries(null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [chartTokenAddress, range, metric]);
+
+  const bars = useMemo(() => {
+    if (metric === "Price" && zerionSeries?.length) return zerionSeries;
+    return generateBars(metric, volume24hUsd, livePrice, tvlUsd, priceChange24h, range);
+  }, [metric, volume24hUsd, livePrice, tvlUsd, priceChange24h, range, zerionSeries]);
   const max = Math.max(...bars, 1e-9);
 
   const headline =
@@ -99,11 +120,13 @@ export function PoolVolumeChart({
         })}
       </div>
       <p className="font-mono text-[9px] mt-3" style={{ color: clmm.textDim }}>
-        {metric === "Volume"
-          ? "24h volume distribution (estimated hourly bars)"
-          : metric === "Price"
-            ? "24h price trend (estimated from pair change)"
-            : "Pool liquidity (estimated)"}
+        {metric === "Price" && zerionSeries?.length
+          ? "Price chart · Zerion"
+          : metric === "Volume"
+            ? "24h volume · DexScreener total (bars illustrative)"
+            : metric === "Price"
+              ? "24h price trend (estimated)"
+              : "Pool liquidity (estimated)"}
       </p>
     </div>
   );

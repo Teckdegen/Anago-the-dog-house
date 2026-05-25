@@ -101,11 +101,17 @@ export function PoolDetailView({
             symbol1={m.symbol1}
             tvlUsd={m.tvlUsd}
             priceChange24h={m.priceChange24h}
+            chartTokenAddress={
+              live.token1Symbol.toUpperCase().includes("MON") &&
+              !live.token0Symbol.toUpperCase().includes("MON")
+                ? live.pool.token0
+                : live.pool.token1
+            }
           />
           <PoolTransactionsTable
             poolAddress={poolAddress}
-            token0={live.pool.token0}
-            token1={live.pool.token1}
+            token0Decimals={live.token0Decimals}
+            token1Decimals={live.token1Decimals}
             symbol0={m.symbol0}
             symbol1={m.symbol1}
           />

@@ -1,6 +1,6 @@
 import type { PublicClient } from "viem";
 import { formatUnits } from "viem";
-import { fetchBlockscoutTokenMeta } from "@/lib/web3/blockscout";
+import { fetchZerionTokenMeta } from "@/lib/web3/zerion";
 import { fetchPairFromDexScreener, fetchTokenFromDexScreener, batchGetTokenPrices } from "@/lib/web3/dexscreener";
 import { ERC20_ABI } from "@/lib/web3/tokens";
 import { fetchPoolMetadata, fetchTokenMeta } from "./poolState";
@@ -53,26 +53,33 @@ type PairDexStats = {
   volume24hUsd: number | null;
   tvlUsd: number | null;
   priceChange24h: number | null;
+  buys24h: number | null;
+  sells24h: number | null;
 };
 
-async function fetchPairDexStats(pairAddress: string): Promise<PairDexStats> {
+export async function fetchPairDexStats(pairAddress: string): Promise<PairDexStats> {
   try {
     const res = await fetch(`https://api.dexscreener.com/latest/dex/pairs/monad/${pairAddress}`, {
       signal: AbortSignal.timeout(5000),
     });
-    if (!res.ok) return { volume24hUsd: null, tvlUsd: null, priceChange24h: null };
+    if (!res.ok) {
+      return { volume24hUsd: null, tvlUsd: null, priceChange24h: null, buys24h: null, sells24h: null };
+    }
     const json = await res.json();
     const pair = json?.pair ?? json?.pairs?.[0];
     const vol = parseFloat(pair?.volume?.h24 ?? "0");
     const liq = parseFloat(pair?.liquidity?.usd ?? "0");
     const pc = parseFloat(pair?.priceChange?.h24 ?? "");
+    const tx24 = pair?.txns?.h24;
     return {
       volume24hUsd: vol > 0 ? vol : null,
       tvlUsd: liq > 0 ? liq : null,
       priceChange24h: Number.isFinite(pc) ? pc : null,
+      buys24h: tx24?.buys != null ? Number(tx24.buys) : null,
+      sells24h: tx24?.sells != null ? Number(tx24.sells) : null,
     };
   } catch {
-    return { volume24hUsd: null, tvlUsd: null, priceChange24h: null };
+    return { volume24hUsd: null, tvlUsd: null, priceChange24h: null, buys24h: null, sells24h: null };
   }
 }
 
@@ -153,15 +160,17 @@ export async function fetchPoolMetrics(
     tvlUsd = await computeTvlUsd(publicClient, resolved);
   }
 
-  const [scout0, scout1] = light
-    ? await Promise.all([
-        fetchBlockscoutTokenMeta(resolved.token0).catch(() => null),
-        fetchBlockscoutTokenMeta(resolved.token1).catch(() => null),
-      ])
-    : [null, null];
+  const [zer0, zer1] = await Promise.all([
+    fetchZerionTokenMeta(resolved.token0).catch(() => null),
+    fetchZerionTokenMeta(resolved.token1).catch(() => null),
+  ]);
 
-  let symbol0 = meta0?.symbol || scout0?.symbol || resolved.token0.slice(0, 6);
-  let symbol1 = meta1?.symbol || scout1?.symbol || resolved.token1.slice(0, 6);
+  let symbol0 = meta0?.symbol || zer0?.symbol || resolved.token0.slice(0, 6);
+  let symbol1 = meta1?.symbol || zer1?.symbol || resolved.token1.slice(0, 6);
+
+  let priceChange24h = pairStats.priceChange24h;
+  if (priceChange24h == null && zer0?.priceChange24h != null) priceChange24h = zer0.priceChange24h;
+  if (priceChange24h == null && zer1?.priceChange24h != null) priceChange24h = zer1.priceChange24h;
 
   if (!light && (!symbol0 || symbol0.length > 12) && publicClient) {
     const m = await fetchTokenMeta(publicClient, resolved.token0);
@@ -183,8 +192,8 @@ export async function fetchPoolMetrics(
     symbol1,
     token0: resolved.token0,
     token1: resolved.token1,
-    logo0: meta0?.logoURI ?? scout0?.logoURI ?? null,
-    logo1: meta1?.logoURI ?? scout1?.logoURI ?? null,
+    logo0: meta0?.logoURI ?? zer0?.logoURI ?? null,
+    logo1: meta1?.logoURI ?? zer1?.logoURI ?? null,
     pairImageUrl: pairDex?.imageUrl ?? null,
     feePercent: feeToPercent(fee),
     tvlUsd,
@@ -192,7 +201,7 @@ export async function fetchPoolMetrics(
     fees24hUsd,
     aprPercent,
     priceUsd: meta0?.priceUsd ?? null,
-    priceChange24h: pairStats.priceChange24h,
+    priceChange24h,
     priceNative: null,
     updatedAt: Date.now(),
   };

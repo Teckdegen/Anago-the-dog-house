@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { ExternalLink, Loader2 } from "lucide-react";
-import { fetchBlockVisionPoolTrades, type BlockVisionTrade } from "@/lib/web3/blockvision";
-import { truncateAddress } from "@/lib/capricorn/poolMetrics";
+import { fetchPairDexStats, truncateAddress } from "@/lib/capricorn/poolMetrics";
+import { fetchPoolSwapsFromApi, type PoolSwapRow } from "@/lib/web3/zerion";
 import { clmm } from "./clmmTheme";
 
 function formatTime(ts: number): string {
+  if (!ts) return "—";
   const d = new Date(ts * 1000);
   const diff = Date.now() - d.getTime();
   if (diff < 60_000) return "just now";
@@ -13,29 +14,22 @@ function formatTime(ts: number): string {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-function tradeUsd(t: BlockVisionTrade): string {
-  const a0 = parseFloat(t.token0Info?.amountUSD ?? "0");
-  const a1 = parseFloat(t.token1Info?.amountUSD ?? "0");
-  const v = Math.max(a0, a1);
-  if (!Number.isFinite(v) || v <= 0) return "—";
-  return `$${v.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
-}
-
 export function PoolTransactionsTable({
   poolAddress,
-  token0,
-  token1,
+  token0Decimals,
+  token1Decimals,
   symbol0,
   symbol1,
 }: {
   poolAddress: `0x${string}`;
-  token0: `0x${string}`;
-  token1: `0x${string}`;
+  token0Decimals: number;
+  token1Decimals: number;
   symbol0: string;
   symbol1: string;
 }) {
   const cols = ["Time", "Type", "USD", symbol0, symbol1, "Wallet"] as const;
-  const [trades, setTrades] = useState<BlockVisionTrade[]>([]);
+  const [swaps, setSwaps] = useState<PoolSwapRow[]>([]);
+  const [dexSummary, setDexSummary] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,14 +38,27 @@ export function PoolTransactionsTable({
     setLoading(true);
     setError(null);
 
-    fetchBlockVisionPoolTrades(poolAddress, token0, token1, 40)
-      .then((rows) => {
-        if (!cancelled) setTrades(rows);
+    Promise.all([
+      fetchPoolSwapsFromApi(poolAddress, {
+        limit: 40,
+        decimals0: token0Decimals,
+        decimals1: token1Decimals,
+      }),
+      fetchPairDexStats(poolAddress).catch(() => null),
+    ])
+      .then(([rows, dex]) => {
+        if (cancelled) return;
+        setSwaps(rows);
+        if (dex?.buys24h != null || dex?.sells24h != null) {
+          setDexSummary(
+            `DexScreener 24h: ${dex.buys24h ?? 0} buys · ${dex.sells24h ?? 0} sells · ${dex.volume24hUsd != null ? `$${Math.round(dex.volume24hUsd).toLocaleString()} vol` : ""}`,
+          );
+        }
       })
       .catch((e) => {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : String(e));
-          setTrades([]);
+          setSwaps([]);
         }
       })
       .finally(() => {
@@ -61,7 +68,7 @@ export function PoolTransactionsTable({
     return () => {
       cancelled = true;
     };
-  }, [poolAddress, token0, token1]);
+  }, [poolAddress, token0Decimals, token1Decimals]);
 
   return (
     <div className="mt-6">
@@ -88,7 +95,7 @@ export function PoolTransactionsTable({
                     style={{ color: clmm.textMuted }}
                   >
                     <Loader2 className="w-5 h-5 animate-spin" style={{ color: clmm.purple }} />
-                    Loading swap history…
+                    Loading swaps from chain…
                   </div>
                 </td>
               </tr>
@@ -96,21 +103,23 @@ export function PoolTransactionsTable({
               <tr>
                 <td colSpan={6} className="py-12 text-center font-mono text-[11px]" style={{ color: clmm.textMuted }}>
                   {error}
-                  <p className="text-[9px] mt-2" style={{ color: clmm.textDim }}>
-                    Ensure BLOCKVISION_API_KEY is set (Pro tier for Monad mainnet).
-                  </p>
                 </td>
               </tr>
-            ) : trades.length === 0 ? (
+            ) : swaps.length === 0 ? (
               <tr>
                 <td colSpan={6} className="py-12 text-center font-mono text-[11px]" style={{ color: clmm.textMuted }}>
-                  No recent swaps indexed for this pool.
+                  No Swap events in the last ~120k blocks for this pool.
+                  {dexSummary && (
+                    <p className="text-[9px] mt-2" style={{ color: clmm.textDim }}>
+                      {dexSummary}
+                    </p>
+                  )}
                 </td>
               </tr>
             ) : (
-              trades.map((t) => (
+              swaps.map((t) => (
                 <tr
-                  key={t.txHash}
+                  key={`${t.txHash}-${t.amount0}`}
                   className="font-mono text-[11px] border-t"
                   style={{ borderColor: clmm.border, color: clmm.text }}
                 >
@@ -118,9 +127,9 @@ export function PoolTransactionsTable({
                     {formatTime(t.timestamp)}
                   </td>
                   <td className="py-3 pr-4 capitalize">{t.type}</td>
-                  <td className="py-3 pr-4">{tradeUsd(t)}</td>
-                  <td className="py-3 pr-4">{t.token0Info?.amount ?? "—"}</td>
-                  <td className="py-3 pr-4">{t.token1Info?.amount ?? "—"}</td>
+                  <td className="py-3 pr-4">—</td>
+                  <td className="py-3 pr-4">{t.amount0}</td>
+                  <td className="py-3 pr-4">{t.amount1}</td>
                   <td className="py-3 pr-4">
                     <a
                       href={`https://monadexplorer.com/tx/${t.txHash}`}
@@ -139,9 +148,10 @@ export function PoolTransactionsTable({
           </tbody>
         </table>
       </div>
-      {!loading && trades.length > 0 && (
+      {!loading && swaps.length > 0 && (
         <p className="font-mono text-[9px] mt-2" style={{ color: clmm.textDim }}>
-          Swaps via BlockVision · {trades[0]?.dex ?? "DEX"}
+          On-chain Swap logs · {swaps.length} recent
+          {dexSummary ? ` · ${dexSummary}` : ""}
         </p>
       )}
     </div>
