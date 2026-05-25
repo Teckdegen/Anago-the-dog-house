@@ -11,8 +11,11 @@ export function v4ApiDevPlugin(): Plugin {
     name: "clmm-api-dev",
     configureServer(server) {
       let clmmPoolsHandler: ApiHandler | null = null;
+      let clmmSwapsHandler: ApiHandler | null = null;
       let clmmSyncHandler: ApiHandler | null = null;
       let zerionHandler: ApiHandler | null = null;
+      let blockvisionHandler: ApiHandler | null = null;
+      let blockscoutHandler: ApiHandler | null = null;
 
       const ready = (async () => {
         const root = process.cwd();
@@ -21,6 +24,8 @@ export function v4ApiDevPlugin(): Plugin {
         clmmSyncHandler = (await import(pathToFileURL(join(root, "api/cron/sync-clmm-pools.js")).href))
           .default;
         zerionHandler = (await import(pathToFileURL(join(root, "api/zerion.js")).href)).default;
+        blockvisionHandler = (await import(pathToFileURL(join(root, "api/blockvision.js")).href)).default;
+        blockscoutHandler = (await import(pathToFileURL(join(root, "api/blockscout.js")).href)).default;
       })();
 
       server.middlewares.use(async (req, res, next) => {
@@ -34,6 +39,16 @@ export function v4ApiDevPlugin(): Plugin {
 
         if (url?.startsWith("/api/zerion") && req.method === "GET" && zerionHandler) {
           await zerionHandler(req, res);
+          return;
+        }
+
+        if (url?.startsWith("/api/blockvision") && blockvisionHandler) {
+          await blockvisionHandler(req, res);
+          return;
+        }
+
+        if (url?.startsWith("/api/blockscout") && blockscoutHandler) {
+          await blockscoutHandler(req, res);
           return;
         }
 

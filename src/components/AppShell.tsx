@@ -78,9 +78,11 @@ export function AppShell({ children }: { children: ReactNode }) {
               <li key={l.label}>
                 <Link
                   to={l.href}
-                  className="font-grotesk text-[11px] uppercase tracking-[0.1em] px-4 py-1.5 rounded-full transition-colors duration-200 block whitespace-nowrap"
-                  style={{ color: "rgba(196,168,240,0.55)" }}
-                  activeProps={{ style: { color: "#EDE0FF", background: "rgba(155,127,212,0.25)", border: "1px solid rgba(155,127,212,0.5)" } }}
+                  className="font-grotesk text-[11px] uppercase tracking-[0.1em] px-4 py-1.5 rounded-full transition-colors duration-200 block whitespace-nowrap text-[rgba(196,168,240,0.55)]"
+                  activeProps={{
+                    className:
+                      "font-grotesk text-[11px] uppercase tracking-[0.1em] px-4 py-1.5 rounded-full transition-colors duration-200 block whitespace-nowrap text-[#EDE0FF] bg-[rgba(155,127,212,0.25)] border border-[rgba(155,127,212,0.5)]",
+                  }}
                 >
                   {l.label}
                 </Link>
@@ -116,9 +118,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           <Link
             key={label}
             to={href}
-            className="flex flex-1 flex-col items-center justify-center gap-1 py-3 transition-colors"
-            style={{ color: "rgba(196,168,240,0.35)" }}
-            activeProps={{ style: { color: "#EDE0FF" } }}
+            className="flex flex-1 flex-col items-center justify-center gap-1 py-3 transition-colors text-[rgba(196,168,240,0.35)]"
+            activeProps={{
+              className:
+                "flex flex-1 flex-col items-center justify-center gap-1 py-3 transition-colors text-[#EDE0FF]",
+            }}
           >
             <Icon className="w-5 h-5" strokeWidth={1.5} />
             <span className="font-grotesk text-[9px] uppercase tracking-wider">{label}</span>
