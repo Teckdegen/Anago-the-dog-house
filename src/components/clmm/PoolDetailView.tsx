@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Copy, ExternalLink } from "lucide-react";
+import { Copy } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { TokenIcon } from "@/components/TokenIcon";
 import { PoolPairLogos } from "@/components/clmm/PoolPairLogos";
@@ -249,27 +249,19 @@ function TokenLinkRow({
   logo: string | null;
 }) {
   return (
-    <div className="flex items-center justify-between gap-2 py-2 first:pt-0">
-      <div className="flex items-center gap-2 min-w-0">
-        <TokenIcon address={address} symbol={symbol} size={24} logoUrl={logo} />
-        <span className="font-grotesk text-[13px]" style={{ color: clmm.text }}>
-          {symbol}
-        </span>
-        <span className="font-mono text-[10px] truncate" style={{ color: clmm.textDim }}>
-          {truncateAddress(address)}
-        </span>
-      </div>
-      <div className="flex gap-1 shrink-0">
-        <a
-          href={`https://monadexplorer.com/address/${address}`}
-          target="_blank"
-          rel="noreferrer"
-          className="p-1.5 rounded-md hover:bg-[rgba(155,127,212,0.12)]"
-          style={{ color: clmm.textMuted }}
-        >
-          <ExternalLink className="w-3.5 h-3.5" />
-        </a>
-      </div>
-    </div>
+    <a
+      href={`https://monadexplorer.com/address/${address}`}
+      target="_blank"
+      rel="noreferrer"
+      className="flex items-center gap-2 min-w-0 py-2 first:pt-0 rounded-lg -mx-1 px-1 transition hover:bg-[rgba(155,127,212,0.12)]"
+    >
+      <TokenIcon address={address} symbol={symbol} size={24} logoUrl={logo} />
+      <span className="font-grotesk text-[13px] shrink-0" style={{ color: clmm.text }}>
+        {symbol}
+      </span>
+      <span className="font-mono text-[10px] truncate min-w-0" style={{ color: clmm.textDim }}>
+        {truncateAddress(address)}
+      </span>
+    </a>
   );
 }
