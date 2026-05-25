@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { getTokenPriceUsd } from "./dexscreener";
 
 /**
  * Static fallback prices — used when CoinGecko is unavailable.
@@ -7,6 +8,9 @@ import { useEffect, useState } from "react";
 export const PRICE_MAP: Record<number, Record<string, number>> = {
   10143: {
     "0x0000000000000000000000000000000000000000": 0, // overwritten by live fetch
+  },
+  143: {
+    "0x0000000000000000000000000000000000000000": 0,
   },
 };
 
@@ -26,6 +30,7 @@ export async function fetchMonPrice(): Promise<number> {
       cachedMonPrice = d.monad.usd;
       lastFetch = now;
       PRICE_MAP[10143]["0x0000000000000000000000000000000000000000"] = cachedMonPrice;
+      PRICE_MAP[143]["0x0000000000000000000000000000000000000000"] = cachedMonPrice;
     }
   } catch {
     // silently fall back to cached / 0
@@ -47,13 +52,49 @@ export function useTokenPriceUsd(chainId: number, token: string): number {
   const monPrice = useMonPrice();
   const lower = token.toLowerCase();
   if (lower === "0x0000000000000000000000000000000000000000") return monPrice;
-  const map = PRICE_MAP[chainId] ?? {};
+  const map = PRICE_MAP[chainId] ?? PRICE_MAP[143] ?? {};
   return (
     map[token] ??
     map[lower] ??
     Object.entries(map).find(([k]) => k.toLowerCase() === lower)?.[1] ??
     0
   );
+}
+
+/** Live ERC-20 USD price (DexScreener) for lock value display. */
+export function useTokenPriceUsdLive(token: string): { priceUsd: number; loading: boolean } {
+  const monPrice = useMonPrice();
+  const lower = token.toLowerCase();
+  const [priceUsd, setPriceUsd] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (lower === "0x0000000000000000000000000000000000000000") {
+      setPriceUsd(monPrice);
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    getTokenPriceUsd(token)
+      .then((p) => {
+        if (!cancelled) {
+          setPriceUsd(p ?? 0);
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPriceUsd(0);
+          setLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, lower, monPrice]);
+
+  return { priceUsd, loading };
 }
 
 export function bigintToUsd(amount: bigint, decimals: number, priceUsd: number): number {

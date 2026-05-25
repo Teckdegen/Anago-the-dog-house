@@ -2,17 +2,32 @@
  * Deployed contract addresses per chain.
  * Fill in after running the deploy scripts in /contracts.
  */
+const TESTNET = {
+  vestingFactory: "0x83Cfd62A53210139f52DB6451bD0aaBDC71De283" as `0x${string}`,
+  tokenLock: "0xCF4171165f807dF47B66d72e731D781Fc62e58df" as `0x${string}`,
+  vestingNFT: "0xF1A3992E1B68295668A6bCE0Dff90f63b6EF8872" as `0x${string}`,
+  streamFarm: "0x8cdaB2A0c70B27E0f6B4eE0540bBC50395978EC1" as `0x${string}`,
+  otcMarket: "0x2B9242272eebF49ca0c2f3fC8Bb2eCf054B14Ef6" as `0x${string}`,
+};
+
+function envAddress(name: string, fallback: `0x${string}`): `0x${string}` {
+  const v = import.meta.env[name];
+  if (typeof v === "string" && /^0x[a-fA-F0-9]{40}$/.test(v)) return v as `0x${string}`;
+  return fallback;
+}
+
 export const CONTRACTS: Record<
   number,
   { vestingFactory: `0x${string}`; tokenLock: `0x${string}`; streamFarm: `0x${string}`; vestingNFT: `0x${string}`; otcMarket: `0x${string}` }
 > = {
-  // Monad testnet (chainId 10143)
-  10143: {
-    vestingFactory: "0x83Cfd62A53210139f52DB6451bD0aaBDC71De283", // legacy — kept for reference
-    tokenLock:      "0xCF4171165f807dF47B66d72e731D781Fc62e58df", // TokenLockNFT (with SVG)
-    vestingNFT:     "0xF1A3992E1B68295668A6bCE0Dff90f63b6EF8872", // VestingNFT (with SVG)
-    streamFarm:     "0x8cdaB2A0c70B27E0f6B4eE0540bBC50395978EC1", // StreamFarm
-    otcMarket:      "0x2B9242272eebF49ca0c2f3fC8Bb2eCf054B14Ef6", // OTCMarket
+  10143: TESTNET,
+  /** Monad mainnet — override via VITE_*_MAINNET in .env.local after deploy */
+  143: {
+    vestingFactory: envAddress("VITE_VESTING_FACTORY_MAINNET", TESTNET.vestingFactory),
+    tokenLock: envAddress("VITE_TOKEN_LOCK_MAINNET", TESTNET.tokenLock),
+    vestingNFT: envAddress("VITE_VESTING_NFT_MAINNET", TESTNET.vestingNFT),
+    streamFarm: envAddress("VITE_STREAM_FARM_MAINNET", TESTNET.streamFarm),
+    otcMarket: envAddress("VITE_OTC_MARKET_MAINNET", TESTNET.otcMarket),
   },
 };
 

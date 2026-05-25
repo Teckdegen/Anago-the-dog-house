@@ -20,6 +20,9 @@ import { formatAmount, formatDate, shortAddr, timeUntil } from "@/lib/web3/forma
 import { useChainId } from "wagmi";
 import { prepareTransactionWithGas } from "@/lib/web3/gasUtils";
 import { usePublicClient } from "wagmi";
+import { TokenIcon } from "@/components/TokenIcon";
+import { bigintToUsd, useTokenPriceUsdLive } from "@/lib/web3/prices";
+import { formatUsdTable } from "@/lib/capricorn/poolMetrics";
 
 export const Route = createFileRoute("/lock")({
   component: LockPage,
@@ -121,6 +124,8 @@ function LockRow({
   });
   const symbol = staticMeta?.symbol ?? (onChain.data?.[0]?.result as string | undefined) ?? `${token.slice(0, 6)}…`;
   const decimals = staticMeta?.decimals ?? (onChain.data?.[1]?.result as number | undefined) ?? 18;
+  const { priceUsd, loading: priceLoading } = useTokenPriceUsdLive(token);
+  const lockUsd = bigintToUsd(amount, decimals, priceUsd);
 
   const tx = useWriteContract();
   const rcpt = useWaitForTransactionReceipt({ hash: tx.data });
@@ -172,12 +177,12 @@ function LockRow({
         style={{ borderBottom: isLast ? "none" : "1px solid rgba(155,127,212,0.15)" }}
       >
       <div className="flex items-center gap-2.5">
-        <div
-          className="w-7 h-7 rounded-full flex items-center justify-center font-grotesk text-[10px]"
-          style={{ background: "rgba(155,127,212,0.15)", border: "1px solid rgba(155,127,212,0.35)", color: "rgba(196,168,240,0.85)" }}
-        >
-          {symbol[0]}
-        </div>
+        <TokenIcon
+          address={token}
+          symbol={symbol}
+          size={28}
+          logoUrl={staticMeta?.logoURI ?? null}
+        />
         <div className="min-w-0">
           <p className="font-grotesk uppercase text-[12px] tracking-wider truncate" style={{ color: "#EDE0FF" }}>{symbol}</p>
           <p className="font-mono text-[9px] truncate" style={{ color: "rgba(196,168,240,0.5)" }}>
@@ -188,7 +193,9 @@ function LockRow({
       <div className="text-right font-grotesk text-[12px] tabular-nums" style={{ color: "rgba(237,224,255,0.9)" }}>
         {formatAmount(amount, decimals)}
       </div>
-      <div className="hidden sm:block text-right font-mono text-[10px]" style={{ color: "rgba(196,168,240,0.4)" }}>—</div>
+      <div className="hidden sm:block text-right font-mono text-[10px] tabular-nums" style={{ color: "rgba(196,168,240,0.75)" }}>
+        {priceLoading ? "…" : lockUsd > 0 ? formatUsdTable(lockUsd) : "—"}
+      </div>
       <div className="hidden sm:block text-right font-mono text-[10px]" style={{ color: "rgba(196,168,240,0.6)" }}>
         {formatDate(unlockAt)}
       </div>
@@ -269,10 +276,7 @@ function TokenLeaderboard({
               style={{ borderBottom: i < tokenLb.length - 1 ? "1px solid rgba(155,127,212,0.15)" : "none" }}>
               <RankBadge rank={i + 1} />
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-7 h-7 rounded-full flex items-center justify-center font-grotesk text-[10px] shrink-0"
-                  style={{ background: "rgba(155,127,212,0.15)", border: "1px solid rgba(155,127,212,0.35)", color: "rgba(196,168,240,0.85)" }}>
-                  {sym[0]}
-                </div>
+                <TokenIcon address={row.address} symbol={sym} size={28} logoUrl={staticMeta?.logoURI ?? null} />
                 <div className="min-w-0">
                   <p className="font-grotesk uppercase text-[12px] tracking-wider" style={{ color: "#EDE0FF" }}>{sym}</p>
                   <p className="font-mono text-[9px] truncate" style={{ color: "rgba(196,168,240,0.45)" }}>{row.address}</p>

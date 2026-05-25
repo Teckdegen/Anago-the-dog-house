@@ -62,29 +62,55 @@ type PairDexStats = {
   sells24h: number | null;
 };
 
-export async function fetchPairDexStats(pairAddress: string): Promise<PairDexStats> {
-  try {
-    const res = await fetch(`https://api.dexscreener.com/latest/dex/pairs/monad/${pairAddress}`, {
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!res.ok) {
-      return { volume24hUsd: null, tvlUsd: null, priceChange24h: null, buys24h: null, sells24h: null };
-    }
-    const json = await res.json();
-    const pair = json?.pair ?? json?.pairs?.[0];
-    const vol = parseFloat(pair?.volume?.h24 ?? "0");
-    const liq = parseFloat(pair?.liquidity?.usd ?? "0");
-    const pc = parseFloat(pair?.priceChange?.h24 ?? "");
-    const tx24 = pair?.txns?.h24;
-    return {
-      volume24hUsd: vol > 0 ? vol : null,
-      tvlUsd: liq > 0 ? liq : null,
-      priceChange24h: Number.isFinite(pc) ? pc : null,
-      buys24h: tx24?.buys != null ? Number(tx24.buys) : null,
-      sells24h: tx24?.sells != null ? Number(tx24.sells) : null,
-    };
-  } catch {
+function parsePairDexStats(pair: Record<string, unknown> | undefined): PairDexStats {
+  if (!pair) {
     return { volume24hUsd: null, tvlUsd: null, priceChange24h: null, buys24h: null, sells24h: null };
+  }
+  const vol = parseFloat(String((pair.volume as { h24?: string })?.h24 ?? "0"));
+  const liq = parseFloat(String((pair.liquidity as { usd?: string })?.usd ?? "0"));
+  const pc = parseFloat(String((pair.priceChange as { h24?: string })?.h24 ?? ""));
+  const tx24 = pair.txns as { h24?: { buys?: number; sells?: number } } | undefined;
+  return {
+    volume24hUsd: vol > 0 ? vol : null,
+    tvlUsd: liq > 0 ? liq : null,
+    priceChange24h: Number.isFinite(pc) ? pc : null,
+    buys24h: tx24?.h24?.buys != null ? Number(tx24.h24.buys) : null,
+    sells24h: tx24?.h24?.sells != null ? Number(tx24.h24.sells) : null,
+  };
+}
+
+export async function fetchPairDexStats(pairAddress: string): Promise<PairDexStats> {
+  const key = pairAddress.toLowerCase();
+  const empty = { volume24hUsd: null, tvlUsd: null, priceChange24h: null, buys24h: null, sells24h: null };
+
+  try {
+    const res = await fetch(`https://api.dexscreener.com/latest/dex/pairs/monad/${key}`, {
+      signal: AbortSignal.timeout(6000),
+    });
+    if (res.ok) {
+      const json = await res.json();
+      const pair = json?.pair ?? json?.pairs?.[0];
+      const stats = parsePairDexStats(pair);
+      if (stats.tvlUsd != null || stats.volume24hUsd != null) return stats;
+    }
+  } catch {
+    /* try search fallback */
+  }
+
+  try {
+    const res = await fetch(`https://api.dexscreener.com/latest/dex/search?q=${key}`, {
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!res.ok) return empty;
+    const json = await res.json();
+    const pairs = (json?.pairs ?? []) as Record<string, unknown>[];
+    const match =
+      pairs.find((p) => String(p.pairAddress ?? "").toLowerCase() === key) ??
+      pairs.find((p) => p.chainId === "monad") ??
+      pairs[0];
+    return parsePairDexStats(match);
+  } catch {
+    return empty;
   }
 }
 
@@ -161,8 +187,9 @@ export async function fetchPoolMetrics(
   let volume24hUsd = pairStats.volume24hUsd;
   let tvlUsd = pairStats.tvlUsd;
 
-  if (!light && publicClient && tvlUsd == null) {
-    tvlUsd = await computeTvlUsd(publicClient, resolved);
+  if (publicClient && (tvlUsd == null || tvlUsd <= 0)) {
+    const onChainTvl = await computeTvlUsd(publicClient, resolved);
+    if (onChainTvl != null && onChainTvl > 0) tvlUsd = onChainTvl;
   }
 
   const [zer0, zer1] = await Promise.all([

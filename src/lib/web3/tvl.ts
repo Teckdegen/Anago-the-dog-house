@@ -1,18 +1,24 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useReadContract, useReadContracts } from "wagmi";
 import { useContractAddresses } from "./hooks";
 import { TOKEN_LOCK_ABI } from "./contracts";
 import { bigintToUsd, useMonPrice } from "./prices";
 import { ERC20_ABI } from "./tokens";
+import { batchGetTokenPrices } from "./dexscreener";
+import { loadAllMetricsCache } from "@/lib/capricorn/poolMetricsCache";
+import { CAPRICORN_POOL_ADDRESSES } from "@/lib/capricorn/pools";
+import { getMonadPublicClient } from "@/lib/capricorn";
+import { fetchPoolMetrics } from "@/lib/capricorn/poolMetrics";
+import { stubPoolsFromAddresses } from "@/lib/capricorn/pools";
 
 const ZERO = "0x0000000000000000000000000000000000000000" as const;
+const NATIVE = ZERO;
 
 // ── Token Lock TVL ────────────────────────────────────────────────────────
 export function useLocksTVL(): { usd: number; isLoading: boolean } {
   const { tokenLock } = useContractAddresses();
   const monPrice = useMonPrice();
 
-  // Fetch all unique locked token addresses, then sum active lock amounts per token
   const allTokensQ = useReadContract({
     address: tokenLock,
     abi: TOKEN_LOCK_ABI,
@@ -22,7 +28,6 @@ export function useLocksTVL(): { usd: number; isLoading: boolean } {
 
   const tokenAddrs = (allTokensQ.data as `0x${string}`[] | undefined) ?? [];
 
-  // For each token, fetch all lock IDs and then their amounts
   const lockIdsQ = useReadContracts({
     allowFailure: true,
     contracts: tokenAddrs.map((t) => ({
@@ -34,11 +39,10 @@ export function useLocksTVL(): { usd: number; isLoading: boolean } {
     query: { enabled: tokenAddrs.length > 0 },
   });
 
-  // Flatten all lock IDs we need to fetch
   const allLockIds = useMemo(() => {
     if (!lockIdsQ.data) return [] as bigint[];
     return lockIdsQ.data.flatMap((r) =>
-      r?.status === "success" ? (r.result as bigint[]) : []
+      r?.status === "success" ? (r.result as bigint[]) : [],
     );
   }, [lockIdsQ.data]);
 
@@ -53,7 +57,6 @@ export function useLocksTVL(): { usd: number; isLoading: boolean } {
     query: { enabled: allLockIds.length > 0 },
   });
 
-  // Aggregate active amounts per token
   const entries = useMemo(() => {
     if (!lockDetailsQ.data) return [] as { token: `0x${string}`; amount: bigint }[];
     const byToken = new Map<`0x${string}`, bigint>();
@@ -67,7 +70,6 @@ export function useLocksTVL(): { usd: number; isLoading: boolean } {
     return Array.from(byToken.entries()).map(([token, amount]) => ({ token, amount }));
   }, [lockDetailsQ.data]);
 
-  // Read decimals for each token
   const decimalsReads = useReadContracts({
     allowFailure: true,
     contracts: entries.map((e) => ({
@@ -78,21 +80,45 @@ export function useLocksTVL(): { usd: number; isLoading: boolean } {
     query: { enabled: entries.length > 0 },
   });
 
+  const [tokenPrices, setTokenPrices] = useState<Map<string, number>>(new Map());
+
+  useEffect(() => {
+    if (entries.length === 0) {
+      setTokenPrices(new Map());
+      return;
+    }
+    const addrs = entries.map((e) => e.token);
+    let cancelled = false;
+    batchGetTokenPrices(addrs).then((map) => {
+      if (!cancelled) setTokenPrices(map);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [entries]);
+
   const usd = useMemo(() => {
     let total = 0;
     for (let i = 0; i < entries.length; i++) {
       const { token, amount } = entries[i];
       const decimals = (decimalsReads.data?.[i]?.result as number | undefined) ?? 18;
-      const isNative = token.toLowerCase() === ZERO;
-      const price = isNative ? monPrice : 0;
+      const key = token.toLowerCase();
+      const price =
+        key === NATIVE
+          ? monPrice
+          : (tokenPrices.get(key) ?? 0);
       total += bigintToUsd(amount, decimals, price);
     }
     return total;
-  }, [entries, decimalsReads.data, monPrice]);
+  }, [entries, decimalsReads.data, monPrice, tokenPrices]);
 
   return {
     usd,
-    isLoading: allTokensQ.isLoading || lockIdsQ.isLoading || lockDetailsQ.isLoading || decimalsReads.isLoading,
+    isLoading:
+      allTokensQ.isLoading ||
+      lockIdsQ.isLoading ||
+      lockDetailsQ.isLoading ||
+      decimalsReads.isLoading,
   };
 }
 
@@ -100,8 +126,67 @@ export function useVestingTVL(): { usd: number; isLoading: boolean } {
   return { usd: 0, isLoading: false };
 }
 
+/** Sum cached + sampled on-chain TVL for Capricorn CL pools (mainnet). */
 export function useCLMMTVL(): { usd: number; isLoading: boolean } {
-  return { usd: 0, isLoading: false };
+  const [usd, setUsd] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const run = async () => {
+      const cache = loadAllMetricsCache();
+      let sum = 0;
+      let cachedCount = 0;
+      for (const m of Object.values(cache)) {
+        if (m.tvlUsd != null && m.tvlUsd > 0) {
+          sum += m.tvlUsd;
+          cachedCount++;
+        }
+      }
+
+      if (cachedCount >= 20) {
+        if (!cancelled) {
+          setUsd(sum);
+          setLoading(false);
+        }
+        return;
+      }
+
+      const client = getMonadPublicClient();
+      const sample = stubPoolsFromAddresses().slice(0, 24);
+      const results = await Promise.all(
+        sample.map(async (pool) => {
+          const cached = cache[pool.address.toLowerCase()];
+          if (cached?.tvlUsd != null && cached.tvlUsd > 0) return cached.tvlUsd;
+          try {
+            const m = await fetchPoolMetrics(pool, client, false, { light: true });
+            return m.tvlUsd ?? 0;
+          } catch {
+            return 0;
+          }
+        }),
+      );
+
+      const sampled = results.reduce((a, b) => a + b, 0);
+      const scale =
+        sample.length > 0 && sampled > 0
+          ? (sampled / sample.length) * CAPRICORN_POOL_ADDRESSES.length
+          : sum;
+
+      if (!cancelled) {
+        setUsd(Math.max(sum, scale));
+        setLoading(false);
+      }
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return { usd, isLoading: loading };
 }
 
 export function useFarmTVL(): { usd: number; isLoading: boolean } {

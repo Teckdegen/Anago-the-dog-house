@@ -25,6 +25,11 @@ function tvlOf(row: EnrichedPool): number {
   return v != null && Number.isFinite(v) ? v : -1;
 }
 
+function metricNum(row: EnrichedPool, key: "aprPercent" | "volume24hUsd" | "tvlUsd"): number {
+  const v = row.metrics[key];
+  return v != null && Number.isFinite(v) ? v : -1;
+}
+
 /** Highest TVL first (unknown TVL last). */
 function sortByTvlDesc(rows: EnrichedPool[]): EnrichedPool[] {
   return [...rows].sort((a, b) => tvlOf(b) - tvlOf(a));
@@ -35,26 +40,10 @@ function sortRows(rows: EnrichedPool[], sort: string, order: "asc" | "desc"): En
     return sortByTvlDesc(rows);
   }
 
-  const key =
-    sort === "apr"
-      ? "aprPercent"
-      : sort === "vol"
-        ? "volume24hUsd"
-        : sort === "liquidity"
-          ? "liquidity"
-          : "tvlUsd";
+  const key: "aprPercent" | "volume24hUsd" | "tvlUsd" =
+    sort === "apr" ? "aprPercent" : sort === "vol" ? "volume24hUsd" : "tvlUsd";
   const mult = order === "asc" ? 1 : -1;
-  return [...rows].sort((a, b) => {
-    const av =
-      key === "liquidity"
-        ? Number(a.liquidity ?? 0)
-        : ((a.metrics as Record<string, number | null>)[key] ?? -1);
-    const bv =
-      key === "liquidity"
-        ? Number(b.liquidity ?? 0)
-        : ((b.metrics as Record<string, number | null>)[key] ?? -1);
-    return (av - bv) * mult;
-  });
+  return [...rows].sort((a, b) => (metricNum(a, key) - metricNum(b, key)) * mult);
 }
 
 function paginate<T>(items: T[], page: number, limit: number): T[] {
@@ -78,7 +67,7 @@ function filterByQuery(rows: EnrichedPool[], q: string): EnrichedPool[] {
   return rows.filter((r) => matchesQuery(r, trimmed));
 }
 
-/** DexScreener + minimal RPC — TVL/volume/symbols for sorting. */
+/** Fetch real TVL/APR for visible page only (mainnet RPC + DexScreener). */
 async function enrichPoolsOnChain(rows: EnrichedPool[]): Promise<EnrichedPool[]> {
   const client = getMonadPublicClient();
 
@@ -111,7 +100,7 @@ async function enrichPoolsOnChain(rows: EnrichedPool[]): Promise<EnrichedPool[]>
         });
       }
     },
-    { concurrency: 2, delayMs: 300 },
+    { concurrency: 2, delayMs: 350 },
   );
 }
 
@@ -139,23 +128,20 @@ export function useClmmPoolsPage(query: ClmmPoolsQuery, enabled = true) {
     try {
       const stubs = stubPoolsFromAddresses().map(stubToEnriched);
       let working = filterByQuery(stubs, q);
-      const sortedStub = sort === "tvl" && order === "desc" ? sortByTvlDesc(working) : sortRows(working, sort, order);
+      const sortedStub = sortRows(working, sort, order);
+      const pageSlice = paginate(sortedStub, page, limit);
 
-      setRows(paginate(sortedStub, page, limit));
+      setRows(pageSlice);
       setTotal(working.length);
       setTotalPages(Math.ceil(working.length / limit) || 0);
       setLoading(false);
 
       setEnriching(true);
-      const enriched = await enrichPoolsOnChain(working);
+      const enrichedPage = await enrichPoolsOnChain(pageSlice);
       if (gen !== enrichGen.current) return;
 
-      working = filterByQuery(enriched, q);
-      const sorted = sort === "tvl" && order === "desc" ? sortByTvlDesc(working) : sortRows(working, sort, order);
-
-      setRows(paginate(sorted, page, limit));
-      setTotal(working.length);
-      setTotalPages(Math.ceil(working.length / limit) || 0);
+      const sortedPage = sortRows(enrichedPage, sort, order);
+      setRows(sortedPage);
     } catch (e) {
       if (gen !== enrichGen.current) return;
       setError(e instanceof Error ? e.message : String(e));
