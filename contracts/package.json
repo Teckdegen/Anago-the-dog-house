@@ -6,6 +6,9 @@
   "scripts": {
     "compile": "hardhat compile",
     "test": "hardhat test",
+    "deploy:suite": "hardhat run scripts/deploySuite.ts --network monadTestnet",
+    "deploy:testnet": "hardhat run scripts/deploySuite.ts --network monadTestnet",
+    "deploy:mainnet": "hardhat run scripts/deploySuite.ts --network monad",
     "deploy:all": "hardhat run scripts/deployAll.ts --network monadTestnet",
     "deploy:vesting": "hardhat run scripts/deployVesting.ts --network monadTestnet",
     "deploy:cliff": "hardhat run scripts/deployVestingCliff.ts --network monadTestnet",

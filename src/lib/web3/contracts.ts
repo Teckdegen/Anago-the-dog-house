@@ -1,13 +1,14 @@
 /**
  * Deployed contract addresses per chain.
- * Fill in after running the deploy scripts in /contracts.
+ * Run `npm run deploy:testnet` or `npm run deploy:mainnet` in /contracts (writes deployments.generated.ts).
  */
-const TESTNET = {
-  vestingFactory: "0x83Cfd62A53210139f52DB6451bD0aaBDC71De283" as `0x${string}`,
-  tokenLock: "0xCF4171165f807dF47B66d72e731D781Fc62e58df" as `0x${string}`,
-  vestingNFT: "0xF1A3992E1B68295668A6bCE0Dff90f63b6EF8872" as `0x${string}`,
-  streamFarm: "0x8cdaB2A0c70B27E0f6B4eE0540bBC50395978EC1" as `0x${string}`,
-  otcMarket: "0x2B9242272eebF49ca0c2f3fC8Bb2eCf054B14Ef6" as `0x${string}`,
+import { TESTNET_DEPLOYMENTS } from "./deployments.generated";
+
+const DEPLOYED = {
+  tokenLock: TESTNET_DEPLOYMENTS.tokenLock,
+  vestingNFT: TESTNET_DEPLOYMENTS.vestingNFT,
+  streamFarm: TESTNET_DEPLOYMENTS.streamFarm,
+  otcMarket: TESTNET_DEPLOYMENTS.otcMarket,
 };
 
 function envAddress(name: string, fallback: `0x${string}`): `0x${string}` {
@@ -16,18 +17,21 @@ function envAddress(name: string, fallback: `0x${string}`): `0x${string}` {
   return fallback;
 }
 
-export const CONTRACTS: Record<
-  number,
-  { vestingFactory: `0x${string}`; tokenLock: `0x${string}`; streamFarm: `0x${string}`; vestingNFT: `0x${string}`; otcMarket: `0x${string}` }
-> = {
-  10143: TESTNET,
+export type ContractAddresses = {
+  tokenLock: `0x${string}`;
+  vestingNFT: `0x${string}`;
+  streamFarm: `0x${string}`;
+  otcMarket: `0x${string}`;
+};
+
+export const CONTRACTS: Record<number, ContractAddresses> = {
+  [TESTNET_DEPLOYMENTS.chainId]: DEPLOYED,
   /** Monad mainnet — override via VITE_*_MAINNET in .env.local after deploy */
   143: {
-    vestingFactory: envAddress("VITE_VESTING_FACTORY_MAINNET", TESTNET.vestingFactory),
-    tokenLock: envAddress("VITE_TOKEN_LOCK_MAINNET", TESTNET.tokenLock),
-    vestingNFT: envAddress("VITE_VESTING_NFT_MAINNET", TESTNET.vestingNFT),
-    streamFarm: envAddress("VITE_STREAM_FARM_MAINNET", TESTNET.streamFarm),
-    otcMarket: envAddress("VITE_OTC_MARKET_MAINNET", TESTNET.otcMarket),
+    tokenLock: envAddress("VITE_TOKEN_LOCK_MAINNET", DEPLOYED.tokenLock),
+    vestingNFT: envAddress("VITE_VESTING_NFT_MAINNET", DEPLOYED.vestingNFT),
+    streamFarm: envAddress("VITE_STREAM_FARM_MAINNET", DEPLOYED.streamFarm),
+    otcMarket: envAddress("VITE_OTC_MARKET_MAINNET", DEPLOYED.otcMarket),
   },
 };
 

@@ -12,6 +12,7 @@ import { AppShell } from "@/components/AppShell";
 import { useUserLocks, useUserVestings } from "@/lib/web3/hooks";
 import { useClmmPositionCount, useFarmPositionCount } from "@/hooks/useDashboardPositions";
 import { useAllTokenBalances } from "@/lib/web3/hooks";
+import { TestnetContractsPanel } from "@/components/TestnetContractsPanel";
 
 export const Route = createFileRoute("/dashboard")({
   component: DashboardPage,
