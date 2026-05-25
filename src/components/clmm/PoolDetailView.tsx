@@ -1,12 +1,11 @@
 import { Link } from "@tanstack/react-router";
-import { Copy, ExternalLink, MoreHorizontal, Share2 } from "lucide-react";
+import { Copy, ExternalLink } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { TokenIcon } from "@/components/TokenIcon";
 import { PoolPairLogos } from "@/components/clmm/PoolPairLogos";
 import { formatApr, formatUsdCompact, truncateAddress, type PoolMetrics } from "@/lib/capricorn/poolMetrics";
 import { feeToPercent, type CachedPool, type PoolLiveState } from "@/lib/capricorn";
 import { PoolVolumeChart } from "./PoolVolumeChart";
-import { PoolTransactionsTable } from "./PoolTransactionsTable";
 import { SwapPanel } from "./SwapPanel";
 import { ClmmTxGate } from "./SwitchToMonadMainnet";
 import { clmm } from "./clmmTheme";
@@ -54,7 +53,7 @@ export function PoolDetailView({
         </span>
       </nav>
 
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="flex flex-wrap items-start gap-4">
         <div className="flex items-center gap-3 min-w-0">
           <PoolPairLogos
             token0={live.pool.token0}
@@ -73,22 +72,8 @@ export function PoolDetailView({
               <Badge>v3</Badge>
               <Badge>{feeLabel}</Badge>
             </div>
-            <PoolIdCopy id={m.displayId} />
+            <PoolIdCopy id={m.displayId} poolAddress={poolAddress} />
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <IconBtn icon={Share2} label="Share" />
-          <a
-            href={`https://monadexplorer.com/address/${poolAddress}`}
-            target="_blank"
-            rel="noreferrer"
-            className="p-2 rounded-lg transition hover:bg-[rgba(155,127,212,0.1)]"
-            style={{ color: clmm.textMuted }}
-            aria-label="Explorer"
-          >
-            <ExternalLink className="w-4 h-4" />
-          </a>
-          <IconBtn icon={MoreHorizontal} label="More" />
         </div>
       </div>
 
@@ -107,13 +92,6 @@ export function PoolDetailView({
                 ? live.pool.token0
                 : live.pool.token1
             }
-          />
-          <PoolTransactionsTable
-            poolAddress={poolAddress}
-            token0Decimals={live.token0Decimals}
-            token1Decimals={live.token1Decimals}
-            symbol0={m.symbol0}
-            symbol1={m.symbol1}
           />
         </div>
 
@@ -157,6 +135,12 @@ export function PoolDetailView({
               subNegative={m.priceChange24h != null && m.priceChange24h < 0}
             />
             <StatRow label="24H fees" value={formatUsdCompact(m.fees24hUsd)} />
+            {(m.buys24h != null || m.sells24h != null) && (
+              <StatRow
+                label="24H trades"
+                value={`${m.buys24h ?? 0} buys · ${m.sells24h ?? 0} sells`}
+              />
+            )}
             <div className="mt-4 pt-4" style={{ borderTop: `1px solid ${clmm.border}` }}>
               <p className="font-mono text-[9px] uppercase mb-2" style={{ color: clmm.textDim }}>
                 Pool balances
@@ -191,36 +175,34 @@ function Badge({ children }: { children: ReactNode }) {
   );
 }
 
-function PoolIdCopy({ id }: { id: string }) {
+function PoolIdCopy({ id, poolAddress }: { id: string; poolAddress: `0x${string}` }) {
   const [copied, setCopied] = useState(false);
   return (
-    <button
-      type="button"
-      className="flex items-center gap-1.5 font-mono text-[10px] mt-1 hover:opacity-80"
-      style={{ color: clmm.textDim }}
-      onClick={() => {
-        void navigator.clipboard.writeText(id);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      }}
-    >
-      {truncateAddress(id, 8, 6)}
-      <Copy className="w-3 h-3" />
-      {copied && <span style={{ color: clmm.green }}>copied</span>}
-    </button>
-  );
-}
-
-function IconBtn({ icon: Icon, label }: { icon: typeof Share2; label: string }) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      className="p-2 rounded-lg transition hover:bg-[rgba(155,127,212,0.1)]"
-      style={{ color: clmm.textMuted }}
-    >
-      <Icon className="w-4 h-4" />
-    </button>
+    <div className="flex items-center gap-2 mt-1">
+      <button
+        type="button"
+        className="flex items-center gap-1.5 font-mono text-[10px] hover:opacity-80"
+        style={{ color: clmm.textDim }}
+        onClick={() => {
+          void navigator.clipboard.writeText(poolAddress);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+        }}
+      >
+        {truncateAddress(id, 8, 6)}
+        <Copy className="w-3 h-3" />
+        {copied && <span style={{ color: clmm.green }}>copied</span>}
+      </button>
+      <a
+        href={`https://monadexplorer.com/address/${poolAddress}`}
+        target="_blank"
+        rel="noreferrer"
+        className="font-mono text-[10px] hover:underline"
+        style={{ color: clmm.textMuted }}
+      >
+        Explorer
+      </a>
+    </div>
   );
 }
 

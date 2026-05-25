@@ -43,6 +43,8 @@ export type PoolMetrics = {
   aprPercent: number | null;
   priceUsd: number | null;
   priceChange24h: number | null;
+  buys24h: number | null;
+  sells24h: number | null;
   priceNative: string | null;
   updatedAt: number;
 };
@@ -202,6 +204,8 @@ export async function fetchPoolMetrics(
     aprPercent,
     priceUsd: meta0?.priceUsd ?? null,
     priceChange24h,
+    buys24h: pairStats.buys24h,
+    sells24h: pairStats.sells24h,
     priceNative: null,
     updatedAt: Date.now(),
   };
@@ -230,6 +234,8 @@ export function enrichFromCache(pool: CachedPool): EnrichedPool {
     aprPercent: null,
     priceUsd: null,
     priceChange24h: null,
+    buys24h: null,
+    sells24h: null,
     priceNative: null,
     updatedAt: 0,
   };

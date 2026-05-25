@@ -106,28 +106,3 @@ export async function fetchZerionTokenChart(
   const points = json?.data?.attributes?.points ?? [];
   return points.map((p) => p[1]).filter((v) => Number.isFinite(v) && v > 0);
 }
-
-export type PoolSwapRow = {
-  txHash: string;
-  sender: string;
-  recipient: string;
-  type: string;
-  timestamp: number;
-  amount0: string;
-  amount1: string;
-};
-
-export async function fetchPoolSwapsFromApi(
-  poolAddress: string,
-  opts?: { limit?: number; decimals0?: number; decimals1?: number },
-): Promise<PoolSwapRow[]> {
-  const params = new URLSearchParams({ pool: poolAddress.toLowerCase() });
-  params.set("limit", String(opts?.limit ?? 40));
-  if (opts?.decimals0 != null) params.set("decimals0", String(opts.decimals0));
-  if (opts?.decimals1 != null) params.set("decimals1", String(opts.decimals1));
-
-  const res = await fetch(`/api/clmm/swaps?${params}`, { signal: AbortSignal.timeout(30_000) });
-  const json = (await res.json()) as { swaps?: PoolSwapRow[]; error?: string };
-  if (!res.ok) throw new Error(json.error ?? `Swaps API ${res.status}`);
-  return json.swaps ?? [];
-}

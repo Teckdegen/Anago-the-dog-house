@@ -11,7 +11,6 @@ export function v4ApiDevPlugin(): Plugin {
     name: "clmm-api-dev",
     configureServer(server) {
       let clmmPoolsHandler: ApiHandler | null = null;
-      let clmmSwapsHandler: ApiHandler | null = null;
       let clmmSyncHandler: ApiHandler | null = null;
       let zerionHandler: ApiHandler | null = null;
 
@@ -30,11 +29,6 @@ export function v4ApiDevPlugin(): Plugin {
 
         if (url === "/api/clmm/pools" && req.method === "GET" && clmmPoolsHandler) {
           await clmmPoolsHandler(req, res);
-          return;
-        }
-
-        if (url === "/api/clmm/swaps" && req.method === "GET" && clmmSwapsHandler) {
-          await clmmSwapsHandler(req, res);
           return;
         }
 
