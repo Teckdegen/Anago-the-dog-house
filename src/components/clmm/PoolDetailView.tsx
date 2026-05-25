@@ -10,7 +10,7 @@ import {
   type PoolMetrics,
 } from "@/lib/capricorn/poolMetrics";
 import { feeToPercent, type CachedPool, type PoolLiveState } from "@/lib/capricorn";
-import { PoolVolumeChart } from "./PoolVolumeChart";
+import { PoolChartEmbeds } from "./PoolChartEmbeds";
 import { SwapPanel } from "./SwapPanel";
 import { ClmmTxGate } from "./SwitchToMonadMainnet";
 import { clmm } from "./clmmTheme";
@@ -84,19 +84,10 @@ export function PoolDetailView({
 
       <div className="grid lg:grid-cols-[1fr_340px] gap-6 items-start">
         <div>
-          <PoolVolumeChart
-            volume24hUsd={m.volume24hUsd}
-            livePrice={live.price}
+          <PoolChartEmbeds
+            poolAddress={poolAddress}
             symbol0={m.symbol0}
             symbol1={m.symbol1}
-            tvlUsd={m.tvlUsd}
-            priceChange24h={m.priceChange24h}
-            chartTokenAddress={
-              live.token1Symbol.toUpperCase().includes("MON") &&
-              !live.token0Symbol.toUpperCase().includes("MON")
-                ? live.pool.token0
-                : live.pool.token1
-            }
           />
         </div>
 

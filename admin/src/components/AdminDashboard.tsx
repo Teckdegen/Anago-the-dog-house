@@ -5,6 +5,7 @@ import { useAccount, useReadContract, useReadContracts, useWriteContract, useWai
 import { useState, useEffect } from "react";
 import { parseUnits, formatUnits } from "viem";
 import { STREAM_FARM_ADDRESS, STREAM_FARM_ABI, ERC20_ABI } from "@/lib/contracts";
+import { DEFAULT_CHAIN_ID, EXPLORER_BASE } from "@/lib/deployments";
 
 export default function AdminDashboard() {
   const { address, isConnected } = useAccount();
@@ -36,7 +37,7 @@ export default function AdminDashboard() {
             <div className="w-6 h-6 rounded-full border-2 animate-spin" style={{ borderColor: "rgba(155,127,212,0.2)", borderTopColor: "#9B7FD4" }} />
           </div>
         ) : !isAdmin ? (
-          <EmptyState title="Access Denied" sub={`${address?.slice(0, 6)}...${address?.slice(-4)} is not an admin.`} />
+          <AccessDenied address={address} />
         ) : (
           <Dashboard />
         )}
@@ -54,6 +55,23 @@ function EmptyState({ title, sub }: { title: string; sub: string }) {
   );
 }
 
+function AccessDenied({ address }: { address?: string }) {
+  return (
+    <div className="max-w-lg mx-auto py-20 space-y-4">
+      <EmptyState
+        title="Access Denied"
+        sub={`${address?.slice(0, 6)}…${address?.slice(-4)} is not an admin on this StreamFarm.`}
+      />
+      <div className="rounded-2xl p-5 font-mono text-[11px] space-y-2" style={{ background: "rgba(155,127,212,0.04)", border: "1px solid rgba(155,127,212,0.15)", color: "rgba(196,168,240,0.65)" }}>
+        <p className="font-grotesk text-[13px]" style={{ color: "#EDE0FF" }}>How to get access</p>
+        <p>1. Connect the wallet that <strong>deployed</strong> StreamFarm (contract owner), or</p>
+        <p>2. Ask the owner to open this dashboard → <strong>Admins</strong> tab → <strong>Add Admin</strong> with your address.</p>
+        <p className="pt-2">Contract: {STREAM_FARM_ADDRESS.slice(0, 10)}… · chain {DEFAULT_CHAIN_ID}</p>
+      </div>
+    </div>
+  );
+}
+
 function Dashboard() {
   const { address } = useAccount();
   const [section, setSection] = useState("overview");
@@ -63,6 +81,7 @@ function Dashboard() {
   const farmCount = Number(farmCountQ.data ?? 0);
   const owner = ownerQ.data as string | undefined;
   const isOwner = !!address && owner?.toLowerCase() === address.toLowerCase();
+  const roleLabel = isOwner ? "Owner" : "Admin";
 
   const tabs = [
     { key: "overview", label: "Overview" },
@@ -85,13 +104,23 @@ function Dashboard() {
           </div>
           <div>
             <p className="font-mono text-[10px] uppercase tracking-wider" style={{ color: "rgba(196,168,240,0.5)" }}>Contract</p>
-            <p className="font-mono text-[13px] mt-2" style={{ color: "#C4A8F0" }}>{STREAM_FARM_ADDRESS.slice(0, 18)}...</p>
-            <p className="font-mono text-[10px] mt-1" style={{ color: "rgba(196,168,240,0.4)" }}>StreamFarm</p>
+            <a
+              href={`${EXPLORER_BASE}/address/${STREAM_FARM_ADDRESS}`}
+              target="_blank"
+              rel="noreferrer"
+              className="font-mono text-[13px] mt-2 block hover:underline"
+              style={{ color: "#C4A8F0" }}
+            >
+              {STREAM_FARM_ADDRESS.slice(0, 10)}…{STREAM_FARM_ADDRESS.slice(-6)}
+            </a>
+            <p className="font-mono text-[10px] mt-1" style={{ color: "rgba(196,168,240,0.4)" }}>chain {DEFAULT_CHAIN_ID}</p>
           </div>
           <div>
-            <p className="font-mono text-[10px] uppercase tracking-wider" style={{ color: "rgba(196,168,240,0.5)" }}>Owner</p>
-            <p className="font-mono text-[13px] mt-2" style={{ color: "#EDE0FF" }}>{owner?.slice(0, 12)}...{owner?.slice(-6)}</p>
-            <p className="font-mono text-[10px] mt-1" style={{ color: "rgba(196,168,240,0.4)" }}>{isOwner ? "You" : "Not you"}</p>
+            <p className="font-mono text-[10px] uppercase tracking-wider" style={{ color: "rgba(196,168,240,0.5)" }}>Your role</p>
+            <p className="font-grotesk text-[18px] font-medium mt-1" style={{ color: "#EDE0FF" }}>{roleLabel}</p>
+            <p className="font-mono text-[10px] mt-1" style={{ color: "rgba(196,168,240,0.4)" }}>
+              {isOwner ? "Can add/remove admins" : "Manage farms & rewards"}
+            </p>
           </div>
         </div>
       </div>
@@ -108,7 +137,7 @@ function Dashboard() {
       </div>
 
       {/* Content */}
-      {section === "overview" && <OverviewSection farmCount={farmCount} />}
+      {section === "overview" && <OverviewSection farmCount={farmCount} isOwner={isOwner} />}
       {section === "create" && <CreateFarmSection />}
       {section === "rewards" && <AddRewardSection farmCount={farmCount} />}
       {section === "boosts" && <BoostTiersSection />}
@@ -119,8 +148,20 @@ function Dashboard() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-function OverviewSection({ farmCount }: { farmCount: number }) {
-  if (farmCount === 0) return <Card><p className="text-center py-12 font-mono text-[12px]" style={{ color: "rgba(196,168,240,0.4)" }}>No farms created yet. Go to "Create Farm" to get started.</p></Card>;
+function OverviewSection({ farmCount, isOwner }: { farmCount: number; isOwner: boolean }) {
+  if (farmCount === 0) {
+    return (
+      <Card>
+        <CardTitle>No farms yet</CardTitle>
+        <ol className="font-mono text-[11px] space-y-2 list-decimal list-inside" style={{ color: "rgba(196,168,240,0.6)" }}>
+          <li>Open <strong style={{ color: "#EDE0FF" }}>Create Farm</strong> — set stake token, lock days, early-exit penalty %.</li>
+          <li>Open <strong style={{ color: "#EDE0FF" }}>Add Rewards</strong> — approve reward token, set budget & duration.</li>
+          <li>Users stake on the main app <strong style={{ color: "#EDE0FF" }}>/farm</strong> page.</li>
+          {!isOwner && <li>Need to onboard another manager? Ask the contract <strong>owner</strong> to use the Admins tab.</li>}
+        </ol>
+      </Card>
+    );
+  }
   return (
     <div className="space-y-3">
       {Array.from({ length: farmCount }, (_, i) => <FarmRow key={i} farmId={i} />)}
