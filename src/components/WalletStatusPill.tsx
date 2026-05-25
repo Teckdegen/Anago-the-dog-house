@@ -22,11 +22,13 @@ function shorten(a: string) {
   return `${a.slice(0, 6)}…${a.slice(-4)}`;
 }
 
-/** Deterministic avatar from wallet address (GZ purple palette). */
+/** Deterministic avatar from wallet address — always GZ purple (never green/gold hues). */
 function WalletAvatar({ address, size = 32 }: { address: string; size?: number }) {
   const seed = parseInt(address.slice(2, 10), 16);
-  const hue = seed % 360;
   const monogram = address.slice(2, 4).toUpperCase();
+  const hue = 262 + (seed % 22);
+  const lightTop = 48 + (seed % 10);
+  const lightBot = 32 + (seed % 8);
 
   return (
     <div
@@ -36,8 +38,9 @@ function WalletAvatar({ address, size = 32 }: { address: string; size?: number }
         height: size,
         fontSize: size * 0.34,
         color: "#EDE0FF",
-        background: `linear-gradient(145deg, hsl(${hue}, 48%, 38%) 0%, hsl(${(hue + 55) % 360}, 42%, 28%) 100%)`,
-        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.2), 0 0 0 2px rgba(155,127,212,0.35)",
+        background: `linear-gradient(145deg, hsl(${hue}, 55%, ${lightTop}%) 0%, hsl(${hue + 8}, 50%, ${lightBot}%) 100%)`,
+        boxShadow:
+          "inset 0 1px 0 rgba(255,255,255,0.18), 0 0 0 2px rgba(155,127,212,0.45)",
       }}
       aria-hidden
     >
