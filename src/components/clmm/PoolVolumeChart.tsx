@@ -31,20 +31,21 @@ export function PoolVolumeChart({
   const [zerionSeries, setZerionSeries] = useState<number[] | null>(null);
 
   useEffect(() => {
-    if (!chartTokenAddress || metric !== "Price") {
+    if (!chartTokenAddress) {
       setZerionSeries(null);
       return;
     }
     const period = range === "1D" ? "hour" : range === "1W" ? "day" : "week";
     let cancelled = false;
+    setZerionSeries(null);
     fetchZerionTokenChart(chartTokenAddress, period).then((pts) => {
-      if (!cancelled && pts.length >= 3) setZerionSeries(pts);
+      if (!cancelled && pts.length >= 2) setZerionSeries(pts);
       else if (!cancelled) setZerionSeries(null);
     });
     return () => {
       cancelled = true;
     };
-  }, [chartTokenAddress, range, metric]);
+  }, [chartTokenAddress, range]);
 
   const bars = useMemo(() => {
     if (metric === "Price" && zerionSeries?.length) return zerionSeries;
@@ -52,14 +53,35 @@ export function PoolVolumeChart({
   }, [metric, volume24hUsd, livePrice, tvlUsd, priceChange24h, range, zerionSeries]);
   const max = Math.max(...bars, 1e-9);
 
-  const headline =
-    metric === "Volume"
-      ? formatUsdCompact(volume24hUsd)
-      : metric === "Liquidity"
-        ? formatUsdCompact(tvlUsd)
-        : formatPrice(livePrice);
+  const periodChangePct = useMemo(() => {
+    const fromSeries = changePctFromSeries(bars);
+    if (fromSeries != null) return fromSeries;
+    if (zerionSeries && zerionSeries.length >= 2) {
+      return changePctFromSeries(zerionSeries);
+    }
+    if (range === "1D" && metric === "Price") return priceChange24h;
+    return null;
+  }, [bars, zerionSeries, range, metric, priceChange24h]);
 
-  const changeLabel = formatDailyChange(priceChange24h);
+  const headline = useMemo(() => {
+    if (metric === "Price") {
+      if (zerionSeries?.length) return formatPrice(zerionSeries[zerionSeries.length - 1]!);
+      return formatPrice(livePrice);
+    }
+    if (metric === "Volume") {
+      const total = bars.reduce((s, v) => s + v, 0);
+      if (total > 0) return formatUsdCompact(total);
+      return formatUsdCompact(volume24hUsd);
+    }
+    if (metric === "Liquidity") {
+      const last = bars[bars.length - 1];
+      if (last != null && last > 0) return formatUsdCompact(last);
+      return formatUsdCompact(tvlUsd);
+    }
+    return "—";
+  }, [metric, bars, zerionSeries, livePrice, volume24hUsd, tvlUsd]);
+
+  const changeLabel = formatPeriodChange(periodChangePct);
 
   return (
     <div
@@ -121,18 +143,29 @@ export function PoolVolumeChart({
       </div>
       <p className="font-mono text-[9px] mt-3" style={{ color: clmm.textDim }}>
         {metric === "Price" && zerionSeries?.length
-          ? "Price chart · Zerion"
+          ? `Price · Zerion (${rangeLabel(range)})`
           : metric === "Volume"
-            ? "24h volume · DexScreener total (bars illustrative)"
-            : metric === "Price"
-              ? "24h price trend (estimated)"
-              : "Pool liquidity (estimated)"}
+            ? `Volume trend (${rangeLabel(range)})`
+            : `Liquidity trend (${rangeLabel(range)})`}
       </p>
     </div>
   );
 }
 
-function formatDailyChange(pct: number | null): { text: string; negative: boolean } | null {
+function rangeLabel(range: Range): string {
+  return range === "1D" ? "24h" : range === "1W" ? "7d" : "30d";
+}
+
+/** % move from first → last point in the active chart series. */
+function changePctFromSeries(values: number[]): number | null {
+  if (values.length < 2) return null;
+  const first = values[0]!;
+  const last = values[values.length - 1]!;
+  if (!Number.isFinite(first) || !Number.isFinite(last) || first <= 0) return null;
+  return ((last - first) / first) * 100;
+}
+
+function formatPeriodChange(pct: number | null): { text: string; negative: boolean } | null {
   if (pct == null || !Number.isFinite(pct) || Math.abs(pct) < 0.005) return null;
   const negative = pct < 0;
   return {
