@@ -6,6 +6,8 @@ import { isMetricsFresh, getCachedMetrics } from "@/lib/capricorn/poolMetricsCac
 import { mapInBatches } from "@/lib/capricorn/rpcQueue";
 import { fetchClmmPoolsPage, type ClmmPoolsQuery } from "@/lib/clmm/api";
 
+const EXPLORE_POOL_CAP = 500;
+
 function apiRowToCached(row: EnrichedPool): CachedPool {
   return {
     address: row.address,
@@ -33,7 +35,21 @@ function rowFromApi(pool: EnrichedPool): EnrichedPool {
   return enrichFromCache(apiRowToCached(pool));
 }
 
+function tvlOf(row: EnrichedPool): number {
+  const v = row.metrics?.tvlUsd;
+  return v != null && Number.isFinite(v) ? v : -1;
+}
+
+/** Highest TVL first (null / unknown TVL last). */
+function sortByTvlDesc(rows: EnrichedPool[]): EnrichedPool[] {
+  return [...rows].sort((a, b) => tvlOf(b) - tvlOf(a));
+}
+
 function sortRows(rows: EnrichedPool[], sort: string, order: "asc" | "desc"): EnrichedPool[] {
+  if (sort === "tvl" && order === "desc") {
+    return sortByTvlDesc(rows);
+  }
+
   const key =
     sort === "apr"
       ? "aprPercent"
@@ -56,7 +72,11 @@ function sortRows(rows: EnrichedPool[], sort: string, order: "asc" | "desc"): En
   });
 }
 
-/** Refresh metrics off-chain APIs first; minimal Monad RPC (metadata only when DB row is empty). */
+function paginate<T>(items: T[], page: number, limit: number): T[] {
+  const from = (page - 1) * limit;
+  return items.slice(from, from + limit);
+}
+
 async function enrichPoolsOnChain(rows: EnrichedPool[]): Promise<EnrichedPool[]> {
   const client = getMonadPublicClient();
 
@@ -96,19 +116,43 @@ export function useClmmPoolsPage(query: ClmmPoolsQuery, enabled = true) {
     try {
       const sort = query.sort ?? "tvl";
       const order = query.order ?? "desc";
-      const data = await fetchClmmPoolsPage(query);
+      const page = query.page ?? 1;
+      const limit = query.limit ?? 20;
+      const q = query.q?.trim() ?? "";
+
+      const data = await fetchClmmPoolsPage({
+        page: q ? page : 1,
+        limit: q ? limit : EXPLORE_POOL_CAP,
+        sort: "tvl",
+        order: "desc",
+        q: q || undefined,
+      });
       if (gen !== enrichGen.current) return;
 
       const initial = data.pools.map(rowFromApi);
-      setRows(sortRows(initial, sort, order));
-      setTotal(data.total);
-      setTotalPages(data.totalPages);
+      const sortedInitial = q ? sortRows(initial, sort, order) : sortByTvlDesc(initial);
+
+      if (q) {
+        setRows(sortedInitial);
+        setTotal(data.total);
+        setTotalPages(data.totalPages);
+      } else {
+        setRows(paginate(sortedInitial, page, limit));
+        setTotal(data.total);
+        setTotalPages(Math.ceil(data.total / limit) || 0);
+      }
       setLoading(false);
 
       setEnriching(true);
       const enriched = await enrichPoolsOnChain(data.pools);
       if (gen !== enrichGen.current) return;
-      setRows(sortRows(enriched, sort, order));
+
+      const sorted = q ? sortRows(enriched, sort, order) : sortByTvlDesc(enriched);
+      if (q) {
+        setRows(sorted);
+      } else {
+        setRows(paginate(sorted, page, limit));
+      }
     } catch (e) {
       if (gen !== enrichGen.current) return;
       setError(e instanceof Error ? e.message : String(e));

@@ -18,20 +18,27 @@ export default defineConfig(({ mode }) => {
       v4ApiDevPlugin(),
     ],
     server: {
-      proxy: blockVisionKey
-        ? {
-            "/bv": {
-              target: "https://api.blockvision.org",
-              changeOrigin: true,
-              rewrite: (path) => path.replace(/^\/bv/, "/v2"),
-              configure: (proxy) => {
-                proxy.on("proxyReq", (proxyReq) => {
-                  proxyReq.setHeader("x-api-key", blockVisionKey);
-                });
+      proxy: {
+        "/bs": {
+          target: "https://monad.blockscout.com",
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/bs/, "/api/v2"),
+        },
+        ...(blockVisionKey
+          ? {
+              "/bv": {
+                target: "https://api.blockvision.org",
+                changeOrigin: true,
+                rewrite: (path) => path.replace(/^\/bv/, "/v2"),
+                configure: (proxy) => {
+                  proxy.on("proxyReq", (proxyReq) => {
+                    proxyReq.setHeader("x-api-key", blockVisionKey);
+                  });
+                },
               },
-            },
-          }
-        : undefined,
+            }
+          : {}),
+      },
     },
   };
 });

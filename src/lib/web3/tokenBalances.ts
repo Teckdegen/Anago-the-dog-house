@@ -12,6 +12,7 @@ import {
   parseBalanceRaw,
   NATIVE_TOKEN_ADDRESS,
 } from "./blockvision";
+import { fetchBlockscoutAddressTokens } from "./blockscout";
 import { discoverAllUserTokens } from "./tokenDiscovery";
 import type { TokenInfo } from "./tokens";
 
@@ -99,6 +100,53 @@ export async function fetchBalancesFromBlockVision(
   return mapBlockVisionTokens(items);
 }
 
+function mapBlockscoutTokens(items: Awaited<ReturnType<typeof fetchBlockscoutAddressTokens>>): TokenBalance[] {
+  const out: TokenBalance[] = [];
+  for (const t of items) {
+    const balance = parseHumanBalanceBlockscout(t.balanceHuman, t.decimals);
+    if (balance <= 0n) continue;
+    const human = parseFloat(t.balanceHuman) || 0;
+    const usdValue = t.priceUsd != null && t.priceUsd > 0 ? human * t.priceUsd : null;
+    out.push({
+      address: t.address,
+      symbol: t.symbol,
+      name: t.name,
+      decimals: t.decimals,
+      logoURI: t.logoURI || undefined,
+      balance,
+      balanceFormatted: formatTokenBalance(balance, t.decimals),
+      usdValue,
+    });
+  }
+  return out;
+}
+
+function parseHumanBalanceBlockscout(balance: string, decimals: number): bigint {
+  const s = balance?.trim() ?? "";
+  if (!s || s === "0") return 0n;
+  if (s.includes(".")) {
+    const [whole, frac = ""] = s.split(".");
+    const padded = (frac + "0".repeat(decimals)).slice(0, decimals);
+    try {
+      return BigInt(whole || "0") * 10n ** BigInt(decimals) + BigInt(padded || "0");
+    } catch {
+      return 0n;
+    }
+  }
+  try {
+    return BigInt(s);
+  } catch {
+    return 0n;
+  }
+}
+
+export async function fetchBalancesFromBlockscout(
+  address: `0x${string}`,
+): Promise<TokenBalance[]> {
+  const items = await fetchBlockscoutAddressTokens(address);
+  return mapBlockscoutTokens(items);
+}
+
 export async function fetchUserTokenBalances(
   address: `0x${string}`,
   chainId: number,
@@ -136,20 +184,26 @@ export async function fetchAllBalances(
 ): Promise<TokenBalance[]> {
   const lists: TokenBalance[][] = [];
 
-  if (isBlockVisionAvailable()) {
-    try {
-      const fromBv = await fetchBalancesFromBlockVision(address);
-      if (fromBv.length > 0) lists.push(fromBv);
-    } catch (e) {
-      console.warn("[tokenBalances] BlockVision unavailable:", e);
-    }
-  }
-
-  const [nativeBalance, tokenBalances] = await Promise.all([
+  const [fromBv, fromBs, nativeBalance, tokenBalances] = await Promise.all([
+    isBlockVisionAvailable()
+      ? fetchBalancesFromBlockVision(address).catch((e) => {
+          console.warn("[tokenBalances] BlockVision unavailable:", e);
+          return [] as TokenBalance[];
+        })
+      : Promise.resolve([] as TokenBalance[]),
+    fetchBalancesFromBlockscout(address).catch((e) => {
+      console.warn("[tokenBalances] Blockscout unavailable:", e);
+      return [] as TokenBalance[];
+    }),
     fetchNativeBalance(address, publicClient),
-    fetchUserTokenBalances(address, chainId, publicClient),
+    fetchUserTokenBalances(address, chainId, publicClient).catch((e) => {
+      console.warn("[tokenBalances] RPC discovery unavailable:", e);
+      return [] as TokenBalance[];
+    }),
   ]);
 
+  if (fromBv.length > 0) lists.push(fromBv);
+  if (fromBs.length > 0) lists.push(fromBs);
   lists.push([nativeBalance, ...tokenBalances]);
 
   return mergeTokenBalances(...lists);

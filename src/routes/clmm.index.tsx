@@ -69,7 +69,7 @@ function CLMMExplorePage() {
     if (sortKey === key) setSortDesc((d) => !d);
     else {
       setSortKey(key);
-      setSortDesc(true);
+      setSortDesc(key === "tvl");
     }
     setPage(1);
   };

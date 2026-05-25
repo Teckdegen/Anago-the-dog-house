@@ -1,5 +1,6 @@
 import type { PublicClient } from "viem";
 import { formatUnits } from "viem";
+import { fetchBlockscoutTokenMeta } from "@/lib/web3/blockscout";
 import { fetchPairFromDexScreener, fetchTokenFromDexScreener, batchGetTokenPrices } from "@/lib/web3/dexscreener";
 import { ERC20_ABI } from "@/lib/web3/tokens";
 import { fetchPoolMetadata, fetchTokenMeta } from "./poolState";
@@ -146,8 +147,15 @@ export async function fetchPoolMetrics(
     tvlUsd = await computeTvlUsd(publicClient, resolved);
   }
 
-  let symbol0 = meta0?.symbol || resolved.token0.slice(0, 6);
-  let symbol1 = meta1?.symbol || resolved.token1.slice(0, 6);
+  const [scout0, scout1] = light
+    ? await Promise.all([
+        fetchBlockscoutTokenMeta(resolved.token0).catch(() => null),
+        fetchBlockscoutTokenMeta(resolved.token1).catch(() => null),
+      ])
+    : [null, null];
+
+  let symbol0 = meta0?.symbol || scout0?.symbol || resolved.token0.slice(0, 6);
+  let symbol1 = meta1?.symbol || scout1?.symbol || resolved.token1.slice(0, 6);
 
   if (!light && (!symbol0 || symbol0.length > 12) && publicClient) {
     const m = await fetchTokenMeta(publicClient, resolved.token0);
@@ -169,8 +177,8 @@ export async function fetchPoolMetrics(
     symbol1,
     token0: resolved.token0,
     token1: resolved.token1,
-    logo0: meta0?.logoURI ?? null,
-    logo1: meta1?.logoURI ?? null,
+    logo0: meta0?.logoURI ?? scout0?.logoURI ?? null,
+    logo1: meta1?.logoURI ?? scout1?.logoURI ?? null,
     pairImageUrl: pairDex?.imageUrl ?? null,
     feePercent: feeToPercent(fee),
     tvlUsd,

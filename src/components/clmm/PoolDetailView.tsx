@@ -88,7 +88,13 @@ export function PoolDetailView({
             symbol1={m.symbol1}
             tvlUsd={m.tvlUsd}
           />
-          <PoolTransactionsTable symbol0={m.symbol0} symbol1={m.symbol1} />
+          <PoolTransactionsTable
+            poolAddress={poolAddress}
+            token0={live.pool.token0}
+            token1={live.pool.token1}
+            symbol0={m.symbol0}
+            symbol1={m.symbol1}
+          />
         </div>
 
         <aside className="space-y-3 lg:sticky lg:top-6">

@@ -318,7 +318,7 @@ export function TokenPicker({ selected, onSelect, excludeNative, compact }: Prop
 
       {!loadingBalances && filteredBalances.length > 0 && !showManual && (
         <p className="font-mono text-[9px] text-center" style={{ color: "rgba(196,168,240,0.45)" }}>
-          {filteredBalances.length} token{filteredBalances.length !== 1 ? "s" : ""} · BlockVision
+          {filteredBalances.length} token{filteredBalances.length !== 1 ? "s" : ""} · indexed balances
         </p>
       )}
     </div>

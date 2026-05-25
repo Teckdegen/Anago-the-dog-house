@@ -3,6 +3,7 @@
  */
 
 import type { PublicClient } from "viem";
+import { fetchBlockscoutTokenMeta } from "./blockscout";
 import { fetchTokenBasicsFromChain, fetchTokenLogoFromChain } from "./tokenOnChain";
 
 const DEXSCREENER_API = "https://api.dexscreener.com/latest/dex";
@@ -73,14 +74,31 @@ export async function fetchTokenFromDexScreener(
 
   if (dex?.logoURI && dex.symbol) return dex;
 
+  const addr = key as `0x${string}`;
+  const scout = await fetchBlockscoutTokenMeta(addr).catch(() => null);
+
   if (!publicClient || key === "0x0000000000000000000000000000000000000000") {
+    if (scout) {
+      return {
+        address: key,
+        name: scout.name,
+        symbol: scout.symbol,
+        logoURI: scout.logoURI ?? dex?.logoURI ?? null,
+        priceUsd: scout.priceUsd ?? dex?.priceUsd ?? null,
+      };
+    }
     return dex;
   }
 
-  const addr = key as `0x${string}`;
   const [logoURI, basics] = await Promise.all([
-    dex?.logoURI ? Promise.resolve(dex.logoURI) : fetchTokenLogoFromChain(addr, publicClient),
-    (!dex?.symbol || !dex?.name) ? fetchTokenBasicsFromChain(addr, publicClient) : Promise.resolve(null),
+    dex?.logoURI || scout?.logoURI
+      ? Promise.resolve(dex?.logoURI ?? scout?.logoURI ?? null)
+      : fetchTokenLogoFromChain(addr, publicClient),
+    !dex?.symbol || !dex?.name
+      ? scout
+        ? Promise.resolve({ name: scout.name, symbol: scout.symbol })
+        : fetchTokenBasicsFromChain(addr, publicClient)
+      : Promise.resolve(null),
   ]);
 
   const merged: TokenData = {
