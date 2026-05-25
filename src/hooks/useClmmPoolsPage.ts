@@ -4,35 +4,20 @@ import { fetchPoolMetadata, getMonadPublicClient } from "@/lib/capricorn";
 import { enrichFromCache, fetchPoolMetrics } from "@/lib/capricorn/poolMetrics";
 import { isMetricsFresh, getCachedMetrics } from "@/lib/capricorn/poolMetricsCache";
 import { mapInBatches } from "@/lib/capricorn/rpcQueue";
-import { fetchClmmPoolsPage, type ClmmPoolsQuery } from "@/lib/clmm/api";
-
-const EXPLORE_POOL_CAP = 500;
-
-function apiRowToCached(row: EnrichedPool): CachedPool {
-  return {
-    address: row.address,
-    token0: row.token0,
-    token1: row.token1,
-    fee: row.fee,
-    tickSpacing: row.tickSpacing,
-    protocol: "v3",
-  };
-}
+import { stubPoolsFromAddresses } from "@/lib/capricorn/pools";
+import type { ClmmPoolsQuery } from "@/lib/clmm/api";
 
 function hasPoolTokens(pool: CachedPool): boolean {
   const t0 = pool.token0?.toLowerCase() ?? "";
   return t0.startsWith("0x") && t0.length === 42 && t0 !== "0x0000000000000000000000000000000000000000";
 }
 
-function rowFromApi(pool: EnrichedPool): EnrichedPool {
+function stubToEnriched(pool: CachedPool): EnrichedPool {
   const cached = getCachedMetrics(pool.address);
   if (cached && isMetricsFresh(cached)) {
-    return { ...apiRowToCached(pool), metrics: cached };
+    return { ...pool, metrics: cached };
   }
-  if (pool.metrics?.symbol0 || pool.metrics?.tvlUsd != null) {
-    return pool;
-  }
-  return enrichFromCache(apiRowToCached(pool));
+  return enrichFromCache(pool);
 }
 
 function tvlOf(row: EnrichedPool): number {
@@ -40,7 +25,7 @@ function tvlOf(row: EnrichedPool): number {
   return v != null && Number.isFinite(v) ? v : -1;
 }
 
-/** Highest TVL first (null / unknown TVL last). */
+/** Highest TVL first (unknown TVL last). */
 function sortByTvlDesc(rows: EnrichedPool[]): EnrichedPool[] {
   return [...rows].sort((a, b) => tvlOf(b) - tvlOf(a));
 }
@@ -77,6 +62,23 @@ function paginate<T>(items: T[], page: number, limit: number): T[] {
   return items.slice(from, from + limit);
 }
 
+function matchesQuery(row: EnrichedPool, q: string): boolean {
+  const needle = q.toLowerCase();
+  if (row.address.toLowerCase().includes(needle)) return true;
+  const m = row.metrics;
+  return (
+    (m.symbol0?.toLowerCase().includes(needle) ?? false) ||
+    (m.symbol1?.toLowerCase().includes(needle) ?? false)
+  );
+}
+
+function filterByQuery(rows: EnrichedPool[], q: string): EnrichedPool[] {
+  const trimmed = q.trim();
+  if (!trimmed) return rows;
+  return rows.filter((r) => matchesQuery(r, trimmed));
+}
+
+/** DexScreener + minimal RPC — TVL/volume/symbols for sorting. */
 async function enrichPoolsOnChain(rows: EnrichedPool[]): Promise<EnrichedPool[]> {
   const client = getMonadPublicClient();
 
@@ -84,7 +86,14 @@ async function enrichPoolsOnChain(rows: EnrichedPool[]): Promise<EnrichedPool[]>
     rows,
     async (row) => {
       try {
-        let pool = apiRowToCached(row);
+        let pool: CachedPool = {
+          address: row.address,
+          token0: row.token0,
+          token1: row.token1,
+          fee: row.fee,
+          tickSpacing: row.tickSpacing,
+          protocol: "v3",
+        };
         if (!hasPoolTokens(pool)) {
           const meta = await fetchPoolMetadata(client, pool.address);
           if (meta) pool = meta;
@@ -92,7 +101,14 @@ async function enrichPoolsOnChain(rows: EnrichedPool[]): Promise<EnrichedPool[]>
         const metrics = await fetchPoolMetrics(pool, client, false, { light: true });
         return { ...pool, metrics } satisfies EnrichedPool;
       } catch {
-        return rowFromApi(row);
+        return stubToEnriched({
+          address: row.address,
+          token0: row.token0,
+          token1: row.token1,
+          fee: row.fee,
+          tickSpacing: row.tickSpacing,
+          protocol: "v3",
+        });
       }
     },
     { concurrency: 2, delayMs: 300 },
@@ -113,46 +129,33 @@ export function useClmmPoolsPage(query: ClmmPoolsQuery, enabled = true) {
     const gen = ++enrichGen.current;
     setLoading(true);
     setError(null);
+
+    const sort = query.sort ?? "tvl";
+    const order = query.order ?? "desc";
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const q = query.q?.trim() ?? "";
+
     try {
-      const sort = query.sort ?? "tvl";
-      const order = query.order ?? "desc";
-      const page = query.page ?? 1;
-      const limit = query.limit ?? 20;
-      const q = query.q?.trim() ?? "";
+      const stubs = stubPoolsFromAddresses().map(stubToEnriched);
+      let working = filterByQuery(stubs, q);
+      const sortedStub = sort === "tvl" && order === "desc" ? sortByTvlDesc(working) : sortRows(working, sort, order);
 
-      const data = await fetchClmmPoolsPage({
-        page: q ? page : 1,
-        limit: q ? limit : EXPLORE_POOL_CAP,
-        sort: "tvl",
-        order: "desc",
-        q: q || undefined,
-      });
-      if (gen !== enrichGen.current) return;
-
-      const initial = data.pools.map(rowFromApi);
-      const sortedInitial = q ? sortRows(initial, sort, order) : sortByTvlDesc(initial);
-
-      if (q) {
-        setRows(sortedInitial);
-        setTotal(data.total);
-        setTotalPages(data.totalPages);
-      } else {
-        setRows(paginate(sortedInitial, page, limit));
-        setTotal(data.total);
-        setTotalPages(Math.ceil(data.total / limit) || 0);
-      }
+      setRows(paginate(sortedStub, page, limit));
+      setTotal(working.length);
+      setTotalPages(Math.ceil(working.length / limit) || 0);
       setLoading(false);
 
       setEnriching(true);
-      const enriched = await enrichPoolsOnChain(data.pools);
+      const enriched = await enrichPoolsOnChain(working);
       if (gen !== enrichGen.current) return;
 
-      const sorted = q ? sortRows(enriched, sort, order) : sortByTvlDesc(enriched);
-      if (q) {
-        setRows(sorted);
-      } else {
-        setRows(paginate(sorted, page, limit));
-      }
+      working = filterByQuery(enriched, q);
+      const sorted = sort === "tvl" && order === "desc" ? sortByTvlDesc(working) : sortRows(working, sort, order);
+
+      setRows(paginate(sorted, page, limit));
+      setTotal(working.length);
+      setTotalPages(Math.ceil(working.length / limit) || 0);
     } catch (e) {
       if (gen !== enrichGen.current) return;
       setError(e instanceof Error ? e.message : String(e));
