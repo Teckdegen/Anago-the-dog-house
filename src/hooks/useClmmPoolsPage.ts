@@ -1,16 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CachedPool, EnrichedPool } from "@/lib/capricorn";
-import { fetchPoolMetadata, getMonadPublicClient } from "@/lib/capricorn";
 import { enrichFromCache, fetchPoolMetrics } from "@/lib/capricorn/poolMetrics";
 import { isMetricsFresh, getCachedMetrics } from "@/lib/capricorn/poolMetricsCache";
 import { mapInBatches } from "@/lib/capricorn/rpcQueue";
 import { stubPoolsFromAddresses } from "@/lib/capricorn/pools";
-import type { ClmmPoolsQuery } from "@/lib/clmm/api";
-
-function hasPoolTokens(pool: CachedPool): boolean {
-  const t0 = pool.token0?.toLowerCase() ?? "";
-  return t0.startsWith("0x") && t0.length === 42 && t0 !== "0x0000000000000000000000000000000000000000";
-}
+import { fetchClmmPoolsPage, type ClmmPoolsQuery } from "@/lib/clmm/api";
 
 function stubToEnriched(pool: CachedPool): EnrichedPool {
   const cached = getCachedMetrics(pool.address);
@@ -67,41 +61,60 @@ function filterByQuery(rows: EnrichedPool[], q: string): EnrichedPool[] {
   return rows.filter((r) => matchesQuery(r, trimmed));
 }
 
-/** Fetch real TVL/APR for visible page only (mainnet RPC + DexScreener). */
-async function enrichPoolsOnChain(rows: EnrichedPool[]): Promise<EnrichedPool[]> {
-  const client = getMonadPublicClient();
-
+/** DexScreener-only enrichment — works on mobile without wallet RPC. */
+async function enrichPoolsLight(rows: EnrichedPool[]): Promise<EnrichedPool[]> {
   return mapInBatches(
     rows,
     async (row) => {
+      const pool: CachedPool = {
+        address: row.address,
+        token0: row.token0,
+        token1: row.token1,
+        fee: row.fee,
+        tickSpacing: row.tickSpacing,
+        protocol: "v3",
+      };
       try {
-        let pool: CachedPool = {
-          address: row.address,
-          token0: row.token0,
-          token1: row.token1,
-          fee: row.fee,
-          tickSpacing: row.tickSpacing,
-          protocol: "v3",
-        };
-        if (!hasPoolTokens(pool)) {
-          const meta = await fetchPoolMetadata(client, pool.address);
-          if (meta) pool = meta;
-        }
-        const metrics = await fetchPoolMetrics(pool, client, false, { light: true });
+        const metrics = await fetchPoolMetrics(pool, null, false, { light: true });
         return { ...pool, metrics } satisfies EnrichedPool;
       } catch {
-        return stubToEnriched({
-          address: row.address,
-          token0: row.token0,
-          token1: row.token1,
-          fee: row.fee,
-          tickSpacing: row.tickSpacing,
-          protocol: "v3",
-        });
+        return stubToEnriched(pool);
       }
     },
-    { concurrency: 2, delayMs: 350 },
+    { concurrency: 3, delayMs: 200 },
   );
+}
+
+async function loadClientFallback(
+  query: ClmmPoolsQuery,
+  gen: number,
+  enrichGen: { current: number },
+  setRows: (rows: EnrichedPool[]) => void,
+  setTotal: (n: number) => void,
+  setTotalPages: (n: number) => void,
+  setLoading: (v: boolean) => void,
+  setEnriching: (v: boolean) => void,
+) {
+  const sort = query.sort ?? "tvl";
+  const order = query.order ?? "desc";
+  const page = query.page ?? 1;
+  const limit = query.limit ?? 20;
+  const q = query.q?.trim() ?? "";
+
+  const stubs = stubPoolsFromAddresses().map(stubToEnriched);
+  let working = filterByQuery(stubs, q);
+  const pageSlice = paginate(sortRows(working, sort, order), page, limit);
+
+  setRows(pageSlice);
+  setTotal(working.length);
+  setTotalPages(Math.ceil(working.length / limit) || 0);
+  setLoading(false);
+
+  setEnriching(true);
+  const enrichedPage = await enrichPoolsLight(pageSlice);
+  if (gen !== enrichGen.current) return;
+
+  setRows(sortRows(enrichedPage, sort, order));
 }
 
 export function useClmmPoolsPage(query: ClmmPoolsQuery, enabled = true) {
@@ -117,31 +130,34 @@ export function useClmmPoolsPage(query: ClmmPoolsQuery, enabled = true) {
     if (!enabled) return;
     const gen = ++enrichGen.current;
     setLoading(true);
+    setEnriching(false);
     setError(null);
 
-    const sort = query.sort ?? "tvl";
-    const order = query.order ?? "desc";
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 20;
-    const q = query.q?.trim() ?? "";
-
     try {
-      const stubs = stubPoolsFromAddresses().map(stubToEnriched);
-      let working = filterByQuery(stubs, q);
-      const sortedStub = sortRows(working, sort, order);
-      const pageSlice = paginate(sortedStub, page, limit);
-
-      setRows(pageSlice);
-      setTotal(working.length);
-      setTotalPages(Math.ceil(working.length / limit) || 0);
-      setLoading(false);
-
-      setEnriching(true);
-      const enrichedPage = await enrichPoolsOnChain(pageSlice);
+      const api = await fetchClmmPoolsPage(query);
       if (gen !== enrichGen.current) return;
 
-      const sortedPage = sortRows(enrichedPage, sort, order);
-      setRows(sortedPage);
+      if (api.pools.length > 0 || api.total === 0) {
+        setRows(api.pools);
+        setTotal(api.total);
+        setTotalPages(api.totalPages);
+        return;
+      }
+    } catch {
+      /* Supabase/API unavailable — fall back to indexed addresses + DexScreener */
+    }
+
+    try {
+      await loadClientFallback(
+        query,
+        gen,
+        enrichGen,
+        setRows,
+        setTotal,
+        setTotalPages,
+        setLoading,
+        setEnriching,
+      );
     } catch (e) {
       if (gen !== enrichGen.current) return;
       setError(e instanceof Error ? e.message : String(e));

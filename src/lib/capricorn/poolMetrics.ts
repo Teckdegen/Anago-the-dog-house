@@ -197,8 +197,8 @@ export async function fetchPoolMetrics(
     fetchZerionTokenMeta(resolved.token1).catch(() => null),
   ]);
 
-  let symbol0 = meta0?.symbol || zer0?.symbol || resolved.token0.slice(0, 6);
-  let symbol1 = meta1?.symbol || zer1?.symbol || resolved.token1.slice(0, 6);
+  let symbol0 = meta0?.symbol || zer0?.symbol || pairDex?.baseSymbol || resolved.token0.slice(0, 6);
+  let symbol1 = meta1?.symbol || zer1?.symbol || pairDex?.quoteSymbol || resolved.token1.slice(0, 6);
 
   let priceChange24h = pairStats.priceChange24h;
   if (priceChange24h == null && zer0?.priceChange24h != null) priceChange24h = zer0.priceChange24h;

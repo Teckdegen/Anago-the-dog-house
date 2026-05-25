@@ -5,8 +5,10 @@ import { ChevronLeft, ChevronRight, Loader2, Search } from "lucide-react";
 import { useAccount, useChainId, usePublicClient } from "wagmi";
 import { AppShell } from "@/components/AppShell";
 import { PositionCards } from "@/components/clmm/PositionCards";
+import { PoolsExploreMobileList } from "@/components/clmm/PoolsExploreMobileList";
 import { PoolsExploreTable } from "@/components/clmm/PoolsExploreTable";
 import { clmm } from "@/components/clmm/clmmTheme";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useClmmPoolsPage } from "@/hooks/useClmmPoolsPage";
 import { isCapricornSupportedChain, fetchUserPositions, type LpPosition } from "@/lib/capricorn";
 
@@ -60,6 +62,7 @@ function CLMMExplorePage() {
     [page, sortKey, sortDesc, searchDebounced],
   );
 
+  const isMobile = useIsMobile();
   const { rows, total, totalPages, loading, enriching, error, reload } = useClmmPoolsPage(
     poolsQuery,
     view === "explore",
@@ -144,6 +147,7 @@ function CLMMExplorePage() {
             totalPages={totalPages}
             total={total}
             onPageChange={setPage}
+            isMobile={isMobile}
           />
         ) : (
           <PositionsView positions={positions} loading={loadingPos} />
@@ -166,6 +170,7 @@ function ExplorePoolsView({
   totalPages,
   total,
   onPageChange,
+  isMobile,
 }: {
   rows: import("@/lib/capricorn/poolMetrics").EnrichedPool[];
   loading: boolean;
@@ -179,6 +184,7 @@ function ExplorePoolsView({
   totalPages: number;
   total: number;
   onPageChange: (p: number) => void;
+  isMobile: boolean;
 }) {
   if (error) {
     return (
@@ -216,13 +222,37 @@ function ExplorePoolsView({
           {loading ? `Loading page ${page}…` : "Refreshing live metrics…"}
         </div>
       )}
-      <PoolsExploreTable
-        rows={rows}
-        sortKey={sortKey}
-        sortDesc={sortDesc}
-        onSort={onSort}
-        rankOffset={rankOffset}
-      />
+      {isMobile && (
+        <div className="flex flex-wrap gap-2">
+          {(["tvl", "apr", "vol"] as const).map((key) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => onSort(key)}
+              className="font-mono text-[10px] uppercase px-3 py-1.5 rounded-full transition"
+              style={{
+                border: `1px solid ${sortKey === key ? clmm.purple : clmm.border}`,
+                color: sortKey === key ? clmm.text : clmm.textMuted,
+                background: sortKey === key ? clmm.purpleBgHover : "transparent",
+              }}
+            >
+              {key === "tvl" ? "TVL" : key === "apr" ? "APR" : "24h vol"}
+              {sortKey === key ? (sortDesc ? " ↓" : " ↑") : ""}
+            </button>
+          ))}
+        </div>
+      )}
+      {isMobile ? (
+        <PoolsExploreMobileList rows={rows} rankOffset={rankOffset} />
+      ) : (
+        <PoolsExploreTable
+          rows={rows}
+          sortKey={sortKey}
+          sortDesc={sortDesc}
+          onSort={onSort}
+          rankOffset={rankOffset}
+        />
+      )}
       {totalPages > 1 && (
         <div className="flex items-center justify-between pt-2">
           <p className="font-mono text-[10px]" style={{ color: clmm.textDim }}>
