@@ -468,10 +468,44 @@ contract StreamFarm is ERC721, Ownable, ReentrancyGuard {
     // ═══════════════════════════════════════════════════════════════════════
 
     /**
-     * @notice Recover penalty tokens or accidentally sent tokens.
+     * @notice Recover penalty tokens or accidentally sent tokens (never user stake/reward escrow).
      */
     function recoverTokens(IERC20 token, uint256 amount) external onlyAdmin {
+        uint256 recoverable = _recoverableBalance(token);
+        require(amount <= recoverable, "Exceeds non-escrow balance");
         token.safeTransfer(owner(), amount);
+    }
+
+    /**
+     * @notice Balance that is not reserved for stakers or undistributed rewards.
+     */
+    function recoverableBalance(IERC20 token) external view returns (uint256) {
+        return _recoverableBalance(token);
+    }
+
+    function _recoverableBalance(IERC20 token) internal view returns (uint256) {
+        uint256 balance = token.balanceOf(address(this));
+        uint256 liability = _tokenLiability(token);
+        return balance > liability ? balance - liability : 0;
+    }
+
+    function _tokenLiability(IERC20 token) internal view returns (uint256) {
+        uint256 liability;
+        uint256 farmLen = farms.length;
+        for (uint256 f = 0; f < farmLen; f++) {
+            if (address(farms[f].stakeToken) == address(token)) {
+                liability += farms[f].totalStaked;
+            }
+            RewardStream[] storage streams = farmRewards[f];
+            uint256 streamLen = streams.length;
+            for (uint256 r = 0; r < streamLen; r++) {
+                if (address(streams[r].token) == address(token)) {
+                    uint256 remaining = streams[r].totalBudget - streams[r].totalDistributed;
+                    liability += remaining;
+                }
+            }
+        }
+        return liability;
     }
 
     // ═══════════════════════════════════════════════════════════════════════

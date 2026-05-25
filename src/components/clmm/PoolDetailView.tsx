@@ -3,7 +3,12 @@ import { Copy, ExternalLink } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { TokenIcon } from "@/components/TokenIcon";
 import { PoolPairLogos } from "@/components/clmm/PoolPairLogos";
-import { formatApr, formatUsdCompact, truncateAddress, type PoolMetrics } from "@/lib/capricorn/poolMetrics";
+import {
+  formatAprPrecise,
+  formatUsdTable,
+  truncateAddress,
+  type PoolMetrics,
+} from "@/lib/capricorn/poolMetrics";
 import { feeToPercent, type CachedPool, type PoolLiveState } from "@/lib/capricorn";
 import { PoolVolumeChart } from "./PoolVolumeChart";
 import { SwapPanel } from "./SwapPanel";
@@ -69,7 +74,7 @@ export function PoolDetailView({
               <h1 className="font-grotesk text-[24px] sm:text-[28px] font-medium" style={{ color: clmm.text }}>
                 {m.symbol0} / {m.symbol1}
               </h1>
-              <Badge>v3</Badge>
+              <Badge>CLMM</Badge>
               <Badge>{feeLabel}</Badge>
             </div>
             <PoolIdCopy id={m.displayId} poolAddress={poolAddress} />
@@ -115,26 +120,26 @@ export function PoolDetailView({
             + Add liquidity
           </Link>
 
-          <SidebarCard title="Total APR">
-            <p className="font-grotesk text-[28px] font-medium" style={{ color: clmm.text }}>
-              {formatApr(m.aprPercent)}
+          <SidebarCard title="Pool APR%">
+            <p className="font-grotesk text-[28px] font-medium tabular-nums" style={{ color: clmm.text }}>
+              {formatAprPrecise(m.aprPercent)}
             </p>
           </SidebarCard>
 
           <SidebarCard title="Stats">
             <StatRow
               label="TVL"
-              value={formatUsdCompact(m.tvlUsd)}
+              value={formatUsdTable(m.tvlUsd)}
               sub={dailyChange}
               subNegative={m.priceChange24h != null && m.priceChange24h < 0}
             />
             <StatRow
-              label="24H volume"
-              value={formatUsdCompact(m.volume24hUsd)}
+              label="24h vol."
+              value={formatUsdTable(m.volume24hUsd)}
               sub={volChangeSub}
               subNegative={m.priceChange24h != null && m.priceChange24h < 0}
             />
-            <StatRow label="24H fees" value={formatUsdCompact(m.fees24hUsd)} />
+            <StatRow label="24h fees" value={formatUsdTable(m.fees24hUsd)} />
             {(m.buys24h != null || m.sells24h != null) && (
               <StatRow
                 label="24H trades"

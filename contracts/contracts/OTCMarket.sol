@@ -48,6 +48,9 @@ contract OTCMarket is ERC721Holder, Ownable, ReentrancyGuard {
     // Track active listings per seller
     mapping(address => uint256[]) public sellerListings;
 
+    /// Active listing for an NFT held in escrow (listingId + 1; 0 = none)
+    mapping(address => mapping(uint256 => uint256)) public activeListingByNft;
+
     // ═══════════════════════════════════════════════════════════════════════
     //                            EVENTS
     // ═══════════════════════════════════════════════════════════════════════
@@ -83,6 +86,7 @@ contract OTCMarket is ERC721Holder, Ownable, ReentrancyGuard {
         require(nftContract != address(0), "Invalid NFT contract");
         require(paymentToken != address(0), "Invalid payment token");
         require(price > 0, "Price must be > 0");
+        require(activeListingByNft[nftContract][tokenId] == 0, "Already listed");
 
         // Transfer NFT to this contract (seller must approve first)
         IERC721(nftContract).safeTransferFrom(msg.sender, address(this), tokenId);
@@ -99,6 +103,7 @@ contract OTCMarket is ERC721Holder, Ownable, ReentrancyGuard {
         }));
 
         sellerListings[msg.sender].push(listingId);
+        activeListingByNft[nftContract][tokenId] = listingId + 1;
 
         emit Listed(listingId, msg.sender, nftContract, tokenId, paymentToken, price);
     }
@@ -114,6 +119,7 @@ contract OTCMarket is ERC721Holder, Ownable, ReentrancyGuard {
         require(msg.sender != listing.seller, "Cannot buy own listing");
 
         listing.active = false;
+        activeListingByNft[listing.nftContract][listing.tokenId] = 0;
 
         // Calculate fee
         uint256 fee = (listing.price * platformFeeBps) / BASIS_POINTS;
@@ -142,6 +148,7 @@ contract OTCMarket is ERC721Holder, Ownable, ReentrancyGuard {
         require(msg.sender == listing.seller, "Not seller");
 
         listing.active = false;
+        activeListingByNft[listing.nftContract][listing.tokenId] = 0;
 
         // Return NFT to seller
         IERC721(listing.nftContract).safeTransferFrom(address(this), msg.sender, listing.tokenId);
@@ -202,7 +209,12 @@ contract OTCMarket is ERC721Holder, Ownable, ReentrancyGuard {
         emit FeeUpdated(newFeeBps);
     }
 
+    /**
+     * @notice Recover NFTs accidentally sent to this contract (not active listings).
+     */
     function recoverStuckNFT(address nftContract, uint256 tokenId, address to) external onlyOwner {
+        require(to != address(0), "Invalid recipient");
+        require(activeListingByNft[nftContract][tokenId] == 0, "Active listing");
         IERC721(nftContract).safeTransferFrom(address(this), to, tokenId);
     }
 }

@@ -13,7 +13,10 @@ import {
 import type { CachedPool } from "./types";
 
 function feeToPercent(fee: number): string {
-  return `${(fee / 10_000).toFixed(fee % 100 === 0 ? 2 : 4)}%`;
+  const pct = fee / 10_000;
+  if (pct >= 1 && pct % 1 === 0) return `${pct.toFixed(0)}%`;
+  if (pct * 10 === Math.floor(pct * 10)) return `${pct.toFixed(1)}%`;
+  return `${pct.toFixed(2)}%`;
 }
 
 function estimateFees24h(volume24h: number | null, fee: number): number | null {
@@ -300,6 +303,28 @@ export function formatUsdCompact(n: number | null | undefined): string {
 export function formatApr(apr: number | null | undefined): string {
   if (apr == null || Number.isNaN(apr)) return "—";
   return `${apr.toFixed(2)}%`;
+}
+
+/** Capricorn-style pool table APR (3 decimal places). */
+export function formatAprPrecise(apr: number | null | undefined): string {
+  if (apr == null || Number.isNaN(apr)) return "—";
+  return `${apr.toFixed(3)}%`;
+}
+
+/** Capricorn-style USD columns ($182.9k, $82,807.4). */
+export function formatUsdTable(n: number | null | undefined): string {
+  if (n == null || Number.isNaN(n)) return "—";
+  if (n >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(2)}B`;
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
+  if (n >= 100_000) {
+    return `$${n.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+  }
+  if (n >= 10_000) {
+    return `$${n.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}`;
+  }
+  if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}k`;
+  if (n >= 1) return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `$${n.toFixed(4)}`;
 }
 
 export function truncateAddress(addr: string, left = 6, right = 4): string {

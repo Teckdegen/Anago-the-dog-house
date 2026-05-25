@@ -59,6 +59,9 @@ contract TokenLockNFT is ERC721, Ownable, ReentrancyGuard {
     address[] private _allLockers;
     mapping(address => bool) private _lockerSeen;
 
+    /// Per-token escrow liability (active, non-withdrawn locks)
+    mapping(address => uint256) public totalEscrowed;
+
     // ─────────────────────────────────────────────────────────────────────
     //  Events
     // ─────────────────────────────────────────────────────────────────────
@@ -105,6 +108,7 @@ contract TokenLockNFT is ERC721, Ownable, ReentrancyGuard {
         require(unlockTime > block.timestamp, "Unlock time must be future");
 
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
+        totalEscrowed[token] += amount;
 
         uint256 tokenId = nextTokenId++;
 
@@ -148,6 +152,7 @@ contract TokenLockNFT is ERC721, Ownable, ReentrancyGuard {
         require(block.timestamp >= lock.unlockTime, "Still locked");
 
         lock.withdrawn = true;
+        totalEscrowed[lock.token] -= lock.amount;
 
         IERC20(lock.token).safeTransfer(msg.sender, lock.amount);
 
@@ -312,6 +317,10 @@ contract TokenLockNFT is ERC721, Ownable, ReentrancyGuard {
      *         to this contract (not locked tokens).
      */
     function emergencyRecoverToken(address token, uint256 amount) external onlyOwner {
+        uint256 balance = IERC20(token).balanceOf(address(this));
+        uint256 escrow = totalEscrowed[token];
+        uint256 recoverable = balance > escrow ? balance - escrow : 0;
+        require(amount <= recoverable, "Exceeds non-escrow balance");
         IERC20(token).safeTransfer(owner(), amount);
     }
 

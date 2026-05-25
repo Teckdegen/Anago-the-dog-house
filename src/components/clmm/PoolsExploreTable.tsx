@@ -1,7 +1,11 @@
 import { Link } from "@tanstack/react-router";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Info } from "lucide-react";
 import { PoolPairLogos } from "@/components/clmm/PoolPairLogos";
-import { formatApr, formatUsdCompact, type EnrichedPool } from "@/lib/capricorn/poolMetrics";
+import {
+  formatAprPrecise,
+  formatUsdTable,
+  type EnrichedPool,
+} from "@/lib/capricorn/poolMetrics";
 import { clmm } from "./clmmTheme";
 
 type SortKey = "tvl" | "apr" | "vol";
@@ -19,40 +23,46 @@ export function PoolsExploreTable({
   onSort: (key: SortKey) => void;
   rankOffset?: number;
 }) {
-  const volKey: SortKey = "vol";
-
   return (
-    <div className="w-full">
-      <div className="overflow-x-auto -mx-2 px-2">
-        <table className="w-full min-w-[900px] border-collapse">
+    <div
+      className="w-full rounded-2xl overflow-hidden"
+      style={{ border: `1px solid ${clmm.border}`, background: clmm.panel }}
+    >
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[880px] border-collapse">
           <thead>
-            <tr className="font-mono text-[10px] uppercase tracking-wide" style={{ color: clmm.textDim }}>
-              <th className="text-left py-3 pr-3 font-normal w-10">#</th>
-              <th className="text-left py-3 pr-4 font-normal min-w-[200px]">Pool</th>
-              <th className="text-left py-3 pr-3 font-normal">Protocol</th>
-              <th className="text-left py-3 pr-3 font-normal">Fee tier</th>
+            <tr
+              className="font-mono text-[11px] uppercase tracking-wide"
+              style={{ color: clmm.textDim, borderBottom: `1px solid ${clmm.rowBorder}` }}
+            >
+              <th className="text-left py-4 pl-5 pr-3 font-normal w-12">#</th>
+              <th className="text-left py-4 pr-4 font-normal min-w-[220px]">Pool</th>
+              <th className="text-center py-4 px-3 font-normal w-[88px]">Type</th>
+              <th className="text-center py-4 px-3 font-normal w-[88px]">Fee tier</th>
+              <th className="text-center py-4 px-3 font-normal min-w-[120px]">
+                <span className="inline-flex items-center justify-center gap-1">
+                  Pool APR%
+                  <Info
+                    className="w-3 h-3 opacity-50"
+                    aria-label="Estimated from 24h volume, fee tier, and TVL"
+                  />
+                </span>
+              </th>
               <SortHeader
                 label="TVL"
                 active={sortKey === "tvl"}
                 desc={sortDesc}
                 onClick={() => onSort("tvl")}
-              />
-              <SortHeader
-                label="Pool APR"
-                active={sortKey === "apr"}
-                desc={sortDesc}
-                onClick={() => onSort("apr")}
-              />
-              <th className="text-right py-3 pr-3 font-normal">Reward APR</th>
-              <SortHeader
-                label="1D vol"
-                active={sortKey === volKey}
-                desc={sortDesc}
-                onClick={() => onSort(volKey)}
                 align="right"
               />
-              <th className="text-right py-3 pr-3 font-normal">30D vol</th>
-              <th className="text-right py-3 font-normal">1D vol/TVL</th>
+              <SortHeader
+                label="24h vol."
+                active={sortKey === "vol"}
+                desc={sortDesc}
+                onClick={() => onSort("vol")}
+                align="right"
+              />
+              <th className="text-right py-4 pr-5 pl-3 font-normal">24h fees</th>
             </tr>
           </thead>
           <tbody>
@@ -80,17 +90,19 @@ function SortHeader({
   align?: "left" | "right";
 }) {
   return (
-    <th className={`py-3 pr-3 font-normal ${align === "right" ? "text-right" : "text-left"}`}>
+    <th
+      className={`py-4 px-3 font-normal ${align === "right" ? "text-right pr-5" : "text-left"}`}
+    >
       <button
         type="button"
         onClick={onClick}
-        className="inline-flex items-center gap-1 hover:opacity-90 transition"
+        className="inline-flex items-center gap-1 hover:opacity-90 transition uppercase"
         style={{ color: active ? clmm.text : clmm.textDim }}
       >
         {label}
         {active && (
           <ChevronDown
-            className="w-3 h-3 transition-transform"
+            className="w-3 h-3 shrink-0"
             style={{ transform: desc ? undefined : "rotate(180deg)" }}
           />
         )}
@@ -102,15 +114,11 @@ function SortHeader({
 function PoolRow({ row, rank }: { row: EnrichedPool; rank: number }) {
   const m = row.metrics;
   const pairLabel = `${m.symbol0}/${m.symbol1}`;
-  const volTvl =
-    m.volume24hUsd != null && m.tvlUsd != null && m.tvlUsd > 0
-      ? (m.volume24hUsd / m.tvlUsd).toFixed(2)
-      : "—";
 
   return (
     <tr
-      className="group border-t transition-colors"
-      style={{ borderColor: clmm.border }}
+      className="group transition-colors"
+      style={{ borderTop: `1px solid ${clmm.rowBorder}` }}
       onMouseEnter={(e) => {
         e.currentTarget.style.background = clmm.purpleBgHover;
       }}
@@ -118,46 +126,38 @@ function PoolRow({ row, rank }: { row: EnrichedPool; rank: number }) {
         e.currentTarget.style.background = "transparent";
       }}
     >
-      <td className="py-4 pr-3 font-mono text-[12px]" style={{ color: clmm.textDim }}>
+      <td className="py-5 pl-5 pr-3 font-mono text-[13px]" style={{ color: clmm.textDim }}>
         {rank}
       </td>
-      <td className="py-4 pr-4">
+      <td className="py-5 pr-4">
         <Link
           to="/clmm/pool/$poolAddress"
           params={{ poolAddress: row.address }}
           className="flex items-center gap-3 min-w-0"
         >
           <PoolPairAvatar row={row} />
-          <span className="font-grotesk text-[15px] font-medium truncate" style={{ color: clmm.text }}>
+          <span className="font-grotesk text-[16px] font-medium truncate" style={{ color: clmm.text }}>
             {pairLabel}
           </span>
         </Link>
       </td>
-      <td className="py-4 pr-3">
-        <span className="font-mono text-[11px] lowercase" style={{ color: clmm.textMuted }}>
-          v3
-        </span>
+      <td className="py-5 px-3 text-center font-mono text-[13px]" style={{ color: clmm.textMuted }}>
+        CLMM
       </td>
-      <td className="py-4 pr-3 font-mono text-[12px]" style={{ color: clmm.text }}>
+      <td className="py-5 px-3 text-center font-mono text-[13px]" style={{ color: clmm.text }}>
         {m.feePercent}
       </td>
-      <td className="py-4 pr-3 text-right font-mono text-[12px]" style={{ color: clmm.text }}>
-        {formatUsdCompact(m.tvlUsd)}
+      <td className="py-5 px-3 text-center font-mono text-[13px] tabular-nums" style={{ color: clmm.text }}>
+        {formatAprPrecise(m.aprPercent)}
       </td>
-      <td className="py-4 pr-3 text-right font-mono text-[12px]" style={{ color: clmm.text }}>
-        {formatApr(m.aprPercent)}
+      <td className="py-5 pr-5 pl-3 text-right font-mono text-[13px] tabular-nums" style={{ color: clmm.text }}>
+        {formatUsdTable(m.tvlUsd)}
       </td>
-      <td className="py-4 pr-3 text-right font-mono text-[12px]" style={{ color: clmm.textDim }}>
-        —
+      <td className="py-5 pr-5 pl-3 text-right font-mono text-[13px] tabular-nums" style={{ color: clmm.text }}>
+        {formatUsdTable(m.volume24hUsd)}
       </td>
-      <td className="py-4 pr-3 text-right font-mono text-[12px]" style={{ color: clmm.text }}>
-        {formatUsdCompact(m.volume24hUsd)}
-      </td>
-      <td className="py-4 pr-3 text-right font-mono text-[12px]" style={{ color: clmm.textDim }}>
-        —
-      </td>
-      <td className="py-4 text-right font-mono text-[12px]" style={{ color: clmm.textMuted }}>
-        {volTvl}
+      <td className="py-5 pr-5 pl-3 text-right font-mono text-[13px] tabular-nums" style={{ color: clmm.text }}>
+        {formatUsdTable(m.fees24hUsd)}
       </td>
     </tr>
   );
@@ -173,7 +173,7 @@ function PoolPairAvatar({ row }: { row: EnrichedPool }) {
       symbol1={m.symbol1}
       logo0={m.logo0 ?? m.pairImageUrl}
       logo1={m.logo1 ?? m.pairImageUrl}
-      size={28}
+      size={32}
     />
   );
 }

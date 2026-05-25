@@ -99,7 +99,7 @@ function CLMMExplorePage() {
             Explore pools
           </h1>
           <p className="font-mono text-[11px] mt-1" style={{ color: clmm.textMuted }}>
-            Capricorn CL on Monad · {total > 0 ? `${total.toLocaleString()} pools` : "loading pools…"}
+            Capricorn CLMM on Monad · {total > 0 ? `${total.toLocaleString()} pools` : "loading pools…"}
           </p>
         </header>
 

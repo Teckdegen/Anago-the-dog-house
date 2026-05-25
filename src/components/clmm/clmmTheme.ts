@@ -15,6 +15,7 @@ export const clmm = {
   purpleBtn: "#9B7FD4",
   border: "rgba(155,127,212,0.22)",
   borderStrong: "rgba(155,127,212,0.42)",
+  rowBorder: "rgba(255, 255, 255, 0.06)",
   green: "#6EE7A8",
   red: "#F87171",
   verified: "#6EE7A8",

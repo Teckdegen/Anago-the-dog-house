@@ -31,6 +31,9 @@ contract VestingNFT is ERC721, Ownable, ReentrancyGuard {
     // Next token ID to mint
     uint256 public nextTokenId;
 
+    /// Per-token escrow liability (unclaimed vesting balances)
+    mapping(address => uint256) public totalEscrowed;
+
     // Events
     event VestingCreated(
         uint256 indexed tokenId,
@@ -79,6 +82,7 @@ contract VestingNFT is ERC721, Ownable, ReentrancyGuard {
 
         // Transfer tokens to contract
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
+        totalEscrowed[token] += amount;
 
         // Get next token ID
         uint256 tokenId = nextTokenId++;
@@ -125,6 +129,7 @@ contract VestingNFT is ERC721, Ownable, ReentrancyGuard {
 
         // Update claimed amount
         vesting.claimed += claimable;
+        totalEscrowed[vesting.token] -= claimable;
 
         // Transfer tokens to NFT owner
         IERC20(vesting.token).safeTransfer(msg.sender, claimable);
@@ -184,9 +189,11 @@ contract VestingNFT is ERC721, Ownable, ReentrancyGuard {
         // Calculate claimable and unvested amounts
         uint256 claimable = _claimableAmount(tokenId);
         uint256 unvested = vesting.totalAmount - vesting.claimed - claimable;
+        uint256 liability = vesting.totalAmount - vesting.claimed;
 
         // Mark as revoked
         vesting.revoked = true;
+        totalEscrowed[vesting.token] -= liability;
 
         // Transfer claimable to beneficiary if any
         if (claimable > 0) {
@@ -316,6 +323,10 @@ contract VestingNFT is ERC721, Ownable, ReentrancyGuard {
         address token,
         uint256 amount
     ) external onlyOwner {
+        uint256 balance = IERC20(token).balanceOf(address(this));
+        uint256 escrow = totalEscrowed[token];
+        uint256 recoverable = balance > escrow ? balance - escrow : 0;
+        require(amount <= recoverable, "Exceeds non-escrow balance");
         IERC20(token).safeTransfer(owner(), amount);
     }
 

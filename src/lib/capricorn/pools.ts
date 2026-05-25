@@ -1,6 +1,29 @@
 /** Curated Capricorn CL pools — UI list; fee/APY/TVL fetched on-chain. */
 
-export const CAPRICORN_POOL_ADDRESSES = [
+/** Featured / user-curated pools (listed first). */
+const CAPRICORN_POOL_PRIORITY = [
+  "0x714a2694c8d4f0b1bfba0e5b76240e439df2182d",
+  "0x04ddf65a9e78a0f0e001807e5567996160767f33",
+  "0x3e1523b270867762a49340389bdea9b8658994aa",
+  "0xe5a8f88c3db25434b6b4320a8e14348c447dd7a8",
+  "0x1227d9a40d457dcacc0e25512ab077a5f019d099",
+  "0xd57e82e32ff8bdb26d5984e4e73c14c2145d8ed4",
+  "0xbab2296c6a98c4e8584051dee817a98ab4069388",
+  "0x200aad3294ce3efa108847d327ed9baa4f24b5f8",
+  "0x877f30447f62bf2d8f1e0d413012ee4c1b087c0b",
+  "0x4d095c36ea743dcc2515c132ce8ac2287c9f3fa6",
+  "0x7214fb4675d8a8567c561faaa28c2f7b1f875853",
+  "0xf4e40aaea62c8b6a023b1f0250e096979b6d28ea",
+  "0x0198833561e4b64afa593cc3e90f446933ac2a9a",
+  "0xef1180a102e0e987b54fed74c4005e9ff8754d98",
+  "0x37b81dc0b8917bb76ef8b936ac71ee892d2e17d7",
+  "0x3704e42144f671822a71c7e40fa6a33fd83ae36f",
+  "0x1201512d6082a4c587628491c7b72b463bcbc1d6",
+  "0x776059ee138ac8811847e8f124e84a6bbf881d8d",
+  "0x2c492d8b6b103be68df5ec37e709750ae3d3444e",
+] as const;
+
+const CAPRICORN_POOL_CURATED = [
   "0x003131af546ab75e7c83b95077aba81d3a4458d9",
   "0x00af459c3cd40c4ab6968a197199fef9d4f24b31",
   "0x01b22f453fe1db6e10d905647d8c21630a184db0",
@@ -144,6 +167,26 @@ export const CAPRICORN_POOL_ADDRESSES = [
   "0xfcfe78084cefe851ff7fd462942a4d051b3b06b2",
   "0xff2f697e073b8205952c9bfd1f6f102434b26262",
 ] as const;
+
+function mergePoolAddresses(
+  priority: readonly string[],
+  curated: readonly string[],
+): readonly `0x${string}`[] {
+  const seen = new Set<string>();
+  const out: `0x${string}`[] = [];
+  for (const addr of [...priority, ...curated]) {
+    const key = addr.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(key as `0x${string}`);
+  }
+  return out;
+}
+
+export const CAPRICORN_POOL_ADDRESSES = mergePoolAddresses(
+  CAPRICORN_POOL_PRIORITY,
+  CAPRICORN_POOL_CURATED,
+);
 
 export function stubPoolsFromAddresses(): import("./types").CachedPool[] {
   return CAPRICORN_POOL_ADDRESSES.map((address) => ({

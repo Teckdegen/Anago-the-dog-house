@@ -98,7 +98,10 @@ export async function fetchPoolLiveState(
 }
 
 export function feeToPercent(fee: number): string {
-  return `${(fee / 10_000).toFixed(fee % 100 === 0 ? 2 : 4)}%`;
+  const pct = fee / 10_000;
+  if (pct >= 1 && pct % 1 === 0) return `${pct.toFixed(0)}%`;
+  if (pct * 10 === Math.floor(pct * 10)) return `${pct.toFixed(1)}%`;
+  return `${pct.toFixed(2)}%`;
 }
 
 const knownSet = new Set(CAPRICORN_POOL_ADDRESSES.map((a) => a.toLowerCase()));
