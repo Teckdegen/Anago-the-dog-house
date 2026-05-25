@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { ChevronDown } from "lucide-react";
-import { TokenIcon } from "@/components/TokenIcon";
+import { PoolPairLogos } from "@/components/clmm/PoolPairLogos";
 import { formatApr, formatUsdCompact, type EnrichedPool } from "@/lib/capricorn/poolMetrics";
 import { clmm } from "./clmmTheme";
 
@@ -135,7 +135,7 @@ function PoolRow({ row, rank }: { row: EnrichedPool; rank: number }) {
       </td>
       <td className="py-4 pr-3">
         <span className="font-mono text-[11px] lowercase" style={{ color: clmm.textMuted }}>
-          v4
+          v3
         </span>
       </td>
       <td className="py-4 pr-3 font-mono text-[12px]" style={{ color: clmm.text }}>
@@ -165,33 +165,15 @@ function PoolRow({ row, rank }: { row: EnrichedPool; rank: number }) {
 
 function PoolPairAvatar({ row }: { row: EnrichedPool }) {
   const m = row.metrics;
-  const size = 28;
-
-  if (m.pairImageUrl) {
-    return (
-      <img
-        src={m.pairImageUrl}
-        alt=""
-        width={size}
-        height={size}
-        className="rounded-full shrink-0 object-cover"
-        style={{ border: `1px solid ${clmm.border}` }}
-      />
-    );
-  }
-
   return (
-    <div className="relative flex shrink-0" style={{ width: size + 12, height: size }}>
-      <TokenIcon address={row.token0} symbol={m.symbol0} size={size} logoUrl={m.logo0} />
-      <div className="absolute left-[14px] top-[6px] ring-2 ring-[#06040F] rounded-full">
-        <TokenIcon address={row.token1} symbol={m.symbol1} size={size} logoUrl={m.logo1} />
-      </div>
-      <div
-        className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-sm flex items-center justify-center text-[7px] font-bold"
-        style={{ background: clmm.purpleSolid, color: clmm.text, border: `1px solid ${clmm.border}` }}
-      >
-        ◆
-      </div>
-    </div>
+    <PoolPairLogos
+      token0={row.token0}
+      token1={row.token1}
+      symbol0={m.symbol0}
+      symbol1={m.symbol1}
+      logo0={m.logo0 ?? m.pairImageUrl}
+      logo1={m.logo1 ?? m.pairImageUrl}
+      size={28}
+    />
   );
 }

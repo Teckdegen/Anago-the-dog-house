@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { Copy, ExternalLink, MoreHorizontal, Share2 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { TokenIcon } from "@/components/TokenIcon";
+import { PoolPairLogos } from "@/components/clmm/PoolPairLogos";
 import { formatApr, formatUsdCompact, truncateAddress, type PoolMetrics } from "@/lib/capricorn/poolMetrics";
 import { feeToPercent, type CachedPool, type PoolLiveState } from "@/lib/capricorn";
 import { PoolVolumeChart } from "./PoolVolumeChart";
@@ -55,12 +56,15 @@ export function PoolDetailView({
 
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="relative flex shrink-0">
-            <TokenIcon address={live.pool.token0} symbol={live.token0Symbol} size={40} logoUrl={m.logo0} />
-            <div className="absolute -right-2 top-4 rounded-full" style={{ boxShadow: `0 0 0 2px ${clmm.bg}` }}>
-              <TokenIcon address={live.pool.token1} symbol={live.token1Symbol} size={40} logoUrl={m.logo1} />
-            </div>
-          </div>
+          <PoolPairLogos
+            token0={live.pool.token0}
+            token1={live.pool.token1}
+            symbol0={live.token0Symbol}
+            symbol1={live.token1Symbol}
+            logo0={m.logo0 ?? m.pairImageUrl}
+            logo1={m.logo1 ?? m.pairImageUrl}
+            size={40}
+          />
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="font-grotesk text-[24px] sm:text-[28px] font-medium" style={{ color: clmm.text }}>

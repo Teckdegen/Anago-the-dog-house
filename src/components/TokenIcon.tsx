@@ -10,45 +10,64 @@ export function TokenIcon({
   symbol,
   size = 28,
   logoUrl: logoUrlProp,
+  fallbackLogoUrl,
 }: {
   address: string;
   symbol?: string;
   size?: number;
   logoUrl?: string | null;
+  /** Shown when this token has no logo (e.g. partner token image in a CL pair). */
+  fallbackLogoUrl?: string | null;
 }) {
   const publicClient = usePublicClient();
-  const [logoUrl, setLogoUrl] = useState<string | null>(logoUrlProp ?? null);
-  const [failed, setFailed] = useState(false);
+  const [logoUrl, setLogoUrl] = useState<string | null>(logoUrlProp ?? fallbackLogoUrl ?? null);
+  const [failedPrimary, setFailedPrimary] = useState(false);
 
   useEffect(() => {
+    setFailedPrimary(false);
     if (logoUrlProp) {
       setLogoUrl(logoUrlProp);
-      setFailed(false);
       return;
     }
+    if (fallbackLogoUrl) {
+      setLogoUrl(fallbackLogoUrl);
+      return;
+    }
+    setLogoUrl(null);
     if (!address || address === "0x0000000000000000000000000000000000000000") return;
     let cancelled = false;
-    setFailed(false);
 
     fetchTokenFromDexScreener(address, publicClient).then((data) => {
       if (!cancelled && data?.logoURI) setLogoUrl(data.logoURI);
     });
 
     return () => { cancelled = true; };
-  }, [address, publicClient, logoUrlProp]);
+  }, [address, publicClient, logoUrlProp, fallbackLogoUrl]);
 
   const letter = (symbol || address?.slice(0, 2) || "?")[0].toUpperCase();
 
-  if (logoUrl && !failed) {
+  const displayUrl =
+    failedPrimary && fallbackLogoUrl
+      ? fallbackLogoUrl
+      : logoUrl || fallbackLogoUrl;
+
+  if (displayUrl && !(failedPrimary && !fallbackLogoUrl)) {
     return (
       <img
-        src={logoUrl}
+        src={displayUrl}
         alt={symbol || "token"}
         width={size}
         height={size}
-        className="rounded-full shrink-0"
-        style={{ width: size, height: size }}
-        onError={() => setFailed(true)}
+        className="rounded-full shrink-0 object-cover"
+        style={{ width: size, height: size, border: "1px solid rgba(155,127,212,0.25)" }}
+        onError={() => {
+          if (!failedPrimary && fallbackLogoUrl && displayUrl !== fallbackLogoUrl) {
+            setFailedPrimary(true);
+          } else {
+            setLogoUrl(null);
+            setFailedPrimary(true);
+          }
+        }}
       />
     );
   }
