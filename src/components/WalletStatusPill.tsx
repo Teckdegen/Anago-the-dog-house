@@ -5,7 +5,6 @@ import {
   ExternalLink,
   LogOut,
   Settings2,
-  User,
 } from "lucide-react";
 import { useAccount, useDisconnect } from "wagmi";
 import { useAppKit } from "@reown/appkit/react";
@@ -14,44 +13,8 @@ function shorten(a: string) {
   return `${a.slice(0, 6)}…${a.slice(-4)}`;
 }
 
-/** Deterministic avatar from wallet address — always GZ purple (never green/gold hues). */
-function WalletAvatar({ address, size = 32 }: { address: string; size?: number }) {
-  const seed = parseInt(address.slice(2, 10), 16);
-  const monogram = address.slice(2, 4).toUpperCase();
-  const hue = 262 + (seed % 22);
-  const lightTop = 48 + (seed % 10);
-  const lightBot = 32 + (seed % 8);
-
-  return (
-    <div
-      className="shrink-0 rounded-full flex items-center justify-center font-mono font-bold uppercase"
-      style={{
-        width: size,
-        height: size,
-        fontSize: size * 0.34,
-        color: "#EDE0FF",
-        background: `linear-gradient(145deg, hsl(${hue}, 55%, ${lightTop}%) 0%, hsl(${hue + 8}, 50%, ${lightBot}%) 100%)`,
-        boxShadow:
-          "inset 0 1px 0 rgba(255,255,255,0.18), 0 0 0 2px rgba(155,127,212,0.45)",
-      }}
-      aria-hidden
-    >
-      {monogram}
-    </div>
-  );
-}
-
-const pillBase =
-  "flex items-center gap-2 rounded-full transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-[#9B7FD4]/50";
-
-const pillStyle = {
-  background: "rgba(42, 31, 107, 0.55)",
-  border: "1px solid rgba(155, 127, 212, 0.38)",
-  backdropFilter: "blur(12px)",
-  WebkitBackdropFilter: "blur(12px)",
-} as const;
-
-const pillHover = "hover:border-[rgba(155,127,212,0.55)] hover:bg-[rgba(91,79,232,0.22)]";
+const triggerClass =
+  "flex items-center gap-1 font-mono text-[11px] tracking-tight transition hover:opacity-80 outline-none focus-visible:opacity-100";
 
 const menuPanelStyle = {
   background: "#120E1F",
@@ -60,8 +23,7 @@ const menuPanelStyle = {
 } as const;
 
 /**
- * Profile-style wallet control: avatar, address, menu (account / copy / explorer / disconnect).
- * Uses a lightweight menu (no Radix dropdown) to avoid focus-trap loops with wallet extensions.
+ * Wallet control: address only in the header; menu for account / copy / explorer / disconnect.
  */
 export function WalletStatusPill() {
   const { address, isConnected } = useAccount();
@@ -97,22 +59,11 @@ export function WalletStatusPill() {
       <button
         type="button"
         onClick={() => open()}
-        className={`${pillBase} ${pillHover} pl-1.5 pr-4 py-1.5`}
-        style={pillStyle}
+        className={`${triggerClass} uppercase font-grotesk text-[11px] tracking-wider`}
+        style={{ color: "#EDE0FF" }}
         aria-label="Connect wallet"
       >
-        <span
-          className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
-          style={{
-            background: "rgba(155,127,212,0.15)",
-            border: "1px solid rgba(155,127,212,0.35)",
-          }}
-        >
-          <User className="w-4 h-4" style={{ color: "#9B7FD4" }} />
-        </span>
-        <span className="font-grotesk text-[11px] uppercase tracking-wider" style={{ color: "#EDE0FF" }}>
-          Connect
-        </span>
+        Connect
       </button>
     );
   }
@@ -131,23 +82,16 @@ export function WalletStatusPill() {
     <div ref={rootRef} className="relative">
       <button
         type="button"
-        className={`${pillBase} ${pillHover} pl-1 pr-2.5 py-1 gap-2`}
-        style={pillStyle}
-        aria-label="Wallet profile menu"
+        className={triggerClass}
+        style={{ color: "#EDE0FF" }}
+        aria-label="Wallet menu"
         aria-expanded={menuOpen}
         aria-haspopup="menu"
         onClick={() => setMenuOpen((o) => !o)}
       >
-        <WalletAvatar address={address} size={32} />
-        <span
-          className="hidden sm:inline font-mono text-[11px] tracking-tight"
-          style={{ color: "#EDE0FF" }}
-        >
-          {shorten(address)}
-        </span>
+        <span>{shorten(address)}</span>
         <ChevronDown
-          className={`w-3.5 h-3.5 shrink-0 opacity-70 transition-transform ${menuOpen ? "rotate-180" : ""}`}
-          style={{ color: "#C4A8F0" }}
+          className={`w-3.5 h-3.5 shrink-0 opacity-60 transition-transform ${menuOpen ? "rotate-180" : ""}`}
           aria-hidden
         />
       </button>
@@ -158,18 +102,10 @@ export function WalletStatusPill() {
           className="absolute right-0 top-full z-50 mt-2 min-w-[220px] rounded-xl p-1.5 shadow-xl"
           style={menuPanelStyle}
         >
-          <div className="px-2 py-2">
-            <div className="flex items-center gap-3">
-              <WalletAvatar address={address} size={40} />
-              <div className="min-w-0">
-                <p className="font-grotesk text-[12px] uppercase tracking-wide" style={{ color: "#C4A8F0" }}>
-                  Wallet
-                </p>
-                <p className="font-mono text-[11px] truncate" style={{ color: "#EDE0FF" }}>
-                  {shorten(address)}
-                </p>
-              </div>
-            </div>
+          <div className="px-2.5 py-2">
+            <p className="font-mono text-[11px] break-all" style={{ color: "#EDE0FF" }}>
+              {address}
+            </p>
           </div>
 
           <div className="my-1 h-px" style={{ background: "rgba(155,127,212,0.15)" }} />

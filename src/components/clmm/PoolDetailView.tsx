@@ -158,10 +158,7 @@ export function PoolDetailView({
 
 function Badge({ children }: { children: ReactNode }) {
   return (
-    <span
-      className="font-mono text-[10px] px-2 py-0.5 rounded-md lowercase"
-      style={{ background: clmm.purpleBg, color: clmm.textMuted, border: `1px solid ${clmm.border}` }}
-    >
+    <span className="font-mono text-[11px] lowercase" style={{ color: clmm.textDim }}>
       {children}
     </span>
   );
