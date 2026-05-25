@@ -1,11 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import {
-  ChevronDown,
-  Copy,
-  ExternalLink,
-  LogOut,
-  Settings2,
-} from "lucide-react";
+import { ChevronDown, Copy, LogOut, Settings2 } from "lucide-react";
 import { useAccount, useDisconnect } from "wagmi";
 import { useAppKit } from "@reown/appkit/react";
 
@@ -124,7 +118,6 @@ export function WalletStatusPill() {
             onClick={() => void copyAddress()}
           />
           <ProfileMenuItem
-            icon={<ExternalLink className="w-4 h-4" />}
             label="View on Explorer"
             onClick={() => {
               closeMenu();
@@ -155,7 +148,7 @@ function ProfileMenuItem({
   onClick,
   destructive,
 }: {
-  icon: ReactNode;
+  icon?: ReactNode;
   label: string;
   onClick: () => void;
   destructive?: boolean;
@@ -168,7 +161,9 @@ function ProfileMenuItem({
       className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 cursor-pointer font-mono text-[11px] outline-none hover:bg-[rgba(155,127,212,0.18)] text-left"
       style={{ color: destructive ? "#F87171" : "#EDE0FF" }}
     >
-      <span style={{ color: destructive ? "#F87171" : "#9B7FD4" }}>{icon}</span>
+      {icon != null && (
+        <span style={{ color: destructive ? "#F87171" : "#9B7FD4" }}>{icon}</span>
+      )}
       {label}
     </button>
   );

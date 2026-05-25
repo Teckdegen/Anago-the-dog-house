@@ -182,15 +182,6 @@ function PoolIdCopy({ id, poolAddress }: { id: string; poolAddress: `0x${string}
         <Copy className="w-3 h-3" />
         {copied && <span style={{ color: clmm.green }}>copied</span>}
       </button>
-      <a
-        href={`https://monadexplorer.com/address/${poolAddress}`}
-        target="_blank"
-        rel="noreferrer"
-        className="font-mono text-[10px] hover:underline"
-        style={{ color: clmm.textMuted }}
-      >
-        Explorer
-      </a>
     </div>
   );
 }
@@ -250,7 +241,7 @@ function TokenLinkRow({
       href={`https://monadexplorer.com/address/${address}`}
       target="_blank"
       rel="noreferrer"
-      className="flex items-center gap-2 min-w-0 py-2 first:pt-0 rounded-lg -mx-1 px-1 transition hover:bg-[rgba(155,127,212,0.12)]"
+      className="flex items-center gap-2 w-full min-w-0 py-2 first:pt-0 rounded-lg -mx-1 px-1 transition hover:bg-[rgba(155,127,212,0.12)]"
     >
       <TokenIcon address={address} symbol={symbol} size={24} logoUrl={logo} />
       <span className="font-grotesk text-[13px] shrink-0" style={{ color: clmm.text }}>

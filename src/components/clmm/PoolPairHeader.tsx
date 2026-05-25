@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { ExternalLink } from "lucide-react";
 import { TokenIcon } from "@/components/TokenIcon";
 import { fetchPairFromDexScreener } from "@/lib/web3/dexscreener";
 import { feeToPercent, type PoolLiveState } from "@/lib/capricorn";
@@ -69,10 +68,10 @@ export function PoolPairHeader({
             href={`https://monadexplorer.com/address/${poolAddress}`}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1 mt-2 font-mono text-[9px] hover:underline"
+            className="inline-block mt-2 font-mono text-[9px] hover:underline truncate max-w-full"
             style={{ color: "rgba(196,168,240,0.45)" }}
           >
-            {poolAddress} <ExternalLink className="w-3 h-3" />
+            {poolAddress}
           </a>
         </div>
       </div>
