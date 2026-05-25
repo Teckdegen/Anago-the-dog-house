@@ -84,11 +84,7 @@ export function PoolDetailView({
 
       <div className="grid lg:grid-cols-[1fr_340px] gap-6 items-start">
         <div>
-          <PoolChartEmbeds
-            poolAddress={poolAddress}
-            symbol0={m.symbol0}
-            symbol1={m.symbol1}
-          />
+          <PoolChartEmbeds poolAddress={poolAddress} />
         </div>
 
         <aside className="space-y-3 lg:sticky lg:top-6">
