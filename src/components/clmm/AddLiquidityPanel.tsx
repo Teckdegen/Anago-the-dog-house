@@ -161,10 +161,6 @@ export function AddLiquidityPanel({
       setAmount1("");
       return;
     }
-    if (priceAboveRange) {
-      setAmount1("");
-      return;
-    }
     const p0 = safeParse(clean, live.token0Decimals);
     if (p0 === 0n) {
       setAmount1("");
@@ -184,10 +180,6 @@ export function AddLiquidityPanel({
     setEditSide("1");
     setAmount1(clean);
     if (!clean) {
-      setAmount0("");
-      return;
-    }
-    if (priceBelowRange) {
       setAmount0("");
       return;
     }

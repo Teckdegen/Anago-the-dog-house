@@ -5,14 +5,31 @@ import { CAPRICORN_POOL_ADDRESSES } from "./pools";
 import { mapInBatches } from "./rpcQueue";
 import type { CachedPool, PoolLiveState, TokenMeta } from "./types";
 
+const Q96 = 2n ** 96n;
+const Q192 = 2n ** 192n;
+
+/** token1 per token0 — bigint-safe (Number(sqrtPriceX96) loses precision). */
 export function sqrtPriceX96ToPrice(
   sqrtPriceX96: bigint,
   decimals0: number,
   decimals1: number,
 ): number {
-  const ratio = Number(sqrtPriceX96) / 2 ** 96;
-  const price = ratio * ratio;
-  return price * 10 ** (decimals0 - decimals1);
+  if (sqrtPriceX96 <= 0n) return 0;
+  const scale = 1_000_000_000_000_000_000n;
+  const ratioScaled = (sqrtPriceX96 * sqrtPriceX96 * scale) / Q192;
+  return (Number(ratioScaled) / Number(scale)) * 10 ** (decimals0 - decimals1);
+}
+
+/** Inverse of sqrtPriceX96ToPrice for range presets. */
+export function priceToSqrtPriceX96(
+  price: number,
+  decimals0: number,
+  decimals1: number,
+): bigint {
+  if (!Number.isFinite(price) || price <= 0) return 1n;
+  const ratio = price / 10 ** (decimals0 - decimals1);
+  const sqrtRatio = Math.sqrt(ratio);
+  return BigInt(Math.floor(sqrtRatio * Number(Q96)));
 }
 
 export async function fetchTokenMeta(

@@ -26,8 +26,20 @@ export function AddLiquidityWizard({
   const [rangePreset, setRangePreset] = useState<RangePreset>("10");
 
   const { tickLower, tickUpper } = useMemo(
-    () => tickRangeForPreset(live.tick, live.pool.tickSpacing, rangePreset),
-    [live.tick, live.pool.tickSpacing, rangePreset],
+    () =>
+      tickRangeForPreset(live.tick, live.pool.tickSpacing, rangePreset, {
+        sqrtPriceX96: live.sqrtPriceX96,
+        decimals0: live.token0Decimals,
+        decimals1: live.token1Decimals,
+      }),
+    [
+      live.tick,
+      live.sqrtPriceX96,
+      live.token0Decimals,
+      live.token1Decimals,
+      live.pool.tickSpacing,
+      rangePreset,
+    ],
   );
 
   return (
