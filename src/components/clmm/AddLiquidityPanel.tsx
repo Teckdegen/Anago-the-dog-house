@@ -281,6 +281,14 @@ export function AddLiquidityPanel({
 
     pendingMintRef.current = amounts;
 
+    if (needsApprove0 && needsApprove1) {
+      toast(
+        "info",
+        "3 wallet confirmations",
+        `Approve ${live.token0Symbol}, approve ${live.token1Symbol}, then deposit liquidity.`,
+      );
+    }
+
     if (needsApprove0) {
       runApprove(live.pool.token0, "0").catch((e) => {
         pendingMintRef.current = null;
@@ -340,6 +348,15 @@ export function AddLiquidityPanel({
 
   const usd0 = usdEstimate(amount0, token0Usd);
   const usd1 = usdEstimate(amount1, token1Usd);
+  const actionLabel = (() => {
+    if (busy) return "Working…";
+    if (needsApprove0 && needsApprove1) {
+      return `Approve ${live.token0Symbol} + ${live.token1Symbol}, then deposit`;
+    }
+    if (needsApprove0) return `Approve ${live.token0Symbol} & deposit liquidity`;
+    if (needsApprove1) return `Approve ${live.token1Symbol} & deposit liquidity`;
+    return "Deposit liquidity";
+  })();
 
   if (!address) {
     return (
@@ -423,7 +440,7 @@ export function AddLiquidityPanel({
         className="w-full py-4 rounded-full font-grotesk text-[14px] font-semibold tracking-wide transition hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
         style={{ background: clmm.purpleBtn, color: clmm.bg }}
       >
-        {busy ? "Working…" : needsApprove0 || needsApprove1 ? "Approve & deposit liquidity" : "Deposit liquidity"}
+        {actionLabel}
       </button>
     </div>
   );

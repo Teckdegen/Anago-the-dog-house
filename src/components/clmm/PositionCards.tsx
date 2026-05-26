@@ -94,6 +94,8 @@ function PositionCard({ position: pos }: { position: LpPosition }) {
 
   const hasOwed = pos.tokensOwed0 > 0n || pos.tokensOwed1 > 0n;
   const canRemove = pos.liquidity > 0n;
+  const owed0Label = formatTokenAmount(pos.tokensOwed0, pos.token0Decimals);
+  const owed1Label = formatTokenAmount(pos.tokensOwed1, pos.token1Decimals);
 
   const runCollect = async () => {
     if (!address || !publicClient) return;
@@ -177,19 +179,26 @@ function PositionCard({ position: pos }: { position: LpPosition }) {
           Ticks {pos.tickLower} → {pos.tickUpper}
         </p>
         <p>Liquidity {pos.liquidity.toString()}</p>
-        {hasOwed && (
-          <p style={{ color: clmm.accent }}>
-            Unclaimed: {formatUnits(pos.tokensOwed0, pos.token0Decimals)} {pos.token0Symbol} +{" "}
-            {formatUnits(pos.tokensOwed1, pos.token1Decimals)} {pos.token1Symbol}
+        <div className="mt-2 rounded-lg p-2.5 space-y-2" style={{ border: `1px solid ${clmm.border}` }}>
+          <p className="text-[9px] uppercase" style={{ color: hasOwed ? clmm.accent : clmm.textDim }}>
+            Unclaimed Fees
           </p>
-        )}
+          <div className="flex items-center justify-between gap-3">
+            <span>{pos.token0Symbol}</span>
+            <span style={{ color: hasOwed ? clmm.text : clmm.textDim }}>{owed0Label}</span>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <span>{pos.token1Symbol}</span>
+            <span style={{ color: hasOwed ? clmm.text : clmm.textDim }}>{owed1Label}</span>
+          </div>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-2 pt-3" style={{ borderTop: `1px solid ${clmm.border}` }}>
         <button
           type="button"
           onClick={runCollect}
-          disabled={pending || !hasOwed}
+          disabled={pending}
           className="px-3 py-2 rounded-lg font-grotesk text-[10px] uppercase tracking-wider disabled:opacity-40"
           style={{ background: clmm.purpleSolid, color: clmm.text, border: `1px solid ${clmm.borderStrong}` }}
         >
@@ -217,4 +226,14 @@ function PositionCard({ position: pos }: { position: LpPosition }) {
       </div>
     </div>
   );
+}
+
+function formatTokenAmount(amount: bigint, decimals: number): string {
+  const raw = formatUnits(amount, decimals);
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n === 0) return "0";
+  if (n >= 1_000_000) return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  if (n >= 1) return n.toLocaleString(undefined, { maximumFractionDigits: 6 });
+  if (n < 0.000001) return "<0.000001";
+  return n.toLocaleString(undefined, { maximumFractionDigits: 8 });
 }
