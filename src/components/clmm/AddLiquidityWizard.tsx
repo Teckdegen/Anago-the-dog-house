@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { ArrowLeft, SlidersHorizontal } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { AddLiquidityPanel } from "./AddLiquidityPanel";
 import { ClmmTxGate } from "@/components/clmm/SwitchToMonadMainnet";
 import { PoolPairLogos } from "@/components/clmm/PoolPairLogos";
@@ -41,20 +41,9 @@ export function AddLiquidityWizard({
         <ArrowLeft className="w-3.5 h-3.5" /> Back to pool
       </Link>
 
-      <div className="flex items-center justify-between gap-3 mb-6">
-        <h1 className="font-grotesk text-[26px] sm:text-[30px] font-medium" style={{ color: clmm.text }}>
-          Create Position
-        </h1>
-        <button
-          type="button"
-          className="p-2 rounded-xl transition hover:bg-[rgba(155,127,212,0.12)]"
-          style={{ color: clmm.textMuted, border: `1px solid ${clmm.border}` }}
-          aria-label="Pool settings"
-          title={`${metrics.symbol0} / ${metrics.symbol1} · ${feeLabel}`}
-        >
-          <SlidersHorizontal className="w-4 h-4" />
-        </button>
-      </div>
+      <h1 className="font-grotesk text-[26px] sm:text-[30px] font-medium mb-6" style={{ color: clmm.text }}>
+        Create Position
+      </h1>
 
       <div
         className="flex items-center gap-3 rounded-2xl px-4 py-3 mb-6"

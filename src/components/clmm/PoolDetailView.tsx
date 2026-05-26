@@ -11,8 +11,6 @@ import {
 } from "@/lib/capricorn/poolMetrics";
 import { feeToPercent, type CachedPool, type PoolLiveState } from "@/lib/capricorn";
 import { PoolChartEmbeds } from "./PoolChartEmbeds";
-import { SwapPanel } from "./SwapPanel";
-import { ClmmTxGate } from "./SwitchToMonadMainnet";
 import { clmm } from "./clmmTheme";
 
 function formatDailyChangeSub(pct: number | null): string | undefined {
@@ -82,18 +80,50 @@ export function PoolDetailView({
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-[1fr_340px] gap-6 items-start">
-        <div>
+      <div className="grid lg:grid-cols-[1fr_300px] gap-6 items-start">
+        <div className="space-y-4 min-w-0">
           <PoolChartEmbeds poolAddress={poolAddress} />
+
+          <div className="rounded-2xl p-4 sm:p-5" style={{ background: clmm.panel, border: `1px solid ${clmm.border}` }}>
+            <p className="font-mono text-[10px] uppercase mb-4" style={{ color: clmm.textDim }}>
+              Stats
+            </p>
+            <div className="grid sm:grid-cols-2 gap-x-6 gap-y-4">
+              <StatRow
+                label="TVL"
+                value={formatUsdTable(m.tvlUsd)}
+                sub={dailyChange}
+                subNegative={m.priceChange24h != null && m.priceChange24h < 0}
+              />
+              <StatRow
+                label="24h vol."
+                value={formatUsdTable(m.volume24hUsd)}
+                sub={volChangeSub}
+                subNegative={m.priceChange24h != null && m.priceChange24h < 0}
+              />
+              <StatRow label="24h fees" value={formatUsdTable(m.fees24hUsd)} />
+              {(m.buys24h != null || m.sells24h != null) && (
+                <StatRow
+                  label="24H trades"
+                  value={`${m.buys24h ?? 0} buys · ${m.sells24h ?? 0} sells`}
+                />
+              )}
+            </div>
+            <div className="mt-4 pt-4" style={{ borderTop: `1px solid ${clmm.border}` }}>
+              <p className="font-mono text-[9px] uppercase mb-2" style={{ color: clmm.textDim }}>
+                Pool balances
+              </p>
+              <p className="font-mono text-[11px]" style={{ color: clmm.text }}>
+                On-chain via StateView · tick {live.tick}
+              </p>
+              <p className="font-mono text-[10px] mt-1" style={{ color: clmm.textMuted }}>
+                1 {live.token0Symbol} ≈ {formatPrice(live.price)} {live.token1Symbol}
+              </p>
+            </div>
+          </div>
         </div>
 
         <aside className="space-y-3 lg:sticky lg:top-6">
-          <div className="rounded-2xl p-4" style={{ background: clmm.panel, border: `1px solid ${clmm.border}` }}>
-            <ClmmTxGate>
-              <SwapPanel pool={pool} live={live} compact />
-            </ClmmTxGate>
-          </div>
-
           <Link
             to="/clmm/pool/$poolAddress/add"
             params={{ poolAddress }}
@@ -111,39 +141,6 @@ export function PoolDetailView({
             <p className="font-grotesk text-[28px] font-medium tabular-nums" style={{ color: clmm.text }}>
               {formatAprPrecise(m.aprPercent)}
             </p>
-          </SidebarCard>
-
-          <SidebarCard title="Stats">
-            <StatRow
-              label="TVL"
-              value={formatUsdTable(m.tvlUsd)}
-              sub={dailyChange}
-              subNegative={m.priceChange24h != null && m.priceChange24h < 0}
-            />
-            <StatRow
-              label="24h vol."
-              value={formatUsdTable(m.volume24hUsd)}
-              sub={volChangeSub}
-              subNegative={m.priceChange24h != null && m.priceChange24h < 0}
-            />
-            <StatRow label="24h fees" value={formatUsdTable(m.fees24hUsd)} />
-            {(m.buys24h != null || m.sells24h != null) && (
-              <StatRow
-                label="24H trades"
-                value={`${m.buys24h ?? 0} buys · ${m.sells24h ?? 0} sells`}
-              />
-            )}
-            <div className="mt-4 pt-4" style={{ borderTop: `1px solid ${clmm.border}` }}>
-              <p className="font-mono text-[9px] uppercase mb-2" style={{ color: clmm.textDim }}>
-                Pool balances
-              </p>
-              <p className="font-mono text-[11px]" style={{ color: clmm.text }}>
-                On-chain via StateView · tick {live.tick}
-              </p>
-              <p className="font-mono text-[10px] mt-1" style={{ color: clmm.textMuted }}>
-                1 {live.token0Symbol} ≈ {formatPrice(live.price)} {live.token1Symbol}
-              </p>
-            </div>
           </SidebarCard>
 
           <SidebarCard title="Links">
@@ -209,7 +206,7 @@ function StatRow({
   subNegative?: boolean;
 }) {
   return (
-    <div className="mb-4 last:mb-0">
+    <div className="mb-0">
       <p className="font-mono text-[10px] mb-1" style={{ color: clmm.textDim }}>
         {label}
       </p>
