@@ -10,3 +10,4 @@ export * from "./poolMetricsCache";
 export * from "./quote";
 export * from "./swap";
 export * from "./liquidity";
+export * from "./liquidityMath";
