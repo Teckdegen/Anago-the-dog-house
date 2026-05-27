@@ -4,8 +4,25 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
+* {
+  box-sizing: border-box;
+}
+
+html,
 body {
-  background: #06040F;
-  color: #EDE0FF;
+  margin: 0;
+  min-height: 100%;
+  background: #06040f;
+  color: #ede0ff;
   font-family: 'Space Grotesk', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: rgba(155, 127, 212, 0.35);
+  color: #ede0ff;
+}
+
+input::placeholder {
+  color: rgba(196, 168, 240, 0.35);
 }

@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Stream Farm Admin",
-  description: "Admin dashboard for Stream Farm management",
+  title: "Dog House — Protocol Admin",
+  description: "DeFi protocol admin: farms, locks, vesting on Monad",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -1,0 +1,20 @@
+/** Dog House admin — same palette as main app / CLMM */
+export const admin = {
+  bg: "#06040F",
+  panel: "#0C0818",
+  panelHover: "#120E1F",
+  sidebar: "#080612",
+  text: "#EDE0FF",
+  textMuted: "rgba(196,168,240,0.55)",
+  textDim: "rgba(196,168,240,0.38)",
+  accent: "#C4A8F0",
+  purple: "#9B7FD4",
+  purpleSolid: "#5B4FE8",
+  purpleBtn: "#9B7FD4",
+  border: "rgba(155,127,212,0.22)",
+  borderStrong: "rgba(155,127,212,0.42)",
+  purpleBg: "rgba(155,127,212,0.08)",
+  purpleBgHover: "rgba(155,127,212,0.14)",
+  green: "#6EE7A8",
+  red: "#F87171",
+} as const;

@@ -1,4 +1,4 @@
-export { STREAM_FARM_ADDRESS } from "./deployments";
+export { STREAM_FARM_ADDRESS, TOKEN_LOCK_ADDRESS, VESTING_NFT_ADDRESS } from "./deployments";
 
 export const STREAM_FARM_ABI = [
   { type: "function", name: "farmCount", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
@@ -39,6 +39,39 @@ export const STREAM_FARM_ABI = [
   { type: "function", name: "recoverTokens", stateMutability: "nonpayable", inputs: [{ name: "token", type: "address" }, { name: "amount", type: "uint256" }], outputs: [] },
   { type: "function", name: "addAdmin", stateMutability: "nonpayable", inputs: [{ name: "admin", type: "address" }], outputs: [] },
   { type: "function", name: "removeAdmin", stateMutability: "nonpayable", inputs: [{ name: "admin", type: "address" }], outputs: [] },
+] as const;
+
+export const TOKEN_LOCK_ABI = [
+  {
+    type: "function",
+    name: "createLock",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "token", type: "address" },
+      { name: "amount", type: "uint256" },
+      { name: "unlockTime", type: "uint256" },
+    ],
+    outputs: [{ name: "tokenId", type: "uint256" }],
+  },
+  { type: "function", name: "locksLength", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "totalLocks", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+] as const;
+
+export const VESTING_NFT_ABI = [
+  {
+    type: "function",
+    name: "createVesting",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "beneficiary", type: "address" },
+      { name: "token", type: "address" },
+      { name: "amount", type: "uint256" },
+      { name: "duration", type: "uint256" },
+      { name: "cliffDuration", type: "uint256" },
+    ],
+    outputs: [{ name: "tokenId", type: "uint256" }],
+  },
+  { type: "function", name: "totalVestings", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
 ] as const;
 
 export const ERC20_ABI = [
