@@ -1,14 +1,15 @@
 /**
  * Deployed contract addresses per chain.
- * Run `npm run deploy:testnet` or `npm run deploy:mainnet` in /contracts (writes deployments.generated.ts).
+ * After `cd contracts && npm run deploy:testnet`, paste new addresses into TESTNET below.
  */
-import { TESTNET_DEPLOYMENTS } from "./deployments.generated";
 
-const DEPLOYED = {
-  tokenLock: TESTNET_DEPLOYMENTS.tokenLock,
-  vestingNFT: TESTNET_DEPLOYMENTS.vestingNFT,
-  streamFarm: TESTNET_DEPLOYMENTS.streamFarm,
-  otcMarket: TESTNET_DEPLOYMENTS.otcMarket,
+/** Monad testnet (chainId 10143) — update after each redeploy */
+const TESTNET = {
+  chainId: 10143,
+  tokenLock: "0x1B326887e87D6671D5c34FB79F66d72B446D0aF0" as `0x${string}`,
+  vestingNFT: "0xfAb8d05E96E8295999AB00Bb20E7973CfdaC2D48" as `0x${string}`,
+  streamFarm: "0x736F281DB537B1595f74320995903666e804B80E" as `0x${string}`,
+  otcMarket: "0x1adA395947Cbc576D151fF4b8E0A337d8d1F78aA" as `0x${string}`,
 };
 
 function envAddress(name: string, fallback: `0x${string}`): `0x${string}` {
@@ -25,13 +26,18 @@ export type ContractAddresses = {
 };
 
 export const CONTRACTS: Record<number, ContractAddresses> = {
-  [TESTNET_DEPLOYMENTS.chainId]: DEPLOYED,
+  [TESTNET.chainId]: {
+    tokenLock: TESTNET.tokenLock,
+    vestingNFT: TESTNET.vestingNFT,
+    streamFarm: TESTNET.streamFarm,
+    otcMarket: TESTNET.otcMarket,
+  },
   /** Monad mainnet — override via VITE_*_MAINNET in .env.local after deploy */
   143: {
-    tokenLock: envAddress("VITE_TOKEN_LOCK_MAINNET", DEPLOYED.tokenLock),
-    vestingNFT: envAddress("VITE_VESTING_NFT_MAINNET", DEPLOYED.vestingNFT),
-    streamFarm: envAddress("VITE_STREAM_FARM_MAINNET", DEPLOYED.streamFarm),
-    otcMarket: envAddress("VITE_OTC_MARKET_MAINNET", DEPLOYED.otcMarket),
+    tokenLock: envAddress("VITE_TOKEN_LOCK_MAINNET", TESTNET.tokenLock),
+    vestingNFT: envAddress("VITE_VESTING_NFT_MAINNET", TESTNET.vestingNFT),
+    streamFarm: envAddress("VITE_STREAM_FARM_MAINNET", TESTNET.streamFarm),
+    otcMarket: envAddress("VITE_OTC_MARKET_MAINNET", TESTNET.otcMarket),
   },
 };
 
@@ -560,7 +566,7 @@ export const OTC_MARKET_ABI = [
     inputs: [{ name: "nftContract", type: "address" }, { name: "tokenId", type: "uint256" }, { name: "paymentToken", type: "address" }, { name: "price", type: "uint256" }],
     outputs: [{ name: "listingId", type: "uint256" }],
   },
-  { type: "function", name: "buy", stateMutability: "nonpayable", inputs: [{ name: "listingId", type: "uint256" }], outputs: [] },
+  { type: "function", name: "buy", stateMutability: "payable", inputs: [{ name: "listingId", type: "uint256" }], outputs: [] },
   { type: "function", name: "unlist", stateMutability: "nonpayable", inputs: [{ name: "listingId", type: "uint256" }], outputs: [] },
   { type: "event", name: "Listed", inputs: [{ name: "listingId", type: "uint256", indexed: true }, { name: "seller", type: "address", indexed: true }, { name: "nftContract", type: "address", indexed: false }, { name: "tokenId", type: "uint256", indexed: false }, { name: "paymentToken", type: "address", indexed: false }, { name: "price", type: "uint256", indexed: false }] },
   { type: "event", name: "Sold", inputs: [{ name: "listingId", type: "uint256", indexed: true }, { name: "buyer", type: "address", indexed: true }, { name: "seller", type: "address", indexed: true }, { name: "price", type: "uint256", indexed: false }, { name: "fee", type: "uint256", indexed: false }] },

@@ -1,12 +1,12 @@
 /**
- * Protocol addresses for admin — keep in sync with ../src/lib/web3/deployments.generated.ts
+ * Protocol addresses for admin — keep in sync with ../src/lib/web3/contracts.ts (TESTNET)
  */
 export const DEFAULT_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 10143);
 
 const TESTNET = {
-  streamFarm: "0xf14eD1b63EF380BF1d32C49fbA43b2871f194Fef" as const,
-  tokenLock: "0x8eDC567AaB95D94DC343331A710b2c534b98dAd6" as const,
-  vestingNFT: "0x05d844E4bA8c2Ee9EBC007eEADdF5d0fFfC5C87A" as const,
+  streamFarm: "0x736F281DB537B1595f74320995903666e804B80E" as const,
+  tokenLock: "0x1B326887e87D6671D5c34FB79F66d72B446D0aF0" as const,
+  vestingNFT: "0xfAb8d05E96E8295999AB00Bb20E7973CfdaC2D48" as const,
 };
 
 function addr(envKey: string, fallback: `0x${string}`): `0x${string}` {

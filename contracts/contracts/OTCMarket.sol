@@ -11,11 +11,11 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 /**
  * @title OTCMarket — Peer-to-peer NFT position marketplace
  * @notice Users can list locked positions (locks, vestings, farm NFTs) for sale.
- *         Buyers pay in any ERC20 token. Sellers set their own price.
+ *         Buyers pay in native MON (paymentToken = address(0)) or any ERC20. Sellers set their own price.
  * @dev
  *   - Supports any ERC721 NFT (TokenLockNFT, VestingNFT, StreamFarm positions)
  *   - Seller approves NFT to this contract, then lists
- *   - Buyer approves payment token, then buys
+ *   - Buyer sends MON (payable buy) or approves ERC20 payment token, then buys
  *   - Platform fee configurable by owner
  *   - Listings can be cancelled anytime by seller
  */
@@ -44,6 +44,8 @@ contract OTCMarket is ERC721Holder, Ownable, ReentrancyGuard {
     uint256 public platformFeeBps = 100; // 1% default
     uint256 public constant MAX_FEE = 1000; // 10% max
     uint256 public constant BASIS_POINTS = 10000;
+    /// @dev address(0) in paymentToken means native MON
+    address public constant NATIVE_PAYMENT = address(0);
 
     // Track active listings per seller
     mapping(address => uint256[]) public sellerListings;
@@ -74,8 +76,8 @@ contract OTCMarket is ERC721Holder, Ownable, ReentrancyGuard {
      * @notice List an NFT position for sale. Transfers NFT to this contract.
      * @param nftContract Address of the NFT contract
      * @param tokenId Token ID to sell
-     * @param paymentToken ERC20 token to receive payment in
-     * @param price Price in payment token units
+     * @param paymentToken ERC20 token to receive payment in, or address(0) for native MON
+     * @param price Price in payment token units (wei for MON)
      */
     function list(
         address nftContract,
@@ -84,7 +86,6 @@ contract OTCMarket is ERC721Holder, Ownable, ReentrancyGuard {
         uint256 price
     ) external nonReentrant returns (uint256 listingId) {
         require(nftContract != address(0), "Invalid NFT contract");
-        require(paymentToken != address(0), "Invalid payment token");
         require(price > 0, "Price must be > 0");
         require(activeListingByNft[nftContract][tokenId] == 0, "Already listed");
 
@@ -112,7 +113,7 @@ contract OTCMarket is ERC721Holder, Ownable, ReentrancyGuard {
      * @notice Buy a listed position. Pays seller, transfers NFT to buyer.
      * @param listingId ID of the listing to buy
      */
-    function buy(uint256 listingId) external nonReentrant {
+    function buy(uint256 listingId) external payable nonReentrant {
         require(listingId < listings.length, "Invalid listing");
         Listing storage listing = listings[listingId];
         require(listing.active, "Not active");
@@ -125,10 +126,20 @@ contract OTCMarket is ERC721Holder, Ownable, ReentrancyGuard {
         uint256 fee = (listing.price * platformFeeBps) / BASIS_POINTS;
         uint256 sellerAmount = listing.price - fee;
 
-        // Transfer payment from buyer
-        IERC20(listing.paymentToken).safeTransferFrom(msg.sender, listing.seller, sellerAmount);
-        if (fee > 0) {
-            IERC20(listing.paymentToken).safeTransferFrom(msg.sender, owner(), fee);
+        if (listing.paymentToken == NATIVE_PAYMENT) {
+            require(msg.value == listing.price, "Incorrect MON amount");
+            (bool sellerOk, ) = listing.seller.call{value: sellerAmount}("");
+            require(sellerOk, "MON transfer to seller failed");
+            if (fee > 0) {
+                (bool feeOk, ) = owner().call{value: fee}("");
+                require(feeOk, "MON fee transfer failed");
+            }
+        } else {
+            require(msg.value == 0, "Send MON only for native listings");
+            IERC20(listing.paymentToken).safeTransferFrom(msg.sender, listing.seller, sellerAmount);
+            if (fee > 0) {
+                IERC20(listing.paymentToken).safeTransferFrom(msg.sender, owner(), fee);
+            }
         }
 
         // Transfer NFT to buyer

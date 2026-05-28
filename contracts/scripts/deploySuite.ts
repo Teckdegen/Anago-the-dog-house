@@ -1,5 +1,5 @@
 /**
- * Deploy Dog House suite → deployments.json + src/lib/web3/deployments.generated.ts
+ * Deploy Dog House suite → deployments.json + src/lib/web3/contracts.ts (paste TESTNET addresses)
  *
  * Usage:
  *   npx hardhat run scripts/deploySuite.ts --network monadTestnet

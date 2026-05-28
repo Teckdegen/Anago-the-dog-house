@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect, useRef } from "react";
 import { ShoppingBag, Tag, X, Wallet } from "lucide-react";
-import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt, useChainId, usePublicClient } from "wagmi";
+import { useAccount, useBalance, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt, useChainId, usePublicClient } from "wagmi";
 import { maxUint256, formatUnits, parseUnits } from "viem";
 import { AppShell } from "@/components/AppShell";
 import { useToast } from "@/components/Toast";
@@ -21,6 +21,9 @@ export const Route = createFileRoute("/otc")({
 
 const TABS = ["Browse", "My Listings", "Sell"] as const;
 type Tab = (typeof TABS)[number];
+/** On-chain: paymentToken == address(0) means native MON */
+const NATIVE_PAYMENT = "0x0000000000000000000000000000000000000000" as const;
+const isNativePaymentToken = (addr: string) => addr.toLowerCase() === NATIVE_PAYMENT;
 
 function useContracts() {
   const chainId = useChainId();
@@ -159,10 +162,12 @@ function ListingCard({ listingId, showBuy, showUnlist, showInactive }: { listing
   const listingQ = useReadContract({ address: contracts.otcMarket, abi: OTC_MARKET_ABI, functionName: "getListing", args: [listingId], query: { refetchInterval: 10_000 } });
   const listing = parseListingTuple(listingQ.data);
 
-  const paymentToken = listing?.paymentToken ?? ("0x0000000000000000000000000000000000000000" as `0x${string}`);
-  const hasPayment = !!listing?.paymentToken && listing.paymentToken !== "0x0000000000000000000000000000000000000000";
-  const paySymQ = useReadContract({ address: paymentToken, abi: ERC20_ABI, functionName: "symbol", query: { enabled: hasPayment } });
-  const payDecQ = useReadContract({ address: paymentToken, abi: ERC20_ABI, functionName: "decimals", query: { enabled: hasPayment } });
+  const paymentToken = listing?.paymentToken ?? NATIVE_PAYMENT;
+  const isNativePayment = isNativePaymentToken(paymentToken);
+  const hasErc20Payment = !!listing?.paymentToken && !isNativePayment;
+  const paySymQ = useReadContract({ address: paymentToken, abi: ERC20_ABI, functionName: "symbol", query: { enabled: hasErc20Payment } });
+  const payDecQ = useReadContract({ address: paymentToken, abi: ERC20_ABI, functionName: "decimals", query: { enabled: hasErc20Payment } });
+  const monBalQ = useBalance({ address, query: { enabled: !!address && isNativePayment, refetchInterval: 5_000 } });
 
   const buyTx = useWriteContract();
   const buyRcpt = useWaitForTransactionReceipt({ hash: buyTx.data });
@@ -176,7 +181,7 @@ function ListingCard({ listingId, showBuy, showUnlist, showInactive }: { listing
     abi: ERC20_ABI,
     functionName: "allowance",
     args: address ? [address, contracts.otcMarket] : undefined,
-    query: { enabled: !!address && hasPayment, refetchInterval: 5_000 },
+    query: { enabled: !!address && hasErc20Payment, refetchInterval: 5_000 },
   });
 
   const balanceQ = useReadContract({
@@ -184,7 +189,7 @@ function ListingCard({ listingId, showBuy, showUnlist, showInactive }: { listing
     abi: ERC20_ABI,
     functionName: "balanceOf",
     args: address ? [address] : undefined,
-    query: { enabled: !!address && hasPayment, refetchInterval: 5_000 },
+    query: { enabled: !!address && hasErc20Payment, refetchInterval: 5_000 },
   });
 
   useEffect(() => {
@@ -237,6 +242,8 @@ function ListingCard({ listingId, showBuy, showUnlist, showInactive }: { listing
     if (unlistRcpt.isSuccess) { setSuccessMsg({ heading: "Listing Cancelled", subtext: "Your position has been returned to your wallet." }); setSuccessOpen(true); }
   }, [unlistRcpt.isSuccess]);
 
+  const listingPrice = listing?.price ?? 0n;
+
   useEffect(() => {
     if (!approveRcpt.isSuccess || !autoBuyRef.current || !publicClient) return;
     if (approveRcpt.data?.transactionHash !== approveTx.data) return;
@@ -248,24 +255,25 @@ function ListingCard({ listingId, showBuy, showUnlist, showInactive }: { listing
           abi: OTC_MARKET_ABI,
           functionName: "buy",
           args: [listingId],
+          value: isNativePayment ? listingPrice : undefined,
           ...gas,
         });
       })
       .catch(() => toast("error", "Transaction Failed", "Failed to buy after approval"));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [approveRcpt.isSuccess, approveRcpt.data?.transactionHash, approveTx.data, publicClient]);
+  }, [approveRcpt.isSuccess, approveRcpt.data?.transactionHash, approveTx.data, publicClient, isNativePayment, listingPrice]);
 
   if (!listing) return null;
 
   const { seller, nftContract, tokenId, price, active } = listing;
   if (!active && !showInactive) return null;
 
-  const paySym = (paySymQ.data as string) || "...";
-  const payDec = (payDecQ.data as number) ?? 18;
+  const paySym = isNativePayment ? "MON" : ((paySymQ.data as string) || "...");
+  const payDec = isNativePayment ? 18 : ((payDecQ.data as number) ?? 18);
   const priceFormatted = Number(formatUnits(price, payDec)).toLocaleString();
   const allowance = (allowanceQ.data as bigint) ?? 0n;
-  const payBalance = (balanceQ.data as bigint) ?? 0n;
-  const needsApproval = price > 0n && allowance < price;
+  const payBalance = isNativePayment ? (monBalQ.data?.value ?? 0n) : ((balanceQ.data as bigint) ?? 0n);
+  const needsApproval = hasErc20Payment && price > 0n && allowance < price;
   const insufficientBalance = price > 0n && payBalance < price;
   const canBuy = !insufficientBalance && price > 0n;
   const isSeller = address?.toLowerCase() === seller?.toLowerCase();
@@ -304,6 +312,7 @@ function ListingCard({ listingId, showBuy, showUnlist, showInactive }: { listing
       abi: OTC_MARKET_ABI,
       functionName: "buy",
       args: [listingId],
+      value: isNativePayment ? price : undefined,
       ...gas,
     });
   };
@@ -406,13 +415,14 @@ function SellTab() {
   const listTx = useWriteContract();
   const listRcpt = useWaitForTransactionReceipt({ hash: listTx.data });
 
+  const sellNativePayment = !!paymentToken && isNativePaymentToken(paymentToken);
   const payDecQ = useReadContract({
-    address: (paymentToken || "0x0000000000000000000000000000000000000000") as `0x${string}`,
+    address: (paymentToken || NATIVE_PAYMENT) as `0x${string}`,
     abi: ERC20_ABI,
     functionName: "decimals",
-    query: { enabled: !!paymentToken && paymentToken.length === 42 && !paymentTokenMeta },
+    query: { enabled: !!paymentToken && paymentToken.length === 42 && !paymentTokenMeta && !sellNativePayment },
   });
-  const payDec = paymentTokenMeta?.decimals ?? (payDecQ.data as number) ?? 18;
+  const payDec = sellNativePayment ? 18 : (paymentTokenMeta?.decimals ?? (payDecQ.data as number) ?? 18);
 
   // Check NFT approval
   const nftAddr = (selected?.contract ?? "0x0000000000000000000000000000000000000000") as `0x${string}`;
@@ -499,7 +509,7 @@ function SellTab() {
           <div className="space-y-4">
             <div>
               <label className="font-mono text-[9px] uppercase tracking-wider mb-1.5 block" style={{ color: "rgba(196,168,240,0.55)" }}>
-                Payment token (buyers pay with)
+                Payment (MON or ERC-20 token)
               </label>
               <TokenPicker
                 compact
