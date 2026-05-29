@@ -19,17 +19,7 @@ const NATIVE: TokenInfo = {
 };
 
 export const TOKEN_LISTS: Record<number, TokenInfo[]> = {
-  // Monad testnet — native token + platform token
-  10143: [
-    NATIVE,
-    // Platform token for pool creation fees
-    {
-      address: "0xa1D67bD149d47d17421c0A558e88E1cf3f8cf541", // HOUSE - Dog House Token
-      symbol: "HOUSE",
-      name: "Dog House Token",
-      decimals: 18,
-    },
-  ],
+  143: [NATIVE],
 };
 
 export function getTokenList(chainId: number): TokenInfo[] {

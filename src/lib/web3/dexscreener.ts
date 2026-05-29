@@ -1,9 +1,10 @@
 /**
- * DexScreener API + on-chain token metadata fallback
+ * Dirol API (primary) → DexScreener (logo/price fallback) → on-chain metadata
  */
 
 import type { PublicClient } from "viem";
-import { fetchZerionTokenMeta } from "./zerion";
+import { fetchTokenFromDirol } from "./dirol";
+import { fetchZerionTokenMeta, fetchZerionTokenPrices } from "./zerion";
 import { fetchTokenBasicsFromChain, fetchTokenLogoFromChain } from "./tokenOnChain";
 
 const DEXSCREENER_API = "https://api.dexscreener.com/latest/dex";
@@ -13,6 +14,7 @@ export type TokenData = {
   address: string;
   name: string;
   symbol: string;
+  decimals: number | null;
   logoURI: string | null;
   priceUsd: number | null;
 };
@@ -51,6 +53,7 @@ async function fetchTokenFromDexScreenerOnly(address: string): Promise<TokenData
       address: key,
       name: token?.name || "",
       symbol: token?.symbol || "",
+      decimals: null,
       logoURI: pair.info?.imageUrl || null,
       priceUsd: priceUsd > 0 ? priceUsd : null,
     };
@@ -63,49 +66,72 @@ async function fetchTokenFromDexScreenerOnly(address: string): Promise<TokenData
 }
 
 /**
- * DexScreener first, then on-chain logoURI / tokenURI / contractURI + ERC-20 symbol/name.
+ * Dirol first, DexScreener logo/price fallback, then on-chain + Zerion.
  */
 export async function fetchTokenFromDexScreener(
   address: string,
   publicClient?: PublicClient | null,
 ): Promise<TokenData | null> {
   const key = address.toLowerCase();
-  const dex = await fetchTokenFromDexScreenerOnly(address);
-
-  if (dex?.logoURI && dex.symbol) return dex;
+  const [dirol, dex] = await Promise.all([
+    fetchTokenFromDirol(address).catch(() => null),
+    fetchTokenFromDexScreenerOnly(address),
+  ]);
 
   const addr = key as `0x${string}`;
   const zerion = await fetchZerionTokenMeta(key).catch(() => null);
 
+  const hasLogo = !!(dirol?.logoURI || dex?.logoURI || zerion?.logoURI);
+  const hasSymbol = !!(dirol?.symbol || dex?.symbol || zerion?.symbol);
+
+  if (hasLogo && hasSymbol && dirol?.logoURI && dirol.symbol) {
+    const complete: TokenData = {
+      address: key,
+      name: dirol.name || dex?.name || zerion?.name || "",
+      symbol: dirol.symbol,
+      decimals: dirol.decimals,
+      logoURI: dirol.logoURI,
+      priceUsd: dex?.priceUsd ?? zerion?.priceUsd ?? null,
+    };
+    cache.set(key, { data: complete, timestamp: Date.now() });
+    return complete;
+  }
+
   if (!publicClient || key === "0x0000000000000000000000000000000000000000") {
-    if (zerion) {
-      return {
-        address: key,
-        name: zerion.name,
-        symbol: zerion.symbol,
-        logoURI: zerion.logoURI ?? dex?.logoURI ?? null,
-        priceUsd: zerion.priceUsd ?? dex?.priceUsd ?? null,
-      };
+    const merged: TokenData = {
+      address: key,
+      name: dirol?.name || dex?.name || zerion?.name || "",
+      symbol: dirol?.symbol || dex?.symbol || zerion?.symbol || key.slice(0, 6),
+      decimals: dirol?.decimals ?? null,
+      logoURI: dirol?.logoURI ?? dex?.logoURI ?? zerion?.logoURI ?? null,
+      priceUsd: dex?.priceUsd ?? zerion?.priceUsd ?? null,
+    };
+    if (merged.symbol || merged.logoURI) {
+      cache.set(key, { data: merged, timestamp: Date.now() });
+      return merged;
     }
     return dex;
   }
 
   const [logoURI, basics] = await Promise.all([
-    dex?.logoURI || zerion?.logoURI
-      ? Promise.resolve(dex?.logoURI ?? zerion?.logoURI ?? null)
+    dirol?.logoURI || dex?.logoURI || zerion?.logoURI
+      ? Promise.resolve(dirol?.logoURI ?? dex?.logoURI ?? zerion?.logoURI ?? null)
       : fetchTokenLogoFromChain(addr, publicClient),
-    !dex?.symbol || !dex?.name
-      ? zerion
-        ? Promise.resolve({ name: zerion.name, symbol: zerion.symbol })
-        : fetchTokenBasicsFromChain(addr, publicClient)
-      : Promise.resolve(null),
+    dirol?.symbol && dirol?.name
+      ? Promise.resolve(null)
+      : !dex?.symbol || !dex?.name
+        ? zerion
+          ? Promise.resolve({ name: zerion.name, symbol: zerion.symbol, decimals: 18 })
+          : fetchTokenBasicsFromChain(addr, publicClient)
+        : Promise.resolve(null),
   ]);
 
   const merged: TokenData = {
     address: key,
-    name: dex?.name || basics?.name || zerion?.name || "",
-    symbol: dex?.symbol || basics?.symbol || zerion?.symbol || key.slice(0, 6),
-    logoURI: logoURI ?? dex?.logoURI ?? zerion?.logoURI ?? null,
+    name: dirol?.name || dex?.name || basics?.name || zerion?.name || "",
+    symbol: dirol?.symbol || dex?.symbol || basics?.symbol || zerion?.symbol || key.slice(0, 6),
+    decimals: dirol?.decimals ?? basics?.decimals ?? null,
+    logoURI: logoURI ?? dirol?.logoURI ?? dex?.logoURI ?? zerion?.logoURI ?? null,
     priceUsd: dex?.priceUsd ?? zerion?.priceUsd ?? null,
   };
 
@@ -126,6 +152,8 @@ export async function getTokenLogo(
 }
 
 export async function getTokenPriceUsd(address: string): Promise<number | null> {
+  const zerion = await fetchZerionTokenMeta(address).catch(() => null);
+  if (zerion?.priceUsd != null && zerion.priceUsd > 0) return zerion.priceUsd;
   const data = await fetchTokenFromDexScreenerOnly(address);
   return data?.priceUsd || null;
 }
@@ -170,11 +198,15 @@ export async function fetchPairFromDexScreener(
 }
 
 export async function batchGetTokenPrices(addresses: string[]): Promise<Map<string, number>> {
-  const prices = new Map<string, number>();
-  const unique = [...new Set(addresses.map((a) => a.toLowerCase()))];
+  const zerionPrices = await fetchZerionTokenPrices(addresses).catch(() => new Map<string, number>());
+
+  const prices = new Map<string, number>(zerionPrices);
+  const missing = addresses
+    .map((a) => a.toLowerCase())
+    .filter((a) => !prices.has(a));
 
   await Promise.all(
-    unique.map(async (addr) => {
+    [...new Set(missing)].map(async (addr) => {
       const price = await getTokenPriceUsd(addr);
       if (price !== null) prices.set(addr, price);
     }),

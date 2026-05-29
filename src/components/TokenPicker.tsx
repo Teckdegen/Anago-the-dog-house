@@ -27,7 +27,7 @@ function formatUsd(n: number | null | undefined): string | null {
 }
 
 /**
- * Wallet token picker — balances from BlockVision (MON + ERC-20), RPC fallback if API unavailable.
+ * Wallet token picker — balances from Zerion (MON + ERC-20), BlockVision / RPC fallback.
  */
 export function TokenPicker({ selected, onSelect, excludeNative, compact }: Props) {
   const { address: wallet } = useAccount();

@@ -27,7 +27,7 @@ const isNativePaymentToken = (addr: string) => addr.toLowerCase() === NATIVE_PAY
 
 function useContracts() {
   const chainId = useChainId();
-  return CONTRACTS[chainId] ?? CONTRACTS[10143];
+  return CONTRACTS[chainId] ?? CONTRACTS[143];
 }
 
 function OTCPage() {

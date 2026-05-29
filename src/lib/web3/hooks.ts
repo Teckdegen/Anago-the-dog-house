@@ -16,7 +16,7 @@ const POLL = 10_000 as const;
 
 /** Etherscan-compatible explorer API bases per chain */
 const EXPLORER_API: Record<number, string> = {
-  10143: "https://testnet.monadexplorer.com/api",
+  143: "https://monadexplorer.com/api",
 };
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -108,7 +108,7 @@ function usePersistentData<T>(
 
 export function useContractAddresses() {
   const chainId = useChainId();
-  return CONTRACTS[chainId] ?? CONTRACTS[10143];
+  return CONTRACTS[chainId] ?? CONTRACTS[143];
 }
 
 // ──────────────────────────────────────────────────────────────────────────

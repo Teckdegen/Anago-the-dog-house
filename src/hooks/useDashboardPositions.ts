@@ -11,7 +11,7 @@ import {
 export function useFarmPositionCount(): { count: number; farmCount: number; isLoading: boolean } {
   const chainId = useChainId();
   const { address } = useAccount();
-  const contracts = CONTRACTS[chainId] ?? CONTRACTS[10143];
+  const contracts = CONTRACTS[chainId] ?? CONTRACTS[143];
 
   const farmCountQ = useReadContract({
     address: contracts.streamFarm,

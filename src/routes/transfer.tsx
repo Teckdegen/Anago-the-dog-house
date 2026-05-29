@@ -21,6 +21,8 @@ import {
 import { useContractAddresses } from "@/lib/web3/hooks";
 import { ERC20_ABI } from "@/lib/web3/tokens";
 import { formatAmount, shortAddr } from "@/lib/web3/format";
+import { TokenIcon } from "@/components/TokenIcon";
+import { useRemoteTokenMeta } from "@/lib/web3/useRemoteTokenMeta";
 
 export const Route = createFileRoute("/transfer")({
   component: TransferPage,
@@ -72,6 +74,7 @@ function TransferPage() {
   const [recipientAddress, setRecipientAddress] = useState("");
   const [confirmed, setConfirmed] = useState(false);
   const { address } = useAccount();
+  const publicClient = usePublicClient();
   const { toast } = useToast();
   const contracts = useContractAddresses();
 
@@ -158,15 +161,29 @@ function TransferPage() {
     query: { enabled: allTokenAddrs.length > 0, refetchInterval: 10_000 },
   });
 
+  const remoteMeta = useRemoteTokenMeta(allTokenAddrs);
+
   const tokenMeta = useMemo(() => {
-    const map: Record<string, { symbol: string; decimals: number }> = {};
+    const map: Record<string, { symbol: string; decimals: number; logoURI?: string | null }> = {};
     allTokenAddrs.forEach((t, i) => {
-      const sym = tokenMetaQ.data?.[i * 2]?.result as string | undefined;
-      const dec = tokenMetaQ.data?.[i * 2 + 1]?.result as number | undefined;
-      if (sym) map[t.toLowerCase()] = { symbol: sym, decimals: dec ?? 18 };
+      const remote = remoteMeta(t);
+      const sym =
+        remote?.symbol ??
+        (tokenMetaQ.data?.[i * 2]?.result as string | undefined);
+      const dec =
+        remote?.decimals ??
+        (tokenMetaQ.data?.[i * 2 + 1]?.result as number | undefined) ??
+        18;
+      if (sym) {
+        map[t.toLowerCase()] = {
+          symbol: sym,
+          decimals: dec,
+          logoURI: remote?.logoURI ?? null,
+        };
+      }
     });
     return map;
-  }, [allTokenAddrs, tokenMetaQ.data]);
+  }, [allTokenAddrs, tokenMetaQ.data, remoteMeta]);
 
   // 5. Transfer tx
   const transferTx  = useWriteContract();
@@ -286,8 +303,10 @@ function TransferPage() {
                         key={pos.tokenId.toString()}
                         contract={contractAddress}
                         tokenId={pos.tokenId}
+                        tokenAddress={stakeToken}
                         symbol={symbol}
                         decimals={decimals}
+                        logoUrl={meta?.logoURI}
                         amount={amount}
                         type={activeTab}
                         isSelected={selectedTokenId === pos.tokenId}
@@ -404,10 +423,11 @@ function tabLabel(tab: TabKey) {
 }
 
 function PositionRow({
-  contract, tokenId, symbol, decimals, amount, type, isSelected, onSelect, isLast,
+  contract, tokenId, tokenAddress, symbol, decimals, logoUrl, amount, isSelected, onSelect, isLast,
 }: {
-  contract: `0x${string}`; tokenId: bigint; symbol: string; decimals: number; amount: bigint | undefined;
-  type: TabKey; isSelected: boolean; onSelect: () => void; isLast: boolean;
+  contract: `0x${string}`; tokenId: bigint; tokenAddress?: `0x${string}`;
+  symbol: string; decimals: number; logoUrl?: string | null; amount: bigint | undefined;
+  isSelected: boolean; onSelect: () => void; isLast: boolean;
 }) {
   return (
     <button
@@ -420,7 +440,11 @@ function PositionRow({
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3 min-w-0">
-          <NftImage contract={contract} tokenId={tokenId} size={40} fallbackLetter={symbol} />
+          {tokenAddress ? (
+            <TokenIcon address={tokenAddress} symbol={symbol} size={40} logoUrl={logoUrl} />
+          ) : (
+            <NftImage contract={contract} tokenId={tokenId} size={40} fallbackLetter={symbol} />
+          )}
           <div className="min-w-0">
             <p className="font-grotesk uppercase text-[12px] tracking-wider truncate" style={{ color: "#EDE0FF" }}>
               {symbol}

@@ -1,5 +1,5 @@
 /**
- * Token balances for connected wallets — BlockVision (primary) + RPC fallback (merged)
+ * Token balances for connected wallets — Zerion (primary) + BlockVision + RPC fallback (merged)
  */
 
 import { parseUnits } from "viem";
@@ -14,6 +14,7 @@ import {
 } from "./blockvision";
 import { fetchBlockscoutAddressTokens } from "./blockscout";
 import { discoverAllUserTokens } from "./tokenDiscovery";
+import { fetchZerionWalletPositions } from "./zerion";
 import type { TokenInfo } from "./tokens";
 
 export type TokenBalance = TokenInfo & {
@@ -100,6 +101,12 @@ export async function fetchBalancesFromBlockVision(
   return mapBlockVisionTokens(items);
 }
 
+export async function fetchBalancesFromZerion(
+  address: `0x${string}`,
+): Promise<TokenBalance[]> {
+  return fetchZerionWalletPositions(address);
+}
+
 function mapBlockscoutTokens(items: Awaited<ReturnType<typeof fetchBlockscoutAddressTokens>>): TokenBalance[] {
   const out: TokenBalance[] = [];
   for (const t of items) {
@@ -184,7 +191,11 @@ export async function fetchAllBalances(
 ): Promise<TokenBalance[]> {
   const lists: TokenBalance[][] = [];
 
-  const [fromBv, fromBs, nativeBalance, tokenBalances] = await Promise.all([
+  const [fromZerion, fromBv, fromBs, nativeBalance, tokenBalances] = await Promise.all([
+    fetchBalancesFromZerion(address).catch((e) => {
+      console.warn("[tokenBalances] Zerion unavailable:", e);
+      return [] as TokenBalance[];
+    }),
     isBlockVisionAvailable()
       ? fetchBalancesFromBlockVision(address).catch((e) => {
           console.warn("[tokenBalances] BlockVision unavailable:", e);
@@ -202,6 +213,7 @@ export async function fetchAllBalances(
     }),
   ]);
 
+  if (fromZerion.length > 0) lists.push(fromZerion);
   if (fromBv.length > 0) lists.push(fromBv);
   if (fromBs.length > 0) lists.push(fromBs);
   lists.push([nativeBalance, ...tokenBalances]);

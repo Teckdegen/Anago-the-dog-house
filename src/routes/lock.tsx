@@ -23,6 +23,7 @@ import { usePublicClient } from "wagmi";
 import { TokenIcon } from "@/components/TokenIcon";
 import { bigintToUsd, useTokenPriceUsdLive } from "@/lib/web3/prices";
 import { formatUsdTable } from "@/lib/capricorn/poolMetrics";
+import { useRemoteTokenMeta } from "@/lib/web3/useRemoteTokenMeta";
 
 export const Route = createFileRoute("/lock")({
   component: LockPage,
@@ -92,6 +93,8 @@ function LockRow({
   mine?: boolean;
 }) {
   const staticMeta = useTokenMeta()(token);
+  const getRemoteMeta = useRemoteTokenMeta([token]);
+  const remoteMeta = getRemoteMeta(token);
   const { tokenLock } = useContractAddresses();
   const { address } = useAccount();
   const publicClient = usePublicClient();
@@ -122,8 +125,17 @@ function LockRow({
     ] : [],
     query: { enabled: !staticMeta, refetchInterval: 10_000 },
   });
-  const symbol = staticMeta?.symbol ?? (onChain.data?.[0]?.result as string | undefined) ?? `${token.slice(0, 6)}…`;
-  const decimals = staticMeta?.decimals ?? (onChain.data?.[1]?.result as number | undefined) ?? 18;
+  const symbol =
+    staticMeta?.symbol ??
+    remoteMeta?.symbol ??
+    (onChain.data?.[0]?.result as string | undefined) ??
+    `${token.slice(0, 6)}…`;
+  const decimals =
+    staticMeta?.decimals ??
+    remoteMeta?.decimals ??
+    (onChain.data?.[1]?.result as number | undefined) ??
+    18;
+  const logoUrl = staticMeta?.logoURI ?? remoteMeta?.logoURI ?? null;
   const { priceUsd, loading: priceLoading } = useTokenPriceUsdLive(token);
   const lockUsd = bigintToUsd(amount, decimals, priceUsd);
 
@@ -181,7 +193,7 @@ function LockRow({
           address={token}
           symbol={symbol}
           size={28}
-          logoUrl={staticMeta?.logoURI ?? null}
+          logoUrl={logoUrl}
         />
         <div className="min-w-0">
           <p className="font-grotesk uppercase text-[12px] tracking-wider truncate" style={{ color: "#EDE0FF" }}>{symbol}</p>
@@ -236,8 +248,9 @@ function TokenLeaderboard({
   tokenMeta,
 }: {
   tokenLb: { address: `0x${string}`; amount: bigint }[];
-  tokenMeta: (addr: string) => { symbol?: string; decimals?: number } | undefined;
+  tokenMeta: (addr: string) => { symbol?: string; decimals?: number; logoURI?: string } | undefined;
 }) {
+  const getRemoteMeta = useRemoteTokenMeta(tokenLb.map((r) => r.address));
   const reads = useReadContracts({
     allowFailure: true,
     contracts: tokenLb.flatMap((row) => [
@@ -263,8 +276,18 @@ function TokenLeaderboard({
         tokenLb.map((row, i) => {
           const o = i * 3;
           const staticMeta = tokenMeta(row.address);
-          const sym = staticMeta?.symbol ?? (reads.data?.[o]?.result as string | undefined) ?? `${row.address.slice(0, 6)}…`;
-          const dec = staticMeta?.decimals ?? (reads.data?.[o + 1]?.result as number | undefined) ?? 18;
+          const remote = getRemoteMeta(row.address);
+          const sym =
+            staticMeta?.symbol ??
+            remote?.symbol ??
+            (reads.data?.[o]?.result as string | undefined) ??
+            `${row.address.slice(0, 6)}…`;
+          const dec =
+            staticMeta?.decimals ??
+            remote?.decimals ??
+            (reads.data?.[o + 1]?.result as number | undefined) ??
+            18;
+          const logoUrl = staticMeta?.logoURI ?? remote?.logoURI ?? null;
           const supply = reads.data?.[o + 2]?.result as bigint | undefined;
           const pct = supply && supply > 0n
             ? Number((BigInt(row.amount) * 100_000n) / BigInt(supply)) / 1000
@@ -276,7 +299,7 @@ function TokenLeaderboard({
               style={{ borderBottom: i < tokenLb.length - 1 ? "1px solid rgba(155,127,212,0.15)" : "none" }}>
               <RankBadge rank={i + 1} />
               <div className="flex items-center gap-2.5 min-w-0">
-                <TokenIcon address={row.address} symbol={sym} size={28} logoUrl={staticMeta?.logoURI ?? null} />
+                <TokenIcon address={row.address} symbol={sym} size={28} logoUrl={logoUrl} />
                 <div className="min-w-0">
                   <p className="font-grotesk uppercase text-[12px] tracking-wider" style={{ color: "#EDE0FF" }}>{sym}</p>
                   <p className="font-mono text-[9px] truncate" style={{ color: "rgba(196,168,240,0.45)" }}>{row.address}</p>

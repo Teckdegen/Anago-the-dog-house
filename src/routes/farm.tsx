@@ -10,6 +10,8 @@ import { AppShell } from "@/components/AppShell";
 import { useToast } from "@/components/Toast";
 import { STREAM_FARM_ABI, CONTRACTS, ERC20_ABI } from "@/lib/web3/contracts";
 import type { TokenInfo } from "@/lib/web3/tokens";
+import { TokenIcon } from "@/components/TokenIcon";
+import { useRemoteTokenMeta } from "@/lib/web3/useRemoteTokenMeta";
 
 export const Route = createFileRoute("/farm")({
   component: FarmPage,
@@ -21,7 +23,7 @@ type Tab = (typeof TABS)[number];
 
 function useContracts() {
   const chainId = useChainId();
-  return CONTRACTS[chainId] ?? CONTRACTS[10143];
+  return CONTRACTS[chainId] ?? CONTRACTS[143];
 }
 
 function FarmPage() {
@@ -131,8 +133,10 @@ function FarmCardInner({ farmId, stakeToken, totalStaked, active, lockDays, pena
   const decimalsQ = useReadContract({ address: stakeToken, abi: ERC20_ABI, functionName: "decimals", query: { enabled: !!stakeToken } });
   const balanceQ = useReadContract({ address: stakeToken, abi: ERC20_ABI, functionName: "balanceOf", args: address ? [address] : undefined, query: { enabled: !!address && !!stakeToken, refetchInterval: 10_000 } });
 
-  const symbol = (symbolQ.data as string) || "...";
-  const decimals = (decimalsQ.data as number) ?? 18;
+  const getRemoteMeta = useRemoteTokenMeta([stakeToken]);
+  const remote = getRemoteMeta(stakeToken);
+  const symbol = remote?.symbol ?? ((symbolQ.data as string) || "...");
+  const decimals = remote?.decimals ?? ((decimalsQ.data as number) ?? 18);
   const userBalance = (balanceQ.data as bigint) ?? 0n;
   const stakedFormatted = Number(formatUnits(totalStaked ?? 0n, decimals)).toLocaleString();
   const balanceFormatted = Number(formatUnits(userBalance, decimals)).toLocaleString();
@@ -142,10 +146,7 @@ function FarmCardInner({ farmId, stakeToken, totalStaked, active, lockDays, pena
       {/* Header row */}
       <div className="flex items-center justify-between gap-4 mb-4">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-9 h-9 rounded-full flex items-center justify-center font-grotesk text-[12px] shrink-0"
-            style={{ background: "rgba(155,127,212,0.15)", border: "1px solid rgba(155,127,212,0.35)", color: "#C4A8F0" }}>
-            {symbol[0]}
-          </div>
+          <TokenIcon address={stakeToken} symbol={symbol} size={36} logoUrl={remote?.logoURI} />
           <div className="min-w-0">
             <p className="font-grotesk text-[15px] font-medium tracking-tight" style={{ color: "#EDE0FF" }}>{symbol} Farm</p>
             <p className="font-mono text-[10px]" style={{ color: "rgba(196,168,240,0.45)" }}>
@@ -229,7 +230,9 @@ function RewardStreams({ farmId, count }: { farmId: number; count: number }) {
 function RewardStreamRow({ token, rewardRate, startTime, endTime, totalBudget, totalDistributed }: any) {
   const symbolQ = useReadContract({ address: token, abi: ERC20_ABI, functionName: "symbol", query: { enabled: !!token } });
   const decimalsQ = useReadContract({ address: token, abi: ERC20_ABI, functionName: "decimals", query: { enabled: !!token } });
-  const sym = (symbolQ.data as string) || "...";
+  const getRemoteMeta = useRemoteTokenMeta([token]);
+  const remote = getRemoteMeta(token);
+  const sym = remote?.symbol ?? ((symbolQ.data as string) || "...");
   const dec = (decimalsQ.data as number) ?? 18;
   const now = Math.floor(Date.now() / 1000);
   const start = Number(startTime); const end = Number(endTime);
@@ -571,8 +574,10 @@ function PositionCardInner({ tokenId, farmId, amount, boost, locked, lockExpiry,
 
   const symbolQ = useReadContract({ address: stakeToken ?? "0x0000000000000000000000000000000000000000", abi: ERC20_ABI, functionName: "symbol", query: { enabled: !!stakeToken } });
   const decimalsQ = useReadContract({ address: stakeToken ?? "0x0000000000000000000000000000000000000000", abi: ERC20_ABI, functionName: "decimals", query: { enabled: !!stakeToken } });
-  const symbol = (symbolQ.data as string) || "...";
-  const decimals = (decimalsQ.data as number) ?? 18;
+  const getRemoteMeta = useRemoteTokenMeta(stakeToken ? [stakeToken] : []);
+  const remote = getRemoteMeta(stakeToken);
+  const symbol = remote?.symbol ?? ((symbolQ.data as string) || "...");
+  const decimals = remote?.decimals ?? ((decimalsQ.data as number) ?? 18);
 
   const pendingTokens: string[] = pendingData?.[0] ?? [];
   const pendingAmounts: bigint[] = pendingData?.[1] ?? [];
@@ -587,7 +592,11 @@ function PositionCardInner({ tokenId, farmId, amount, boost, locked, lockExpiry,
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
-          <NftImage contract={contracts.streamFarm} tokenId={tokenId} size={40} fallbackLetter={symbol} />
+          {stakeToken ? (
+            <TokenIcon address={stakeToken} symbol={symbol} size={40} logoUrl={remote?.logoURI} />
+          ) : (
+            <NftImage contract={contracts.streamFarm} tokenId={tokenId} size={40} fallbackLetter={symbol} />
+          )}
           <div className="min-w-0">
             <p className="font-grotesk text-[14px] font-medium tracking-tight" style={{ color: "#EDE0FF" }}>
               {stakedFormatted} {symbol}

@@ -2,12 +2,7 @@ import { useLocation } from "@tanstack/react-router";
 import { useChainId, useSwitchChain } from "wagmi";
 import { Loader2, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { MONAD_CHAIN_ID, isCapricornSupportedChain } from "@/lib/capricorn";
-import { MONAD_TESTNET_CHAIN_ID } from "@/lib/web3/chains";
-
-function isClmmPath(pathname: string): boolean {
-  return pathname === "/clmm" || pathname.startsWith("/clmm/");
-}
+import { MONAD_CHAIN_ID } from "@/lib/web3/chains";
 
 function SwitchButton({
   chainId,
@@ -51,7 +46,7 @@ function SwitchButton({
   );
 }
 
-/** CLMM = mainnet 143 · Dog House = testnet 10143 */
+/** Prompt wallet switch when not on Monad mainnet (143). */
 export function NetworkRouteBanner() {
   const { pathname } = useLocation();
   const chainId = useChainId();
@@ -61,17 +56,9 @@ export function NetworkRouteBanner() {
     setDismissed(false);
   }, [pathname]);
 
-  const onClmm = isClmmPath(pathname);
-  const onMainnet = isCapricornSupportedChain(chainId);
+  const onMainnet = chainId === MONAD_CHAIN_ID;
 
-  const needsMainnet = onClmm && !onMainnet;
-  const needsTestnet = !onClmm && onMainnet;
-
-  if (dismissed || (!needsMainnet && !needsTestnet)) return null;
-
-  const message = needsMainnet
-    ? "Capricorn CL runs on Monad mainnet (143)."
-    : "Locks, farms & vesting run on Monad testnet (10143). Switch back from mainnet.";
+  if (dismissed || onMainnet) return null;
 
   return (
     <div
@@ -82,17 +69,9 @@ export function NetworkRouteBanner() {
       }}
     >
       <p className="font-mono text-[10px] sm:text-[11px]" style={{ color: "rgba(196,168,240,0.85)" }}>
-        {message}
+        The Dog House runs on Monad mainnet (chain 143). Switch your wallet to continue.
       </p>
-      {needsMainnet ? (
-        <SwitchButton chainId={MONAD_CHAIN_ID} label="Switch to mainnet" pendingLabel="Switching…" />
-      ) : (
-        <SwitchButton
-          chainId={MONAD_TESTNET_CHAIN_ID}
-          label="Switch to testnet"
-          pendingLabel="Switching…"
-        />
-      )}
+      <SwitchButton chainId={MONAD_CHAIN_ID} label="Switch to Monad" pendingLabel="Switching…" />
       <button
         type="button"
         onClick={() => setDismissed(true)}

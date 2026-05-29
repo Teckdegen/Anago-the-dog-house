@@ -16,20 +16,7 @@ if (projectId === "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6" && import.meta.env.DEV) {
   );
 }
 
-export const monadTestnet = defineChain({
-  id: 10143,
-  name: "Monad Testnet",
-  nativeCurrency: { name: "Monad", symbol: "MON", decimals: 18 },
-  rpcUrls: {
-    default: { http: ["https://testnet-rpc.monad.xyz"] },
-  },
-  blockExplorers: {
-    default: { name: "Monad Explorer", url: "https://testnet.monadexplorer.com" },
-  },
-  testnet: true,
-});
-
-/** Monad mainnet — Capricorn CL deployments (chainId 143) */
+/** Monad mainnet — Dog House + Capricorn CL (chainId 143) */
 export const monad = defineChain({
   id: 143,
   name: "Monad",
@@ -42,7 +29,7 @@ export const monad = defineChain({
   },
 });
 
-export const networks = [monad, monadTestnet] as const;
+export const networks = [monad] as const;
 
 export const wagmiAdapter = new WagmiAdapter({
   projectId,
@@ -60,13 +47,11 @@ export const wagmiConfig = wagmiAdapter.wagmiConfig;
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      refetchInterval: 10_000,       // poll every 10 seconds
-      refetchIntervalInBackground: false, // pause when tab is hidden
-      staleTime: 8_000,              // treat data as fresh for 8 s
-      gcTime: 60_000,                // keep in cache for 1 min
-      retry: 1,                      // one retry on failure
-      // If a refetch fails, the previous successful data is kept
-      // (this is the default wagmi/react-query behaviour with keepPreviousData)
+      refetchInterval: 10_000,
+      refetchIntervalInBackground: false,
+      staleTime: 8_000,
+      gcTime: 60_000,
+      retry: 1,
     },
   },
 });
@@ -75,7 +60,7 @@ createAppKit({
   adapters: [wagmiAdapter],
   networks: [...networks],
   projectId,
-  defaultNetwork: monadTestnet,
+  defaultNetwork: monad,
   metadata: {
     name: "The Dog House",
     description: "Vesting, Locks, CLMM & Yield Farming on Monad",

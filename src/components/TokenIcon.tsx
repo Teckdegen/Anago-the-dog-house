@@ -3,7 +3,7 @@ import { usePublicClient } from "wagmi";
 import { fetchTokenFromDexScreener } from "@/lib/web3/dexscreener";
 
 /**
- * Token icon — DexScreener logo, then on-chain logoURI/tokenURI/contractURI, then letter fallback.
+ * Token icon — Dirol logo, DexScreener fallback, then on-chain URI fields, then letter fallback.
  */
 export function TokenIcon({
   address,

@@ -19,7 +19,7 @@ function formatUsd(n: number | null | undefined): string | null {
   return `$${n.toFixed(2)}`;
 }
 
-/** Wallet token list with balances from BlockVision */
+/** Wallet token list with balances from Zerion (+ BlockVision / RPC fallback) */
 export function TokenBalanceSelector({
   onSelect,
   selectedAddress,

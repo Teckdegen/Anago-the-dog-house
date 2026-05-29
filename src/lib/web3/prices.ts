@@ -1,14 +1,12 @@
 import { useEffect, useState } from "react";
 import { getTokenPriceUsd } from "./dexscreener";
+import { fetchZerionTokenPriceUsd } from "./zerion";
 
 /**
  * Static fallback prices — used when CoinGecko is unavailable.
  * Keys are lowercased token addresses. address(0) = native MON.
  */
 export const PRICE_MAP: Record<number, Record<string, number>> = {
-  10143: {
-    "0x0000000000000000000000000000000000000000": 0, // overwritten by live fetch
-  },
   143: {
     "0x0000000000000000000000000000000000000000": 0,
   },
@@ -21,6 +19,17 @@ let lastFetch = 0;
 export async function fetchMonPrice(): Promise<number> {
   const now = Date.now();
   if (now - lastFetch < 60_000 && cachedMonPrice > 0) return cachedMonPrice;
+
+  const zerion = await fetchZerionTokenPriceUsd(
+    "0x0000000000000000000000000000000000000000",
+  ).catch(() => null);
+  if (zerion != null && zerion > 0) {
+    cachedMonPrice = zerion;
+    lastFetch = now;
+    PRICE_MAP[143]["0x0000000000000000000000000000000000000000"] = cachedMonPrice;
+    return cachedMonPrice;
+  }
+
   try {
     const r = await fetch(
       "https://api.coingecko.com/api/v3/simple/price?ids=monad&vs_currencies=usd",
@@ -29,7 +38,6 @@ export async function fetchMonPrice(): Promise<number> {
     if (d?.monad?.usd) {
       cachedMonPrice = d.monad.usd;
       lastFetch = now;
-      PRICE_MAP[10143]["0x0000000000000000000000000000000000000000"] = cachedMonPrice;
       PRICE_MAP[143]["0x0000000000000000000000000000000000000000"] = cachedMonPrice;
     }
   } catch {
@@ -71,7 +79,13 @@ export function useTokenPriceUsdLive(token: string): { priceUsd: number; loading
   useEffect(() => {
     if (lower === "0x0000000000000000000000000000000000000000") {
       setPriceUsd(monPrice);
-      setLoading(false);
+      setLoading(monPrice <= 0);
+      if (monPrice <= 0) {
+        fetchZerionTokenPriceUsd(lower).then((p) => {
+          if (p != null && p > 0) setPriceUsd(p);
+          setLoading(false);
+        });
+      }
       return;
     }
     let cancelled = false;

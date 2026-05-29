@@ -10,8 +10,12 @@ import { NewActionCTA } from "@/components/NewActionCTA";
 import { useUserVestings, useContractAddresses, type VestingView } from "@/lib/web3/hooks";
 import { VESTING_NFT_ABI } from "@/lib/web3/contracts";
 import { ERC20_ABI } from "@/lib/web3/tokens";
+import { TokenIcon } from "@/components/TokenIcon";
+import { useRemoteTokenMeta } from "@/lib/web3/useRemoteTokenMeta";
 import { formatAmount } from "@/lib/web3/format";
 import { prepareTransactionWithGas } from "@/lib/web3/gasUtils";
+import { bigintToUsd, useTokenPriceUsdLive } from "@/lib/web3/prices";
+import { formatUsdTable } from "@/lib/capricorn/poolMetrics";
 
 export const Route = createFileRoute("/vesting")({
   component: VestingPage,
@@ -51,8 +55,15 @@ function VestingRow({
     ],
     query: { enabled: !!vesting.token, refetchInterval: 10_000 },
   });
-  const symbol   = (metaQ.data?.[0]?.result as string  | undefined) ?? vesting.token.slice(0, 6);
-  const decimals = (metaQ.data?.[1]?.result as number  | undefined) ?? 18;
+  const getRemoteMeta = useRemoteTokenMeta([vesting.token]);
+  const remote = getRemoteMeta(vesting.token);
+  const symbol   =
+    remote?.symbol ??
+    ((metaQ.data?.[0]?.result as string | undefined) ?? vesting.token.slice(0, 6));
+  const decimals =
+    remote?.decimals ?? ((metaQ.data?.[1]?.result as number | undefined) ?? 18);
+
+  const { priceUsd, loading: priceLoading } = useTokenPriceUsdLive(vesting.token);
 
   const tx   = useWriteContract();
   const rcpt = useWaitForTransactionReceipt({ hash: tx.data });
@@ -112,6 +123,9 @@ function VestingRow({
   const claimed = BigInt(vesting.claimed || 0);
   const claimable = BigInt(vesting.claimable || 0);
 
+  const totalUsd = bigintToUsd(totalAmount, decimals, priceUsd);
+  const claimableUsd = bigintToUsd(claimable, decimals, priceUsd);
+
   // How much has linearly vested so far (before subtracting claimed)
   const vestedSoFar: bigint = (() => {
     if (nowSec < cliffTime) return 0n;
@@ -167,10 +181,14 @@ function VestingRow({
       <VestingRowUI
         symbol={symbol}
         decimals={decimals}
+        logoUrl={remote?.logoURI}
         vesting={vesting}
         totalAmount={totalAmount}
         claimed={claimed}
         claimable={claimable}
+        totalUsd={totalUsd}
+        claimableUsd={claimableUsd}
+        priceLoading={priceLoading}
         vestedPct={vestedPct}
         claimedPct={claimedPct}
         inCliff={inCliff}
@@ -190,7 +208,7 @@ function VestingRow({
   );
 }
 
-function VestingRowUI({ symbol, decimals, vesting, totalAmount, claimed, claimable, vestedPct, claimedPct, inCliff, fullyVested, hasCliff, cliff, duration, endDate, cliffDate, timeLabel, justClaimed, doClaim, txPending, isLast }: any) {
+function VestingRowUI({ symbol, decimals, logoUrl, vesting, totalAmount, claimed, claimable, vestedPct, claimedPct, inCliff, fullyVested, hasCliff, cliff, duration, endDate, cliffDate, timeLabel, justClaimed, doClaim, txPending, isLast }: any) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -202,12 +220,7 @@ function VestingRowUI({ symbol, decimals, vesting, totalAmount, claimed, claimab
       <div className="flex items-center gap-3">
         {/* Token icon + name */}
         <div className="flex items-center gap-2.5 min-w-0 flex-1">
-          <div
-            className="w-7 h-7 rounded-full flex items-center justify-center font-grotesk text-[10px] shrink-0"
-            style={{ background: "rgba(155,127,212,0.15)", border: "1px solid rgba(155,127,212,0.35)", color: "rgba(196,168,240,0.85)" }}
-          >
-            {symbol[0]}
-          </div>
+          <TokenIcon address={vesting.token} symbol={symbol} size={28} logoUrl={logoUrl} />
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <p className="font-grotesk uppercase text-[12px] tracking-wider truncate" style={{ color: "#EDE0FF" }}>{symbol}</p>
@@ -265,6 +278,9 @@ function VestingRowUI({ symbol, decimals, vesting, totalAmount, claimed, claimab
             <div>
               <p className="font-mono text-[8px] uppercase tracking-wider" style={{ color: "rgba(196,168,240,0.4)" }}>Total</p>
               <p className="font-mono text-[11px] mt-0.5" style={{ color: "#EDE0FF" }}>{formatAmount(totalAmount, decimals)} {symbol}</p>
+              <p className="font-mono text-[9px] mt-0.5" style={{ color: "rgba(196,168,240,0.55)" }}>
+                {priceLoading ? "…" : totalUsd > 0 ? formatUsdTable(totalUsd) : "—"}
+              </p>
             </div>
             <div>
               <p className="font-mono text-[8px] uppercase tracking-wider" style={{ color: "rgba(196,168,240,0.4)" }}>Claimed</p>
@@ -273,6 +289,9 @@ function VestingRowUI({ symbol, decimals, vesting, totalAmount, claimed, claimab
             <div>
               <p className="font-mono text-[8px] uppercase tracking-wider" style={{ color: "rgba(196,168,240,0.4)" }}>Claimable</p>
               <p className="font-mono text-[11px] mt-0.5" style={{ color: claimable > 0n ? "#C4A8F0" : "rgba(196,168,240,0.6)" }}>{formatAmount(claimable, decimals)} {symbol}</p>
+              <p className="font-mono text-[9px] mt-0.5" style={{ color: "rgba(196,168,240,0.55)" }}>
+                {priceLoading ? "…" : claimableUsd > 0 ? formatUsdTable(claimableUsd) : "—"}
+              </p>
             </div>
             <div>
               <p className="font-mono text-[8px] uppercase tracking-wider" style={{ color: "rgba(196,168,240,0.4)" }}>End Date</p>

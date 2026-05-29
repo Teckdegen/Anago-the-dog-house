@@ -7,12 +7,12 @@ import {
   BarChart2,
   ArrowRight,
 } from "lucide-react";
-import { useAccount, useBalance } from "wagmi";
+import { useAccount } from "wagmi";
 import { AppShell } from "@/components/AppShell";
 import { useUserLocks, useUserVestings } from "@/lib/web3/hooks";
 import { useClmmPositionCount, useFarmPositionCount } from "@/hooks/useDashboardPositions";
-import { useAllTokenBalances } from "@/lib/web3/hooks";
-import { TestnetContractsPanel } from "@/components/TestnetContractsPanel";
+import { useDoghousePositionUsd, useZerionWallet } from "@/hooks/useZerionWallet";
+import { formatUsdTable, formatUsdCompact } from "@/lib/capricorn/poolMetrics";
 
 export const Route = createFileRoute("/dashboard")({
   component: DashboardPage,
@@ -27,7 +27,7 @@ export const Route = createFileRoute("/dashboard")({
 /** Fetch MON/USD price — tries multiple sources */
 async function fetchMonPrice(): Promise<number> {
   // 1. CoinGecko — try known IDs for MON
-  const cgIds = ["monad", "monad-testnet", "monad-2"];
+  const cgIds = ["monad", "monad-2"];
   for (const id of cgIds) {
     try {
       const r = await fetch(
@@ -80,9 +80,11 @@ function DashboardPage() {
   const { locks } = useUserLocks();
   const { vestings } = useUserVestings();
 
-  const monBal = useBalance({ address, query: { enabled: !!address, refetchInterval: 10_000 } });
-  const { balances: walletTokens } = useAllTokenBalances();
-  const monFromBv = walletTokens.find(
+  const { snapshot: zerion, isLoading: zerionLoading } = useZerionWallet();
+  const { locksUsd, vestingUsd, walletUsd, isLoading: positionUsdLoading } =
+    useDoghousePositionUsd();
+
+  const monFromZerion = zerion?.balances.find(
     (t) => t.symbol.toUpperCase() === "MON" || t.address === "0x0000000000000000000000000000000000000000",
   );
 
@@ -105,52 +107,48 @@ function DashboardPage() {
   }, []);
 
   const monAmount = useMemo(() => {
-    if (monFromBv && monFromBv.balance > 0n) {
-      return Number(monFromBv.balance) / 1e18;
+    if (monFromZerion && monFromZerion.balance > 0n) {
+      return Number(monFromZerion.balance) / 10 ** monFromZerion.decimals;
     }
-    if (!monBal.data) return null;
-    return Number(monBal.data.value) / 1e18;
-  }, [monBal.data, monFromBv]);
+    return null;
+  }, [monFromZerion]);
 
-  const monUsd = useMemo(() => {
-    if (monAmount === null || monPrice === 0) return null;
-    const usd = monAmount * monPrice;
-    // Use enough decimal places so small balances don't round to $0.00
-    if (usd === 0) return "0.00";
-    if (usd < 0.01) return usd.toFixed(6);
-    if (usd < 1)    return usd.toFixed(4);
-    return usd.toFixed(2);
-  }, [monAmount, monPrice]);
-
-  const priceAvailable = monPrice > 0;
+  const portfolioUsd = walletUsd > 0 ? walletUsd : zerion?.totalUsd ?? 0;
+  const priceAvailable = portfolioUsd > 0 || monPrice > 0;
 
   const displayValue = useMemo(() => {
+    if (!isConnected) return unit === "USD" ? "$0.00" : "0.0000 MON";
+    if (zerionLoading && unit === "USD") return "Loading…";
     if (unit === "MON") {
       return monAmount !== null ? `${monAmount.toFixed(4)} MON` : "0.0000 MON";
     }
-    // USD mode
+    if (portfolioUsd > 0) return formatUsdTable(portfolioUsd) ?? "$0.00";
     if (priceLoading) return "Loading…";
-    if (!priceAvailable) {
-      // Price not on CoinGecko (testnet) — show MON amount with USD label
-      return monAmount !== null ? `${monAmount.toFixed(4)} MON` : "—";
-    }
-    return `$${monUsd ?? "0.00"}`;
-  }, [unit, monAmount, monUsd, priceAvailable, priceLoading]);
+    return monAmount !== null ? `${monAmount.toFixed(4)} MON` : "—";
+  }, [unit, monAmount, portfolioUsd, zerionLoading, priceLoading, isConnected]);
 
   const subtitle = useMemo(() => {
     if (!isConnected) return "connect wallet to load balances";
-    if (!monBal.data) return "loading…";
+    if (zerionLoading) return "fetching via Zerion…";
     if (unit === "USD") {
-      if (priceLoading) return "fetching price…";
-      if (!priceAvailable) {
-        return `${monAmount?.toFixed(4) ?? "0"} MON · price unavailable (testnet)`;
-      }
-      return `${monAmount?.toFixed(4) ?? "0"} MON · $${monPrice.toFixed(4)} / MON`;
+      const ch = zerion?.change24hPct;
+      const chLabel =
+        ch != null && Number.isFinite(ch)
+          ? `${ch >= 0 ? "+" : ""}${ch.toFixed(2)}% 24h`
+          : null;
+      const parts = [
+        monAmount != null ? `${monAmount.toFixed(4)} MON wallet` : null,
+        chLabel,
+        "Zerion portfolio",
+      ].filter(Boolean);
+      return parts.join(" · ");
     }
-    // MON mode
-    if (!priceAvailable) return "price unavailable (testnet)";
-    return monUsd ? `≈ $${monUsd} USD · $${monPrice.toFixed(4)} / MON` : "price unavailable";
-  }, [isConnected, monBal.data, unit, priceLoading, priceAvailable, monAmount, monPrice, monUsd]);
+    if (portfolioUsd > 0) {
+      return `≈ ${formatUsdTable(portfolioUsd)} USD · Zerion`;
+    }
+    if (!priceAvailable) return "price unavailable";
+    return "Zerion portfolio";
+  }, [isConnected, zerionLoading, unit, monAmount, portfolioUsd, priceAvailable, zerion?.change24hPct]);
 
   const activeLocks = locks.filter((l) => !l.withdrawn);
   const claimableLocks = activeLocks.filter(
@@ -167,19 +165,39 @@ function DashboardPage() {
   const farmStats = useFarmPositionCount();
   const clmmStats = useClmmPositionCount();
 
+  const fmtPositionUsd = (usd: number, fallback: string) => {
+    if (!isConnected) return "—";
+    if (positionUsdLoading && usd === 0) return "…";
+    if (usd > 0) return formatUsdCompact(usd) ?? formatUsdTable(usd) ?? fallback;
+    return fallback;
+  };
+
   const POSITIONS = [
     {
       label: "Token Locks",
-      value: `${activeLocks.length} active`,
-      sub: claimableLocks ? `${claimableLocks} claimable now` : `${activeLocks.length} active locks`,
+      value: fmtPositionUsd(
+        locksUsd,
+        activeLocks.length > 0 ? `${activeLocks.length} active` : "—",
+      ),
+      sub: claimableLocks
+        ? `${claimableLocks} claimable · ${activeLocks.length} lock${activeLocks.length === 1 ? "" : "s"}`
+        : activeLocks.length > 0
+          ? `${activeLocks.length} active lock${activeLocks.length === 1 ? "" : "s"}`
+          : "no active locks",
       color: "#C4A8F0",
       icon: LockKeyhole,
       href: "/lock",
     },
     {
       label: "Vesting",
-      value: `${activeVestings.length} active`,
-      sub: activeVestings.length > 0 ? `${activeVestings.length} yet to be claimed` : "no active vestings",
+      value: fmtPositionUsd(
+        vestingUsd,
+        activeVestings.length > 0 ? `${activeVestings.length} active` : "—",
+      ),
+      sub:
+        activeVestings.length > 0
+          ? `${activeVestings.length} schedule${activeVestings.length === 1 ? "" : "s"} · unclaimed`
+          : "no active vestings",
       color: "#9B7FD4",
       icon: Timer,
       href: "/vesting",
