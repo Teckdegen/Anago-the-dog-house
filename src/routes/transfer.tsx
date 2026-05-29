@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useMemo, useRef } from "react";
-import { Send, CheckCircle2, LockKeyhole, Timer, Sprout, ArrowRight } from "lucide-react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import { Send, CheckCircle2, LockKeyhole, Timer, Sprout } from "lucide-react";
 import {
   useAccount,
+  useReadContract,
   useReadContracts,
   useWriteContract,
   useWaitForTransactionReceipt,
@@ -14,11 +15,13 @@ import { LIVE_CHAIN_QUERY } from "@/lib/web3/nftImage";
 import { NftImage } from "@/components/NftImage";
 import { useToast } from "@/components/Toast";
 import {
-  TOKEN_LOCK_NFT_ABI,
+  TOKEN_LOCK_ABI,
   VESTING_NFT_ABI,
   STREAM_FARM_ABI,
+  ERC721_ABI,
 } from "@/lib/web3/contracts";
 import { useContractAddresses } from "@/lib/web3/hooks";
+import { parseLockTuple } from "@/lib/web3/parseLock";
 import { ERC20_ABI } from "@/lib/web3/tokens";
 import { formatAmount, shortAddr } from "@/lib/web3/format";
 import { TokenIcon } from "@/components/TokenIcon";
@@ -44,26 +47,49 @@ const TABS = [
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
-const now = () => Math.floor(Date.now() / 1000);
+const ZERO = "0x0000000000000000000000000000000000000000" as const;
 
-/** Returns true if a position is still "active" and can be transferred */
-function isActive(tab: TabKey, data: any): boolean {
+function asBigint(v: unknown): bigint | undefined {
+  if (v == null) return undefined;
+  try {
+    return typeof v === "bigint" ? v : BigInt(v as string | number);
+  } catch {
+    return undefined;
+  }
+}
+
+function pickField(data: unknown, ...keys: string[]): unknown {
+  if (data == null) return undefined;
+  if (Array.isArray(data)) {
+    const idx = Number(keys[0]);
+    return Number.isFinite(idx) ? data[idx] : undefined;
+  }
+  const r = data as Record<string, unknown>;
+  for (const k of keys) {
+    if (r[k] != null) return r[k];
+  }
+  return undefined;
+}
+
+/** Returns true if the NFT position can still be transferred */
+function isActive(tab: TabKey, data: unknown): boolean {
   if (!data) return false;
   if (tab === "Locks") {
-    // active = not withdrawn AND still locked (unlock time in the future)
-    if (data.withdrawn) return false;
-    const unlockTime = Number(data.unlockTime ?? data.unlockAt ?? 0);
-    return unlockTime > now();
+    const lock = parseLockTuple(data);
+    return !!lock && !lock.withdrawn;
   }
   if (tab === "Vestings") {
-    // active = not revoked AND not fully claimed
-    if (data.revoked) return false;
-    const total = BigInt(data.totalAmount ?? 0);
-    const claimed = BigInt(data.claimed ?? 0);
+    const revoked = Boolean(pickField(data, "revoked"));
+    if (revoked) return false;
+    const total = asBigint(pickField(data, "totalAmount")) ?? 0n;
+    const claimed = asBigint(pickField(data, "claimed")) ?? 0n;
     return claimed < total;
   }
-  // Farms — all staked positions are active (unstaking removes the NFT)
   return true;
+}
+
+function tokenIdsEqual(a: bigint | null, b: bigint): boolean {
+  return a != null && a.toString() === b.toString();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -90,28 +116,38 @@ function TransferPage() {
     ? contracts.vestingNFT
     : contracts.streamFarm;
 
-  const abi = isLock
-    ? TOKEN_LOCK_NFT_ABI
-    : isVesting
-    ? VESTING_NFT_ABI
-    : STREAM_FARM_ABI;
-
-  const listFn   = isLock ? "locksOf"   : isVesting ? "vestingsOf"  : "positionsOf";
-  const detailFn = isLock ? "getLock"   : isVesting ? "getVesting"  : "getPosition";
+  const readAbi = isLock ? TOKEN_LOCK_ABI : isVesting ? VESTING_NFT_ABI : STREAM_FARM_ABI;
+  const listFn = isLock ? "locksOf" : isVesting ? "vestingsOf" : "positionsOf";
+  const detailFn = isLock ? "getLock" : isVesting ? "getVesting" : "getPosition";
+  const contractReady = contractAddress !== ZERO;
 
   // 1. Fetch user's token IDs
-  const idsQ = useReadContracts({
-    contracts: [{ address: contractAddress, abi: abi as any, functionName: listFn, args: address ? [address] : undefined }],
-    query: { ...LIVE_CHAIN_QUERY, enabled: !!address, refetchInterval: 10_000 },
+  const idsQ = useReadContract({
+    address: contractAddress,
+    abi: readAbi,
+    functionName: listFn,
+    args: address ? [address] : undefined,
+    query: {
+      ...LIVE_CHAIN_QUERY,
+      enabled: !!address && contractReady,
+      refetchInterval: 10_000,
+    },
   });
-  const tokenIds = (idsQ.data?.[0]?.result as bigint[] | undefined) ?? [];
+  const tokenIds = (idsQ.data as bigint[] | undefined) ?? [];
 
   // 2. Fetch details for each position
   const detailsQ = useReadContracts({
     contracts: tokenIds.map((id) => ({
-      address: contractAddress, abi: abi as any, functionName: detailFn, args: [id] as const,
+      address: contractAddress,
+      abi: readAbi,
+      functionName: detailFn,
+      args: [id] as const,
     })),
-    query: { ...LIVE_CHAIN_QUERY, enabled: tokenIds.length > 0, refetchInterval: 10_000 },
+    query: {
+      ...LIVE_CHAIN_QUERY,
+      enabled: contractReady && tokenIds.length > 0,
+      refetchInterval: 10_000,
+    },
   });
 
   // 3. Build positions, filter to active only
@@ -128,24 +164,43 @@ function TransferPage() {
   // 4. Token metadata
   const tokenAddresses = useMemo(() => {
     if (isFarm) return [];
-    return [...new Set(positions.map((p) => (p.data as any)?.token as `0x${string}`).filter(Boolean))];
+    return [
+      ...new Set(
+        positions
+          .map((p) => pickField(p.data, "token", "0") as `0x${string}` | undefined)
+          .filter((t): t is `0x${string}` => !!t && t !== ZERO),
+      ),
+    ];
   }, [positions, isFarm]);
 
   const farmPoolIds = useMemo(() => {
     if (!isFarm) return [];
-    return positions.map((p) => (p.data as any)?.[0] as bigint | undefined).filter(Boolean) as bigint[];
+    return positions
+      .map((p) => asBigint(pickField(p.data, "farmId", "0")))
+      .filter((id): id is bigint => id != null);
   }, [positions, isFarm]);
 
   const poolInfoQ = useReadContracts({
     contracts: farmPoolIds.map((poolId) => ({
-      address: contractAddress, abi: abi as any, functionName: "getFarm", args: [poolId] as const,
+      address: contractAddress,
+      abi: STREAM_FARM_ABI,
+      functionName: "getFarm",
+      args: [poolId] as const,
     })),
-    query: { ...LIVE_CHAIN_QUERY, enabled: isFarm && farmPoolIds.length > 0, refetchInterval: 10_000 },
+    query: {
+      ...LIVE_CHAIN_QUERY,
+      enabled: contractReady && isFarm && farmPoolIds.length > 0,
+      refetchInterval: 10_000,
+    },
   });
 
   const farmStakeTokens = useMemo(() => {
     if (!isFarm || !poolInfoQ.data) return [] as (`0x${string}` | undefined)[];
-    return poolInfoQ.data.map((r) => (r?.result as any)?.[0] as `0x${string}` | undefined);
+    return poolInfoQ.data.map((r) => {
+      const raw = r?.result;
+      const t = pickField(raw, "stakeToken", "0");
+      return typeof t === "string" ? (t as `0x${string}`) : undefined;
+    });
   }, [isFarm, poolInfoQ.data]);
 
   const allTokenAddrs = useMemo(() => {
@@ -185,33 +240,73 @@ function TransferPage() {
     return map;
   }, [allTokenAddrs, tokenMetaQ.data, remoteMeta]);
 
-  // 5. Transfer tx
-  const transferTx  = useWriteContract();
+  const isValidAddress = /^0x[a-fA-F0-9]{40}$/.test(recipientAddress);
+  const isSelf = recipientAddress.toLowerCase() === address?.toLowerCase();
+
+  // 5. Transfer tx (standard ERC-721 safeTransferFrom on all position NFTs)
+  const transferTx = useWriteContract();
   const transferRcpt = useWaitForTransactionReceipt({ hash: transferTx.data });
 
-  const handleTransfer = async () => {
-    if (!selectedTokenId || !address || !isValidAddress || !publicClient) return;
-    const to = recipientAddress as `0x${string}`;
-    pendingRef.current = { from: address, to, tokenId: selectedTokenId };
-    const gas = await prepareTransactionWithGas(publicClient);
-    transferTx.writeContract({
-      address: contractAddress,
-      abi: abi as any,
-      functionName: "transferFrom",
-      args: [address, to, selectedTokenId],
-      ...gas,
-    });
-  };
-
-  if (transferRcpt.isSuccess && !confirmed && pendingRef.current) {
+  useEffect(() => {
+    if (!transferRcpt.isSuccess || confirmed || !pendingRef.current) return;
     setConfirmed(true);
     toast("success", "Position transferred", `Sent to ${shortAddr(pendingRef.current.to)}`);
-  }
+  }, [transferRcpt.isSuccess, confirmed, toast]);
 
-  const selectedPos   = positions.find((p) => p.tokenId === selectedTokenId);
-  const isValidAddress = /^0x[a-fA-F0-9]{40}$/.test(recipientAddress);
-  const isSelf        = recipientAddress.toLowerCase() === address?.toLowerCase();
-  const canTransfer   = !!selectedTokenId && isValidAddress && !isSelf && !transferTx.isPending && !transferRcpt.isLoading;
+  const handleTransfer = useCallback(async () => {
+    if (!selectedTokenId || !address || !publicClient || !contractReady) {
+      toast("error", "Transfer failed", "Connect your wallet and select a position.");
+      return;
+    }
+    if (!isValidAddress) {
+      toast("error", "Invalid address", "Enter a valid recipient wallet address.");
+      return;
+    }
+    if (isSelf) {
+      toast("error", "Invalid recipient", "You cannot transfer to yourself.");
+      return;
+    }
+
+    const to = recipientAddress as `0x${string}`;
+    pendingRef.current = { from: address, to, tokenId: selectedTokenId };
+
+    try {
+      const gas = await prepareTransactionWithGas(publicClient);
+      transferTx.writeContract({
+        address: contractAddress,
+        abi: ERC721_ABI,
+        functionName: "safeTransferFrom",
+        args: [address, to, selectedTokenId],
+        account: address,
+        chain: publicClient.chain,
+        ...gas,
+      });
+    } catch (err) {
+      pendingRef.current = null;
+      const msg = err instanceof Error ? err.message : String(err);
+      toast("error", "Transfer failed", msg);
+    }
+  }, [
+    selectedTokenId,
+    address,
+    publicClient,
+    contractReady,
+    isValidAddress,
+    isSelf,
+    recipientAddress,
+    contractAddress,
+    transferTx,
+    toast,
+  ]);
+
+  const selectedPos = positions.find((p) => tokenIdsEqual(selectedTokenId, p.tokenId));
+  const canTransfer =
+    contractReady &&
+    !!selectedTokenId &&
+    isValidAddress &&
+    !isSelf &&
+    !transferTx.isPending &&
+    !transferRcpt.isLoading;
 
   const resetForm = () => {
     setConfirmed(false);
@@ -237,6 +332,11 @@ function TransferPage() {
 
         {!address ? (
           <EmptyState title="Wallet not connected" sub="Connect your wallet to transfer positions." />
+        ) : !contractReady ? (
+          <EmptyState
+            title="Contracts not configured"
+            sub="Token lock, vesting, or farm addresses are missing for this network."
+          />
         ) : confirmed ? (
           <SuccessState onDone={resetForm} recipient={recipientAddress} />
         ) : (
@@ -283,7 +383,7 @@ function TransferPage() {
                     </p>
                     <p className="font-mono text-[9px] mt-1.5 max-w-[240px]" style={{ color: "rgba(196,168,240,0.4)" }}>
                       {activeTab === "Locks"
-                        ? "Only locked (not yet unlocked) positions can be transferred."
+                        ? "Only active lock NFTs (not yet claimed) can be transferred."
                         : activeTab === "Vestings"
                         ? "Only active (not fully claimed) vestings can be transferred."
                         : "Stake in a farm to see transferable positions."}
@@ -291,12 +391,18 @@ function TransferPage() {
                   </div>
                 ) : (
                   positions.map((pos, i) => {
-                    const d = pos.data as any;
-                    const stakeToken = isFarm ? farmStakeTokens[i] : (d?.token as `0x${string}` | undefined);
+                    const d = pos.data;
+                    const stakeToken = isFarm
+                      ? farmStakeTokens[i]
+                      : (pickField(d, "token", "0") as `0x${string}` | undefined);
                     const meta = stakeToken ? tokenMeta[stakeToken.toLowerCase()] : undefined;
-                    const symbol   = meta?.symbol ?? "???";
+                    const symbol = meta?.symbol ?? "???";
                     const decimals = meta?.decimals ?? 18;
-                    const amount   = isLock ? d?.amount : isVesting ? d?.totalAmount : d?.[1];
+                    const amount = isLock
+                      ? asBigint(pickField(d, "amount", "1"))
+                      : isVesting
+                        ? asBigint(pickField(d, "totalAmount", "1"))
+                        : asBigint(pickField(d, "amount", "1"));
 
                     return (
                       <PositionRow
@@ -308,9 +414,12 @@ function TransferPage() {
                         decimals={decimals}
                         logoUrl={meta?.logoURI}
                         amount={amount}
-                        type={activeTab}
-                        isSelected={selectedTokenId === pos.tokenId}
-                        onSelect={() => setSelectedTokenId(pos.tokenId === selectedTokenId ? null : pos.tokenId)}
+                        isSelected={tokenIdsEqual(selectedTokenId, pos.tokenId)}
+                        onSelect={() =>
+                          setSelectedTokenId(
+                            tokenIdsEqual(selectedTokenId, pos.tokenId) ? null : pos.tokenId,
+                          )
+                        }
                         isLast={i === positions.length - 1}
                       />
                     );
@@ -349,14 +458,19 @@ function TransferPage() {
 
               {/* Selected position summary — shown when something is selected */}
               {selectedPos && (() => {
-                const d = selectedPos.data as any;
+                const d = selectedPos.data;
+                const idx = positions.indexOf(selectedPos);
                 const stakeToken = isFarm
-                  ? farmStakeTokens[positions.indexOf(selectedPos)]
-                  : (d?.token as `0x${string}` | undefined);
-                const meta     = stakeToken ? tokenMeta[stakeToken.toLowerCase()] : undefined;
-                const symbol   = meta?.symbol ?? "???";
+                  ? farmStakeTokens[idx]
+                  : (pickField(d, "token", "0") as `0x${string}` | undefined);
+                const meta = stakeToken ? tokenMeta[stakeToken.toLowerCase()] : undefined;
+                const symbol = meta?.symbol ?? "???";
                 const decimals = meta?.decimals ?? 18;
-                const amount   = isLock ? d?.amount : isVesting ? d?.totalAmount : d?.[1];
+                const amount = isLock
+                  ? asBigint(pickField(d, "amount", "1"))
+                  : isVesting
+                    ? asBigint(pickField(d, "totalAmount", "1"))
+                    : asBigint(pickField(d, "amount", "1"));
                 return (
                   <div
                     className="rounded-xl p-4 space-y-2"
@@ -398,7 +512,11 @@ function TransferPage() {
                 ) : (
                   <>
                     <Send className="w-4 h-4" strokeWidth={1.5} />
-                    {selectedTokenId ? "Transfer Position" : "Select a position above"}
+                    {selectedTokenId
+                      ? isValidAddress
+                        ? "Transfer Position"
+                        : "Enter recipient address"
+                      : "Select a position above"}
                   </>
                 )}
               </button>
