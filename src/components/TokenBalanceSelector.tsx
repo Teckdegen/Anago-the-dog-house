@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Search, Coins, RefreshCw } from "lucide-react";
+import { Search, Coins } from "lucide-react";
 import { useAllTokenBalances } from "@/lib/web3/hooks";
 import type { TokenBalance } from "@/lib/web3/tokenBalances";
 import { TokenIcon } from "./TokenIcon";
@@ -26,7 +26,7 @@ export function TokenBalanceSelector({
   className = "",
   excludeNative,
 }: TokenBalanceSelectorProps) {
-  const { balances, isLoading, error, refetch } = useAllTokenBalances();
+  const { balances, isLoading, error } = useAllTokenBalances();
   const [search, setSearch] = useState("");
 
   const filtered = useMemo(() => {
@@ -42,79 +42,55 @@ export function TokenBalanceSelector({
     );
   }, [balances, search, excludeNative]);
 
-  if (error) {
+  if (error && !isLoading && balances.length === 0) {
     return (
       <div
         className={`rounded-xl p-6 text-center ${className}`}
         style={{ border: "1px solid rgba(155,127,212,0.35)", background: "rgba(155,127,212,0.05)" }}
       >
         <p className="font-mono text-[11px]" style={{ color: "rgba(255,100,100,0.8)" }}>
-          Failed to load token balances
+          Failed to load token balances. Check your Zerion API key.
         </p>
-        <button
-          type="button"
-          onClick={refetch}
-          className="mt-3 px-4 py-2 rounded-full font-grotesk text-[10px] uppercase tracking-wider"
-          style={{ background: "rgba(155,127,212,0.25)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.6)" }}
-        >
-          Retry
-        </button>
       </div>
     );
   }
 
   return (
     <div className={className}>
-      <div className="flex items-center gap-2 mb-3">
-        <div
-          className="flex-1 flex items-center gap-2 px-3 py-2 rounded-full"
-          style={{ background: "rgba(155,127,212,0.08)", border: "1px solid rgba(155,127,212,0.25)" }}
-        >
-          <Search className="w-3.5 h-3.5" style={{ color: "rgba(196,168,240,0.5)" }} strokeWidth={1.5} />
-          <input
-            type="text"
-            placeholder="Search tokens…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="flex-1 bg-transparent font-mono text-[11px] outline-none"
-            style={{ color: "#EDE0FF" }}
-          />
-        </div>
-        <button
-          type="button"
-          onClick={refetch}
-          disabled={isLoading}
-          className="p-2 rounded-full transition-colors disabled:opacity-50"
-          style={{ background: "rgba(155,127,212,0.15)", border: "1px solid rgba(155,127,212,0.35)" }}
-          title="Refresh balances"
-        >
-          <RefreshCw
-            className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`}
-            style={{ color: "rgba(196,168,240,0.7)" }}
-            strokeWidth={1.5}
-          />
-        </button>
+      <div
+        className="flex items-center gap-2 px-3 py-2 rounded-full mb-3"
+        style={{ background: "rgba(155,127,212,0.08)", border: "1px solid rgba(155,127,212,0.25)" }}
+      >
+        <Search className="w-3.5 h-3.5" style={{ color: "rgba(196,168,240,0.5)" }} strokeWidth={1.5} />
+        <input
+          type="text"
+          placeholder="Search tokens…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="flex-1 bg-transparent font-mono text-[11px] outline-none"
+          style={{ color: "#EDE0FF" }}
+        />
       </div>
 
       <div
         className="rounded-xl overflow-hidden max-h-[400px] overflow-y-auto"
         style={{ border: "1px solid rgba(155,127,212,0.35)" }}
       >
-        {isLoading && balances.length === 0 ? (
+        {isLoading ? (
           <div className="flex flex-col items-center justify-center py-12">
             <div
               className="w-6 h-6 rounded-full border-2 animate-spin mb-3"
               style={{ borderColor: "rgba(155,127,212,0.2)", borderTopColor: "rgba(155,127,212,0.8)" }}
             />
             <p className="font-mono text-[10px]" style={{ color: "rgba(196,168,240,0.6)" }}>
-              Loading wallet tokens…
+              Loading balances from Zerion…
             </p>
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12">
             <Coins className="w-5 h-5 mb-2" style={{ color: "rgba(196,168,240,0.6)" }} strokeWidth={1.5} />
             <p className="font-grotesk uppercase text-[12px] tracking-wider" style={{ color: "#EDE0FF" }}>
-              {search ? "No tokens found" : "No tokens yet"}
+              {search ? "No matching tokens" : "No tokens in this wallet"}
             </p>
           </div>
         ) : (
@@ -159,7 +135,7 @@ export function TokenBalanceSelector({
 
       {!isLoading && balances.length > 0 && (
         <p className="font-mono text-[9px] mt-2 text-center" style={{ color: "rgba(196,168,240,0.45)" }}>
-          {balances.length} token{balances.length !== 1 ? "s" : ""} · BlockVision
+          {balances.length} token{balances.length !== 1 ? "s" : ""} · Zerion
         </p>
       )}
     </div>

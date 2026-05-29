@@ -526,7 +526,7 @@ export function useUserVestings(): {
 //                         TOKEN BALANCES (AUTO-DISCOVERY)
 // ──────────────────────────────────────────────────────────────────────────
 import { usePublicClient } from "wagmi";
-import { fetchAllBalances, type TokenBalance } from "./tokenBalances";
+import { fetchAllBalances, fetchBalancesFromZerion, type TokenBalance } from "./tokenBalances";
 import { addCustomToken } from "./customTokens";
 import type { TokenInfo as CustomTokenInfo } from "./tokens";
 
@@ -546,57 +546,53 @@ export function useAllTokenBalances(): {
   const chainId = useChainId();
   const publicClient = usePublicClient();
   
-  const [balances, setBalances] = useState<TokenBalance[]>(() => {
-    // Initialize from cache
-    if (!address) return [];
-    try {
-      const cached = localStorage.getItem(`token_balances_v7_${address}_${chainId}`);
-      if (cached) {
-        const { data } = JSON.parse(cached);
-        // Restore bigints
-        return data.map((t: any) => ({ ...t, balance: BigInt(t.balance) }));
-      }
-    } catch {}
-    return [];
-  });
-  const [isLoading, setIsLoading] = useState(false);
+  const [balances, setBalances] = useState<TokenBalance[]>([]);
+  const [hasFetched, setHasFetched] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     if (!address || !publicClient) {
       setBalances([]);
+      setHasFetched(false);
       return;
     }
 
     let cancelled = false;
-    setIsLoading(true);
+    setHasFetched(false);
     setError(null);
+    setBalances([]);
 
-    fetchAllBalances(address, chainId, publicClient)
-      .then((results) => {
-        if (cancelled) return;
-        if (results.length > 0) {
-          setBalances(results);
-          try {
-            const serializable = results.map((t) => ({ ...t, balance: t.balance.toString() }));
-            localStorage.setItem(
-              `token_balances_v7_${address}_${chainId}`,
-              JSON.stringify({ data: serializable, timestamp: Date.now() }),
-            );
-          } catch {
-            /* ignore cache errors */
-          }
+    const run = async () => {
+      try {
+        const fromZerion = await fetchBalancesFromZerion(address);
+        if (!cancelled && fromZerion.length > 0) {
+          setBalances(fromZerion);
         }
-        setIsLoading(false);
-      })
-      .catch((err) => {
+
+        const results = await fetchAllBalances(address, chainId, publicClient);
+        if (cancelled) return;
+
+        setBalances(results);
+        setHasFetched(true);
+        try {
+          const serializable = results.map((t) => ({ ...t, balance: t.balance.toString() }));
+          localStorage.setItem(
+            `token_balances_v7_${address}_${chainId}`,
+            JSON.stringify({ data: serializable, timestamp: Date.now() }),
+          );
+        } catch {
+          /* ignore cache errors */
+        }
+      } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err : new Error(String(err)));
-          // Keep existing cached data on error
-          setIsLoading(false);
+          setHasFetched(true);
         }
-      });
+      }
+    };
+
+    void run();
 
     return () => {
       cancelled = true;
@@ -604,11 +600,14 @@ export function useAllTokenBalances(): {
   }, [address, chainId, publicClient, refreshKey]);
 
   const refetch = () => setRefreshKey((k) => k + 1);
-  
+
   const addToken = (token: CustomTokenInfo) => {
     addCustomToken(chainId, token);
     refetch();
   };
 
-  return { balances, isLoading: isLoading && balances.length === 0, error, refetch, addToken };
+  /** True until the first Zerion-backed balance fetch finishes for this wallet. */
+  const isLoading = !!address && !hasFetched;
+
+  return { balances, isLoading, error, refetch, addToken };
 }

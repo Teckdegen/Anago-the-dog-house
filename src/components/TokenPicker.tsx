@@ -3,7 +3,7 @@ import { useAccount, useReadContracts } from "wagmi";
 import { formatAmount } from "@/lib/web3/format";
 import { getBlockVisionApiKey } from "@/lib/web3/blockvision";
 import { ERC20_ABI, type TokenInfo } from "@/lib/web3/tokens";
-import { Check, Search, Loader2, Coins, RefreshCw } from "lucide-react";
+import { Check, Search, Loader2, Coins } from "lucide-react";
 import { useAllTokenBalances } from "@/lib/web3/hooks";
 import { TokenIcon } from "./TokenIcon";
 
@@ -34,7 +34,7 @@ export function TokenPicker({ selected, onSelect, excludeNative, compact }: Prop
   const [input, setInput] = useState("");
   const [showManual, setShowManual] = useState(false);
 
-  const { balances, isLoading: loadingBalances, error, refetch, addToken } = useAllTokenBalances();
+  const { balances, isLoading: loadingBalances, error, addToken } = useAllTokenBalances();
   const hasBvKey = import.meta.env.DEV || !!getBlockVisionApiKey() || import.meta.env.PROD;
 
   const filteredBalances = useMemo(() => {
@@ -94,46 +94,30 @@ export function TokenPicker({ selected, onSelect, excludeNative, compact }: Prop
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <div
-          className="flex-1 flex items-center gap-2 px-3 py-2.5 rounded-xl"
-          style={{ background: "rgba(155,127,212,0.07)", border: "1px solid rgba(155,127,212,0.3)" }}
-        >
-          <Search className="w-3.5 h-3.5 shrink-0" style={{ color: "rgba(196,168,240,0.5)" }} strokeWidth={1.5} />
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Search your tokens…"
-            className="flex-1 bg-transparent font-mono text-[11px] outline-none placeholder:text-[rgba(155,127,212,0.4)]"
-            style={{ color: "#EDE0FF" }}
-            spellCheck={false}
-          />
-          {input && (
-            <button
-              type="button"
-              onClick={() => setInput("")}
-              className="font-mono text-[10px] transition hover:opacity-80"
-              style={{ color: "rgba(196,168,240,0.45)" }}
-            >
-              ✕
-            </button>
-          )}
-        </div>
-        <button
-          type="button"
-          onClick={refetch}
-          disabled={loadingBalances}
-          className="p-2.5 rounded-xl transition-colors disabled:opacity-50"
-          style={{ background: "rgba(155,127,212,0.12)", border: "1px solid rgba(155,127,212,0.3)" }}
-          title="Refresh balances"
-        >
-          <RefreshCw
-            className={`w-3.5 h-3.5 ${loadingBalances ? "animate-spin" : ""}`}
-            style={{ color: "rgba(196,168,240,0.7)" }}
-            strokeWidth={1.5}
-          />
-        </button>
+      <div
+        className="flex items-center gap-2 px-3 py-2.5 rounded-xl"
+        style={{ background: "rgba(155,127,212,0.07)", border: "1px solid rgba(155,127,212,0.3)" }}
+      >
+        <Search className="w-3.5 h-3.5 shrink-0" style={{ color: "rgba(196,168,240,0.5)" }} strokeWidth={1.5} />
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="Search your tokens…"
+          className="flex-1 bg-transparent font-mono text-[11px] outline-none placeholder:text-[rgba(155,127,212,0.4)]"
+          style={{ color: "#EDE0FF" }}
+          spellCheck={false}
+        />
+        {input && (
+          <button
+            type="button"
+            onClick={() => setInput("")}
+            className="font-mono text-[10px] transition hover:opacity-80"
+            style={{ color: "rgba(196,168,240,0.45)" }}
+          >
+            ✕
+          </button>
+        )}
       </div>
 
       {!wallet && (
@@ -142,9 +126,9 @@ export function TokenPicker({ selected, onSelect, excludeNative, compact }: Prop
         </p>
       )}
 
-      {wallet && error && filteredBalances.length === 0 && (
+      {wallet && error && !loadingBalances && filteredBalances.length === 0 && (
         <p className="font-mono text-[10px] text-center py-2" style={{ color: "rgba(255,120,120,0.85)" }}>
-          Could not load balances. Check your BlockVision API key.
+          Could not load balances. Check your Zerion API key.
         </p>
       )}
 
@@ -158,18 +142,18 @@ export function TokenPicker({ selected, onSelect, excludeNative, compact }: Prop
         className={`rounded-xl overflow-hidden ${maxH} overflow-y-auto`}
         style={{ border: "1px solid rgba(155,127,212,0.3)" }}
       >
-        {loadingBalances && filteredBalances.length === 0 ? (
+        {!wallet ? null : loadingBalances ? (
           <div className="flex flex-col items-center justify-center py-8">
             <Loader2 className="w-5 h-5 animate-spin mb-2" style={{ color: "rgba(155,127,212,0.7)" }} />
             <p className="font-mono text-[10px]" style={{ color: "rgba(196,168,240,0.6)" }}>
-              Loading wallet tokens…
+              Loading balances from Zerion…
             </p>
           </div>
         ) : searchFiltered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 px-4">
             <Coins className="w-6 h-6 mb-2" style={{ color: "rgba(155,127,212,0.5)" }} strokeWidth={1.5} />
             <p className="font-mono text-[10px] text-center" style={{ color: "rgba(196,168,240,0.6)" }}>
-              {input ? "No tokens found" : "No tokens in this wallet"}
+              {input ? "No matching tokens" : "No tokens in this wallet"}
             </p>
             {!input && (
               <button
@@ -318,7 +302,7 @@ export function TokenPicker({ selected, onSelect, excludeNative, compact }: Prop
 
       {!loadingBalances && filteredBalances.length > 0 && !showManual && (
         <p className="font-mono text-[9px] text-center" style={{ color: "rgba(196,168,240,0.45)" }}>
-          {filteredBalances.length} token{filteredBalances.length !== 1 ? "s" : ""} · indexed balances
+          {filteredBalances.length} token{filteredBalances.length !== 1 ? "s" : ""} · Zerion
         </p>
       )}
     </div>
