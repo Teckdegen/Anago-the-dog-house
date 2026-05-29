@@ -238,7 +238,7 @@ function TokenLinkRow({
       href={`https://monadexplorer.com/address/${address}`}
       target="_blank"
       rel="noreferrer"
-      className="flex items-center gap-2 w-full min-w-0 py-2 first:pt-0 rounded-lg -mx-1 px-1 transition hover:bg-[rgba(155,127,212,0.12)]"
+      className="flex items-center gap-2 w-full min-w-0 py-2 first:pt-0 rounded-lg -mx-1 px-1 transition hover:bg-[rgba(139,92,246,0.12)]"
     >
       <TokenIcon address={address} symbol={symbol} size={24} logoUrl={logo} />
       <span className="font-grotesk text-[13px] shrink-0" style={{ color: clmm.text }}>

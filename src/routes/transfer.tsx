@@ -322,10 +322,10 @@ function TransferPage() {
 
         {/* Header */}
         <div className="mb-8">
-          <h1 className="font-grotesk uppercase text-[22px] sm:text-[28px] leading-none tracking-tight" style={{ color: "#EDE0FF" }}>
+          <h1 className="font-grotesk uppercase text-[22px] sm:text-[28px] leading-none tracking-tight" style={{ color: "#FFFFFF" }}>
             Transfer Positions
           </h1>
-          <p className="font-mono text-[10px] mt-1.5 tracking-wide" style={{ color: "rgba(196,168,240,0.55)" }}>
+          <p className="font-mono text-[10px] mt-1.5 tracking-wide" style={{ color: "rgba(255,255,255,0.55)" }}>
             Transfer your NFT positions — locks, vestings, or farm stakes — to any address
           </p>
         </div>
@@ -342,13 +342,13 @@ function TransferPage() {
         ) : (
           <div
             className="rounded-2xl overflow-hidden"
-            style={{ border: "1px solid rgba(155,127,212,0.3)", background: "rgba(155,127,212,0.03)" }}
+            style={{ border: "1px solid rgba(139,92,246,0.3)", background: "rgba(139,92,246,0.03)" }}
           >
             {/* ── Tab bar ── */}
             <div className="p-4 pb-0">
               <div
                 className="flex items-center gap-0.5 p-1 rounded-full"
-                style={{ background: "rgba(155,127,212,0.08)", border: "1px solid rgba(155,127,212,0.18)" }}
+                style={{ background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.18)" }}
               >
                 {TABS.map(({ key, label, icon: Icon }) => (
                   <button
@@ -357,8 +357,8 @@ function TransferPage() {
                     className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full font-grotesk text-[11px] uppercase tracking-wider transition"
                     style={
                       activeTab === key
-                        ? { background: "rgba(155,127,212,0.35)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.5)" }
-                        : { color: "rgba(196,168,240,0.45)" }
+                        ? { background: "rgba(139,92,246,0.35)", color: "#FFFFFF", border: "1px solid rgba(139,92,246,0.5)" }
+                        : { color: "rgba(255,255,255,0.45)" }
                     }
                   >
                     <Icon className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -370,18 +370,18 @@ function TransferPage() {
 
             {/* ── Position list ── */}
             <div className="p-4">
-              <p className="font-mono text-[9px] uppercase tracking-[0.18em] mb-3" style={{ color: "rgba(196,168,240,0.4)" }}>
+              <p className="font-mono text-[9px] uppercase tracking-[0.18em] mb-3" style={{ color: "rgba(255,255,255,0.4)" }}>
                 Select position
               </p>
-              <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(155,127,212,0.2)" }}>
+              <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(139,92,246,0.2)" }}>
                 {idsQ.isLoading ? (
                   <LoadingRows />
                 ) : positions.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-10 px-6 text-center">
-                    <p className="font-grotesk uppercase text-[12px] tracking-wider" style={{ color: "rgba(237,224,255,0.7)" }}>
+                    <p className="font-grotesk uppercase text-[12px] tracking-wider" style={{ color: "rgba(255,255,255,0.7)" }}>
                       No active {tabLabel(activeTab)}
                     </p>
-                    <p className="font-mono text-[9px] mt-1.5 max-w-[240px]" style={{ color: "rgba(196,168,240,0.4)" }}>
+                    <p className="font-mono text-[9px] mt-1.5 max-w-[240px]" style={{ color: "rgba(255,255,255,0.4)" }}>
                       {activeTab === "Locks"
                         ? "Only active lock NFTs (not yet claimed) can be transferred."
                         : activeTab === "Vestings"
@@ -429,11 +429,11 @@ function TransferPage() {
             </div>
 
             {/* ── Divider ── */}
-            <div style={{ height: "1px", background: "rgba(155,127,212,0.15)", margin: "0 16px" }} />
+            <div style={{ height: "1px", background: "rgba(139,92,246,0.15)", margin: "0 16px" }} />
 
             {/* ── Recipient + Send (always visible below) ── */}
             <div className="p-4 space-y-4">
-              <p className="font-mono text-[9px] uppercase tracking-[0.18em]" style={{ color: "rgba(196,168,240,0.4)" }}>
+              <p className="font-mono text-[9px] uppercase tracking-[0.18em]" style={{ color: "rgba(255,255,255,0.4)" }}>
                 Recipient address
               </p>
 
@@ -442,11 +442,11 @@ function TransferPage() {
                 value={recipientAddress}
                 onChange={(e) => setRecipientAddress(e.target.value.trim())}
                 placeholder="0x..."
-                className="w-full bg-transparent rounded-xl px-4 py-3 font-mono text-[12px] outline-none transition placeholder:text-[rgba(155,127,212,0.25)]"
+                className="w-full bg-transparent rounded-xl px-4 py-3 font-mono text-[12px] outline-none transition placeholder:text-[rgba(139,92,246,0.25)]"
                 style={{
-                  color: "#EDE0FF",
-                  border: `1px solid ${recipientAddress && !isValidAddress ? "rgba(255,100,100,0.5)" : "rgba(155,127,212,0.28)"}`,
-                  background: "rgba(155,127,212,0.06)",
+                  color: "#FFFFFF",
+                  border: `1px solid ${recipientAddress && !isValidAddress ? "rgba(255,100,100,0.5)" : "rgba(139,92,246,0.28)"}`,
+                  background: "rgba(139,92,246,0.06)",
                 }}
               />
               {recipientAddress && !isValidAddress && (
@@ -474,11 +474,11 @@ function TransferPage() {
                 return (
                   <div
                     className="rounded-xl p-4 space-y-2"
-                    style={{ background: "rgba(155,127,212,0.08)", border: "1px solid rgba(155,127,212,0.2)" }}
+                    style={{ background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.2)" }}
                   >
                     <div className="flex items-center gap-3 mb-2">
                       <NftImage contract={contractAddress} tokenId={selectedPos.tokenId} size={48} fallbackLetter={symbol} />
-                      <p className="font-mono text-[9px] uppercase tracking-wider" style={{ color: "rgba(196,168,240,0.4)" }}>
+                      <p className="font-mono text-[9px] uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.4)" }}>
                         Transferring
                       </p>
                     </div>
@@ -489,8 +489,8 @@ function TransferPage() {
                       ["NFT ID", `#${selectedPos.tokenId.toString()}`],
                     ] as [string, string][]).map(([k, v]) => (
                       <div key={k} className="flex items-center justify-between">
-                        <span className="font-mono text-[10px] uppercase tracking-wider" style={{ color: "rgba(196,168,240,0.4)" }}>{k}</span>
-                        <span className="font-grotesk text-[12px]" style={{ color: "rgba(237,224,255,0.9)" }}>{v}</span>
+                        <span className="font-mono text-[10px] uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.4)" }}>{k}</span>
+                        <span className="font-grotesk text-[12px]" style={{ color: "rgba(255,255,255,0.9)" }}>{v}</span>
                       </div>
                     ))}
                   </div>
@@ -502,7 +502,7 @@ function TransferPage() {
                 onClick={handleTransfer}
                 disabled={!canTransfer}
                 className="w-full rounded-xl py-3.5 font-grotesk text-[12px] uppercase tracking-wider transition disabled:opacity-35 active:scale-[0.99] flex items-center justify-center gap-2"
-                style={{ background: "rgba(155,127,212,0.22)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.5)" }}
+                style={{ background: "rgba(139,92,246,0.22)", color: "#FFFFFF", border: "1px solid rgba(139,92,246,0.5)" }}
               >
                 {transferTx.isPending || transferRcpt.isLoading ? (
                   <>
@@ -550,10 +550,10 @@ function PositionRow({
   return (
     <button
       onClick={onSelect}
-      className="w-full text-left px-4 py-3 hover:bg-[rgba(155,127,212,0.05)] transition-colors"
+      className="w-full text-left px-4 py-3 hover:bg-[rgba(139,92,246,0.05)] transition-colors"
       style={{
-        borderBottom: isLast ? "none" : "1px solid rgba(155,127,212,0.1)",
-        background: isSelected ? "rgba(155,127,212,0.13)" : "transparent",
+        borderBottom: isLast ? "none" : "1px solid rgba(139,92,246,0.1)",
+        background: isSelected ? "rgba(139,92,246,0.13)" : "transparent",
       }}
     >
       <div className="flex items-center justify-between">
@@ -564,10 +564,10 @@ function PositionRow({
             <NftImage contract={contract} tokenId={tokenId} size={40} fallbackLetter={symbol} />
           )}
           <div className="min-w-0">
-            <p className="font-grotesk uppercase text-[12px] tracking-wider truncate" style={{ color: "#EDE0FF" }}>
+            <p className="font-grotesk uppercase text-[12px] tracking-wider truncate" style={{ color: "#FFFFFF" }}>
               {symbol}
             </p>
-            <p className="font-mono text-[9px] truncate" style={{ color: "rgba(196,168,240,0.4)" }}>
+            <p className="font-mono text-[9px] truncate" style={{ color: "rgba(255,255,255,0.4)" }}>
               #{tokenId.toString()} · {formatAmount(amount, decimals)}
             </p>
           </div>
@@ -575,11 +575,11 @@ function PositionRow({
         <div
           className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-all"
           style={{
-            background: isSelected ? "#9B7FD4" : "rgba(155,127,212,0.1)",
-            border: isSelected ? "none" : "1px solid rgba(155,127,212,0.3)",
+            background: isSelected ? "#8B5CF6" : "rgba(139,92,246,0.1)",
+            border: isSelected ? "none" : "1px solid rgba(139,92,246,0.3)",
           }}
         >
-          {isSelected && <CheckCircle2 className="w-3 h-3" style={{ color: "#0D0B14" }} strokeWidth={3} />}
+          {isSelected && <CheckCircle2 className="w-3 h-3" style={{ color: "#0c0c10" }} strokeWidth={3} />}
         </div>
       </div>
     </button>
@@ -590,12 +590,12 @@ function LoadingRows() {
   return (
     <>
       {[0, 1, 2].map((i) => (
-        <div key={i} className="px-4 py-3 animate-pulse" style={{ borderBottom: i < 2 ? "1px solid rgba(155,127,212,0.1)" : "none" }}>
+        <div key={i} className="px-4 py-3 animate-pulse" style={{ borderBottom: i < 2 ? "1px solid rgba(139,92,246,0.1)" : "none" }}>
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full" style={{ background: "rgba(155,127,212,0.12)" }} />
+            <div className="w-8 h-8 rounded-full" style={{ background: "rgba(139,92,246,0.12)" }} />
             <div className="space-y-1.5">
-              <div className="h-3 w-20 rounded" style={{ background: "rgba(155,127,212,0.12)" }} />
-              <div className="h-2 w-32 rounded" style={{ background: "rgba(155,127,212,0.08)" }} />
+              <div className="h-3 w-20 rounded" style={{ background: "rgba(139,92,246,0.12)" }} />
+              <div className="h-2 w-32 rounded" style={{ background: "rgba(139,92,246,0.08)" }} />
             </div>
           </div>
         </div>
@@ -607,11 +607,11 @@ function LoadingRows() {
 function EmptyState({ title, sub }: { title: string; sub: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
-      <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4" style={{ background: "rgba(155,127,212,0.1)", border: "1px solid rgba(155,127,212,0.25)" }}>
-        <Send className="w-4 h-4" style={{ color: "rgba(196,168,240,0.5)" }} strokeWidth={1.5} />
+      <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4" style={{ background: "rgba(139,92,246,0.1)", border: "1px solid rgba(139,92,246,0.25)" }}>
+        <Send className="w-4 h-4" style={{ color: "rgba(255,255,255,0.5)" }} strokeWidth={1.5} />
       </div>
-      <p className="font-grotesk uppercase text-[13px] tracking-wider" style={{ color: "#EDE0FF" }}>{title}</p>
-      <p className="font-mono text-[10px] mt-1.5 max-w-[260px]" style={{ color: "rgba(196,168,240,0.5)" }}>{sub}</p>
+      <p className="font-grotesk uppercase text-[13px] tracking-wider" style={{ color: "#FFFFFF" }}>{title}</p>
+      <p className="font-mono text-[10px] mt-1.5 max-w-[260px]" style={{ color: "rgba(255,255,255,0.5)" }}>{sub}</p>
     </div>
   );
 }
@@ -619,17 +619,17 @@ function EmptyState({ title, sub }: { title: string; sub: string }) {
 function SuccessState({ onDone, recipient }: { onDone: () => void; recipient: string }) {
   return (
     <div className="max-w-md mx-auto text-center py-10">
-      <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-5" style={{ background: "rgba(155,127,212,0.18)", border: "1px solid rgba(155,127,212,0.5)" }}>
-        <CheckCircle2 className="w-7 h-7" style={{ color: "#C4A8F0" }} strokeWidth={1.5} />
+      <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-5" style={{ background: "rgba(139,92,246,0.18)", border: "1px solid rgba(139,92,246,0.5)" }}>
+        <CheckCircle2 className="w-7 h-7" style={{ color: "#A78BFA" }} strokeWidth={1.5} />
       </div>
-      <p className="font-grotesk uppercase tracking-wider text-[18px] mb-2" style={{ color: "#EDE0FF" }}>Position Transferred</p>
-      <p className="font-mono text-[11px] max-w-[320px] mx-auto leading-relaxed" style={{ color: "rgba(196,168,240,0.6)" }}>
-        Successfully sent to <span style={{ color: "#C4A8F0" }}>{shortAddr(recipient as `0x${string}`)}</span>
+      <p className="font-grotesk uppercase tracking-wider text-[18px] mb-2" style={{ color: "#FFFFFF" }}>Position Transferred</p>
+      <p className="font-mono text-[11px] max-w-[320px] mx-auto leading-relaxed" style={{ color: "rgba(255,255,255,0.6)" }}>
+        Successfully sent to <span style={{ color: "#A78BFA" }}>{shortAddr(recipient as `0x${string}`)}</span>
       </p>
       <button
         onClick={onDone}
         className="mt-7 px-6 py-3 rounded-xl font-grotesk text-[12px] uppercase tracking-wider transition active:scale-[0.99]"
-        style={{ background: "rgba(155,127,212,0.18)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.45)" }}
+        style={{ background: "rgba(139,92,246,0.18)", color: "#FFFFFF", border: "1px solid rgba(139,92,246,0.45)" }}
       >
         Transfer Another
       </button>

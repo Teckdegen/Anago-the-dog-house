@@ -40,28 +40,28 @@ function FarmPage() {
       <div className="max-w-[1280px] mx-auto px-5 sm:px-8 lg:px-14 pt-8 pb-20">
         <div className="flex items-start justify-between gap-4 mb-7">
           <div>
-            <h1 className="font-grotesk uppercase text-[22px] sm:text-[28px] leading-none tracking-tight" style={{ color: "#EDE0FF" }}>Stream Farms</h1>
-            <p className="font-mono text-[10px] mt-1 tracking-wide" style={{ color: "rgba(196,168,240,0.55)" }}>
+            <h1 className="font-grotesk uppercase text-[22px] sm:text-[28px] leading-none tracking-tight" style={{ color: "#FFFFFF" }}>Stream Farms</h1>
+            <p className="font-mono text-[10px] mt-1 tracking-wide" style={{ color: "rgba(255,255,255,0.55)" }}>
               Continuous reward streaming · Deposit · Earn · Withdraw anytime
             </p>
           </div>
         </div>
 
         <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
-          <div className="flex items-center gap-0.5 p-1 rounded-full" style={{ background: "rgba(155,127,212,0.08)", border: "1px solid rgba(155,127,212,0.25)" }}>
+          <div className="flex items-center gap-0.5 p-1 rounded-full" style={{ background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.25)" }}>
             {TABS.map((t) => (
               <button key={t} onClick={() => setActiveTab(t)}
                 className="px-4 py-1.5 rounded-full font-grotesk text-[11px] uppercase tracking-wider transition whitespace-nowrap"
-                style={activeTab === t ? { background: "rgba(155,127,212,0.35)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.6)" } : { color: "rgba(196,168,240,0.5)" }}>
+                style={activeTab === t ? { background: "rgba(139,92,246,0.35)", color: "#FFFFFF", border: "1px solid rgba(139,92,246,0.6)" } : { color: "rgba(255,255,255,0.5)" }}>
                 {t}
               </button>
             ))}
           </div>
           {activeTab === "All Farms" && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-full" style={{ background: "rgba(155,127,212,0.08)", border: "1px solid rgba(155,127,212,0.25)" }}>
-              <Search className="w-3.5 h-3.5" style={{ color: "rgba(196,168,240,0.5)" }} strokeWidth={1.5} />
+            <div className="flex items-center gap-2 px-3 py-2 rounded-full" style={{ background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.25)" }}>
+              <Search className="w-3.5 h-3.5" style={{ color: "rgba(255,255,255,0.5)" }} strokeWidth={1.5} />
               <input type="text" placeholder="Search farms…" value={search} onChange={(e) => setSearch(e.target.value)}
-                className="bg-transparent font-mono text-[11px] outline-none w-32 sm:w-44" style={{ color: "#EDE0FF" }} />
+                className="bg-transparent font-mono text-[11px] outline-none w-32 sm:w-44" style={{ color: "#FFFFFF" }} />
             </div>
           )}
         </div>
@@ -80,13 +80,13 @@ function FarmPage() {
 function AllFarmsTab({ farmCount }: { farmCount: number }) {
   if (farmCount === 0) {
     return (
-      <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(155,127,212,0.35)" }}>
+      <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(139,92,246,0.35)" }}>
         <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
-          <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-4" style={{ background: "rgba(155,127,212,0.15)", border: "1px solid rgba(155,127,212,0.35)" }}>
-            <Sprout className="w-5 h-5" style={{ color: "rgba(196,168,240,0.7)" }} strokeWidth={1.5} />
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-4" style={{ background: "rgba(139,92,246,0.15)", border: "1px solid rgba(139,92,246,0.35)" }}>
+            <Sprout className="w-5 h-5" style={{ color: "rgba(255,255,255,0.7)" }} strokeWidth={1.5} />
           </div>
-          <p className="font-grotesk uppercase text-[14px] tracking-wider" style={{ color: "#EDE0FF" }}>No Farms Yet</p>
-          <p className="font-mono text-[11px] mt-2 max-w-[300px]" style={{ color: "rgba(196,168,240,0.55)" }}>
+          <p className="font-grotesk uppercase text-[14px] tracking-wider" style={{ color: "#FFFFFF" }}>No Farms Yet</p>
+          <p className="font-mono text-[11px] mt-2 max-w-[300px]" style={{ color: "rgba(255,255,255,0.55)" }}>
             Farms are created by the admin from the Admin dashboard. Check back soon!
           </p>
         </div>
@@ -111,7 +111,7 @@ function FarmCard({ farmId }: { farmId: number }) {
 
   const farmQ = useReadContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "getFarm", args: [BigInt(farmId)], query: { ...LIVE_CHAIN_QUERY, refetchInterval: 10_000 } });
   const data = farmQ.data as any;
-  if (!data) return <div className="rounded-xl p-5 animate-pulse h-36" style={{ border: "1px solid rgba(155,127,212,0.2)", background: "rgba(155,127,212,0.03)" }} />;
+  if (!data) return <div className="rounded-xl p-5 animate-pulse h-36" style={{ border: "1px solid rgba(139,92,246,0.2)", background: "rgba(139,92,246,0.03)" }} />;
 
   const [stakeToken, , totalStaked, active, lockDuration, earlyWithdrawBps, rewardStreamCount] = data;
   const rewardCount = Number(rewardStreamCount ?? 0);
@@ -119,7 +119,7 @@ function FarmCard({ farmId }: { farmId: number }) {
   const penaltyPct = Number(earlyWithdrawBps ?? 0) / 100;
 
   return (
-    <div className="rounded-xl p-5" style={{ border: "1px solid rgba(155,127,212,0.35)", background: "rgba(155,127,212,0.05)" }}>
+    <div className="rounded-xl p-5" style={{ border: "1px solid rgba(139,92,246,0.35)", background: "rgba(139,92,246,0.05)" }}>
       <FarmCardInner farmId={farmId} stakeToken={stakeToken} totalStaked={totalStaked} active={active} lockDays={lockDays} penaltyPct={penaltyPct} rewardCount={rewardCount} showDeposit={showDeposit} setShowDeposit={setShowDeposit} />
     </div>
   );
@@ -148,8 +148,8 @@ function FarmCardInner({ farmId, stakeToken, totalStaked, active, lockDays, pena
         <div className="flex items-center gap-3 min-w-0">
           <TokenIcon address={stakeToken} symbol={symbol} size={36} logoUrl={remote?.logoURI} />
           <div className="min-w-0">
-            <p className="font-grotesk text-[15px] font-medium tracking-tight" style={{ color: "#EDE0FF" }}>{symbol} Farm</p>
-            <p className="font-mono text-[10px]" style={{ color: "rgba(196,168,240,0.45)" }}>
+            <p className="font-grotesk text-[15px] font-medium tracking-tight" style={{ color: "#FFFFFF" }}>{symbol} Farm</p>
+            <p className="font-mono text-[10px]" style={{ color: "rgba(255,255,255,0.45)" }}>
               {stakedFormatted} {symbol} staked · {rewardCount} stream{rewardCount !== 1 ? "s" : ""}
               {lockDays > 0 && ` · ${lockDays}d lock`}
               {penaltyPct > 0 && ` · ${penaltyPct}% exit fee`}
@@ -160,14 +160,14 @@ function FarmCardInner({ farmId, stakeToken, totalStaked, active, lockDays, pena
           {address && active && (
             <button onClick={() => setShowDeposit(true)}
               className="px-4 py-2 rounded-xl font-grotesk text-[10px] uppercase tracking-wider transition hover:opacity-90 active:scale-[0.98]"
-              style={{ background: "rgba(155,127,212,0.2)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.5)" }}>
+              style={{ background: "rgba(139,92,246,0.2)", color: "#FFFFFF", border: "1px solid rgba(139,92,246,0.5)" }}>
               Deposit
             </button>
           )}
           {rewardCount > 0 && (
             <button onClick={() => setExpanded(!expanded)}
-              className="w-7 h-7 rounded-full flex items-center justify-center transition hover:bg-[rgba(155,127,212,0.15)]"
-              style={{ color: "rgba(196,168,240,0.5)" }}>
+              className="w-7 h-7 rounded-full flex items-center justify-center transition hover:bg-[rgba(139,92,246,0.15)]"
+              style={{ color: "rgba(255,255,255,0.5)" }}>
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ transform: expanded ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
                 <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
@@ -177,15 +177,15 @@ function FarmCardInner({ farmId, stakeToken, totalStaked, active, lockDays, pena
       </div>
 
       {/* Stats row */}
-      <div className="flex items-center gap-6 font-mono text-[11px]" style={{ color: "rgba(196,168,240,0.7)" }}>
-        <span>TVL <span style={{ color: "#EDE0FF" }}>{stakedFormatted}</span></span>
-        <span>Balance <span style={{ color: "#EDE0FF" }}>{balanceFormatted}</span></span>
+      <div className="flex items-center gap-6 font-mono text-[11px]" style={{ color: "rgba(255,255,255,0.7)" }}>
+        <span>TVL <span style={{ color: "#FFFFFF" }}>{stakedFormatted}</span></span>
+        <span>Balance <span style={{ color: "#FFFFFF" }}>{balanceFormatted}</span></span>
         {!active && <span style={{ color: "rgba(255,100,100,0.8)" }}>Paused</span>}
       </div>
 
       {/* Expanded: reward streams */}
       {expanded && rewardCount > 0 && (
-        <div className="mt-4 pt-3" style={{ borderTop: "1px solid rgba(155,127,212,0.12)" }}>
+        <div className="mt-4 pt-3" style={{ borderTop: "1px solid rgba(139,92,246,0.12)" }}>
           <RewardStreams farmId={farmId} count={rewardCount} />
         </div>
       )}
@@ -199,9 +199,9 @@ function FarmCardInner({ farmId, stakeToken, totalStaked, active, lockDays, pena
 
 function StatBox({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
-    <div className="rounded-lg p-3" style={{ background: "rgba(155,127,212,0.08)", border: "1px solid rgba(155,127,212,0.2)" }}>
-      <p className="font-mono text-[9px] uppercase tracking-wider mb-1" style={{ color: "rgba(196,168,240,0.5)" }}>{label}</p>
-      <p className="font-mono text-[13px]" style={{ color: accent ? "#C4A8F0" : "#EDE0FF" }}>{value}</p>
+    <div className="rounded-lg p-3" style={{ background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.2)" }}>
+      <p className="font-mono text-[9px] uppercase tracking-wider mb-1" style={{ color: "rgba(255,255,255,0.5)" }}>{label}</p>
+      <p className="font-mono text-[13px]" style={{ color: accent ? "#A78BFA" : "#FFFFFF" }}>{value}</p>
     </div>
   );
 }
@@ -216,7 +216,7 @@ function RewardStreams({ farmId, count }: { farmId: number; count: number }) {
 
   return (
     <div className="mt-3 space-y-2">
-      <p className="font-mono text-[9px] uppercase tracking-wider" style={{ color: "rgba(196,168,240,0.5)" }}>Reward Streams</p>
+      <p className="font-mono text-[9px] uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.5)" }}>Reward Streams</p>
       {Array.from({ length: count }, (_, i) => {
         const d = streamsQ.data?.[i];
         if (d?.status !== "success") return null;
@@ -245,16 +245,16 @@ function RewardStreamRow({ token, rewardRate, startTime, endTime, totalBudget, t
     <div className="flex items-center justify-between gap-3 py-2">
       <div className="flex items-center gap-2 min-w-0 flex-1">
         <div className="min-w-0">
-          <p className="font-mono text-[11px]" style={{ color: "#EDE0FF" }}>{sym} <span style={{ color: "rgba(196,168,240,0.5)" }}>· {ratePerDay.toFixed(2)}/day</span></p>
+          <p className="font-mono text-[11px]" style={{ color: "#FFFFFF" }}>{sym} <span style={{ color: "rgba(255,255,255,0.5)" }}>· {ratePerDay.toFixed(2)}/day</span></p>
           <div className="flex items-center gap-2 mt-1">
-            <div className="w-24 h-1 rounded-full overflow-hidden" style={{ background: "rgba(155,127,212,0.15)" }}>
-              <div className="h-full rounded-full transition-all" style={{ width: `${progress}%`, background: "#9B7FD4" }} />
+            <div className="w-24 h-1 rounded-full overflow-hidden" style={{ background: "rgba(139,92,246,0.15)" }}>
+              <div className="h-full rounded-full transition-all" style={{ width: `${progress}%`, background: "#8B5CF6" }} />
             </div>
-            <span className="font-mono text-[8px]" style={{ color: "rgba(196,168,240,0.4)" }}>{isEnded ? "Ended" : isActive ? "Active" : "Pending"}</span>
+            <span className="font-mono text-[8px]" style={{ color: "rgba(255,255,255,0.4)" }}>{isEnded ? "Ended" : isActive ? "Active" : "Pending"}</span>
           </div>
         </div>
       </div>
-      <p className="font-mono text-[10px] shrink-0" style={{ color: "rgba(196,168,240,0.5)" }}>
+      <p className="font-mono text-[10px] shrink-0" style={{ color: "rgba(255,255,255,0.5)" }}>
         {Number(formatUnits(totalDistributed, dec)).toLocaleString()} / {Number(formatUnits(totalBudget, dec)).toLocaleString()} {sym}
       </p>
     </div>
@@ -355,14 +355,14 @@ function DepositModal({ farmId, stakeToken, symbol, decimals, userBalance, onClo
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(6,4,15,0.85)", backdropFilter: "blur(8px)" }} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="w-full max-w-md rounded-2xl overflow-hidden" style={{ background: "#0D0B18", border: "1px solid rgba(155,127,212,0.35)" }}>
-        <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: "1px solid rgba(155,127,212,0.2)" }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="w-full max-w-md rounded-2xl overflow-hidden" style={{ background: "#0D0B18", border: "1px solid rgba(139,92,246,0.35)" }}>
+        <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: "1px solid rgba(139,92,246,0.2)" }}>
           <div>
-            <p className="font-grotesk uppercase text-[15px] tracking-wider" style={{ color: "#EDE0FF" }}>Deposit {symbol}</p>
-            <p className="font-mono text-[9px] mt-0.5" style={{ color: "rgba(196,168,240,0.5)" }}>Farm #{farmId} · Earn streaming rewards</p>
+            <p className="font-grotesk uppercase text-[15px] tracking-wider" style={{ color: "#FFFFFF" }}>Deposit {symbol}</p>
+            <p className="font-mono text-[9px] mt-0.5" style={{ color: "rgba(255,255,255,0.5)" }}>Farm #{farmId} · Earn streaming rewards</p>
           </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center transition hover:bg-[rgba(155,127,212,0.15)]" style={{ color: "rgba(196,168,240,0.6)" }}>
+          <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center transition hover:bg-[rgba(139,92,246,0.15)]" style={{ color: "rgba(255,255,255,0.6)" }}>
             <X className="w-4 h-4" strokeWidth={2} />
           </button>
         </div>
@@ -370,24 +370,24 @@ function DepositModal({ farmId, stakeToken, symbol, decimals, userBalance, onClo
         <div className="px-6 py-5 space-y-4">
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="font-mono text-[9px] uppercase tracking-wider" style={{ color: "rgba(196,168,240,0.55)" }}>Amount</label>
-              <button onClick={() => setAmount(formatUnits(userBalance, decimals))} className="font-mono text-[9px] uppercase tracking-wider transition hover:opacity-80" style={{ color: "rgba(196,168,240,0.55)" }}>
+              <label className="font-mono text-[9px] uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.55)" }}>Amount</label>
+              <button onClick={() => setAmount(formatUnits(userBalance, decimals))} className="font-mono text-[9px] uppercase tracking-wider transition hover:opacity-80" style={{ color: "rgba(255,255,255,0.55)" }}>
                 Max: {Number(formatUnits(userBalance, decimals)).toLocaleString()}
               </button>
             </div>
             <input type="text" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="0.0"
               className="w-full bg-transparent rounded-xl px-4 py-3 font-grotesk text-[20px] outline-none"
-              style={{ color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.3)", background: "rgba(155,127,212,0.06)" }} />
+              style={{ color: "#FFFFFF", border: "1px solid rgba(139,92,246,0.3)", background: "rgba(139,92,246,0.06)" }} />
           </div>
 
           {/* Boost tier selector */}
           <div>
-            <label className="font-mono text-[9px] uppercase tracking-wider mb-2 block" style={{ color: "rgba(196,168,240,0.55)" }}>Lock Boost (optional)</label>
+            <label className="font-mono text-[9px] uppercase tracking-wider mb-2 block" style={{ color: "rgba(255,255,255,0.55)" }}>Lock Boost (optional)</label>
             <div className="grid grid-cols-2 gap-2">
               {[0, ...durations.map((_, i) => i + 1)].map((tier) => (
                 <button key={tier} onClick={() => setLockTier(tier)}
                   className="px-3 py-2 rounded-lg font-mono text-[10px] transition text-left"
-                  style={{ background: lockTier === tier ? "rgba(155,127,212,0.2)" : "rgba(155,127,212,0.05)", border: `1px solid ${lockTier === tier ? "rgba(155,127,212,0.5)" : "rgba(155,127,212,0.2)"}`, color: lockTier === tier ? "#EDE0FF" : "rgba(196,168,240,0.6)" }}>
+                  style={{ background: lockTier === tier ? "rgba(139,92,246,0.2)" : "rgba(139,92,246,0.05)", border: `1px solid ${lockTier === tier ? "rgba(139,92,246,0.5)" : "rgba(139,92,246,0.2)"}`, color: lockTier === tier ? "#FFFFFF" : "rgba(255,255,255,0.6)" }}>
                   {boostLabel(tier)}
                 </button>
               ))}
@@ -395,10 +395,10 @@ function DepositModal({ farmId, stakeToken, symbol, decimals, userBalance, onClo
           </div>
 
           {(approveTx.isPending || approveRcpt.isLoading) && (
-            <p className="font-mono text-[10px]" style={{ color: "rgba(196,168,240,0.7)" }}>Step 1 of 2 — Approving {symbol}…</p>
+            <p className="font-mono text-[10px]" style={{ color: "rgba(255,255,255,0.7)" }}>Step 1 of 2 — Approving {symbol}…</p>
           )}
           {(depositTx.isPending || depositRcpt.isLoading) && (
-            <p className="font-mono text-[10px]" style={{ color: "rgba(196,168,240,0.7)" }}>{needsApproval ? "Step 2 of 2 — " : ""}Depositing…</p>
+            <p className="font-mono text-[10px]" style={{ color: "rgba(255,255,255,0.7)" }}>{needsApproval ? "Step 2 of 2 — " : ""}Depositing…</p>
           )}
 
           <div className="flex gap-3">
@@ -407,7 +407,7 @@ function DepositModal({ farmId, stakeToken, symbol, decimals, userBalance, onClo
                 onClick={handleApproveAndDeposit}
                 disabled={!parsedAmount || parsedAmount === 0n || parsedAmount > userBalance || approveTx.isPending || approveRcpt.isLoading || depositTx.isPending || depositRcpt.isLoading}
                 className="flex-1 rounded-xl py-3 font-grotesk text-[12px] uppercase tracking-wider transition disabled:opacity-40 active:scale-[0.99]"
-                style={{ background: "rgba(155,127,212,0.2)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.5)" }}
+                style={{ background: "rgba(139,92,246,0.2)", color: "#FFFFFF", border: "1px solid rgba(139,92,246,0.5)" }}
               >
                 {approveTx.isPending || approveRcpt.isLoading ? "Approving…" : depositTx.isPending || depositRcpt.isLoading ? "Depositing…" : `Approve & Deposit`}
               </button>
@@ -416,7 +416,7 @@ function DepositModal({ farmId, stakeToken, symbol, decimals, userBalance, onClo
                 onClick={handleDeposit}
                 disabled={!parsedAmount || parsedAmount === 0n || parsedAmount > userBalance || depositTx.isPending || depositRcpt.isLoading}
                 className="flex-1 rounded-xl py-3 font-grotesk text-[12px] uppercase tracking-wider transition disabled:opacity-40 active:scale-[0.99]"
-                style={{ background: "rgba(155,127,212,0.25)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.55)" }}
+                style={{ background: "rgba(139,92,246,0.25)", color: "#FFFFFF", border: "1px solid rgba(139,92,246,0.55)" }}
               >
                 {depositTx.isPending || depositRcpt.isLoading ? "Depositing…" : "Deposit"}
               </button>
@@ -454,27 +454,27 @@ function MyPositionsTab() {
 
   if (!address) {
     return (
-      <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(155,127,212,0.35)" }}>
+      <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(139,92,246,0.35)" }}>
         <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
-          <Wallet className="w-8 h-8 mb-3" style={{ color: "rgba(196,168,240,0.5)" }} strokeWidth={1.5} />
-          <p className="font-grotesk uppercase text-[14px] tracking-wider" style={{ color: "#EDE0FF" }}>Connect Wallet</p>
-          <p className="font-mono text-[11px] mt-1.5" style={{ color: "rgba(196,168,240,0.55)" }}>Connect your wallet to view your positions</p>
+          <Wallet className="w-8 h-8 mb-3" style={{ color: "rgba(255,255,255,0.5)" }} strokeWidth={1.5} />
+          <p className="font-grotesk uppercase text-[14px] tracking-wider" style={{ color: "#FFFFFF" }}>Connect Wallet</p>
+          <p className="font-mono text-[11px] mt-1.5" style={{ color: "rgba(255,255,255,0.55)" }}>Connect your wallet to view your positions</p>
         </div>
       </div>
     );
   }
 
   if (positionsQ.isLoading) {
-    return <div className="text-center py-12"><div className="w-6 h-6 rounded-full border-2 animate-spin mx-auto" style={{ borderColor: "rgba(155,127,212,0.2)", borderTopColor: "rgba(155,127,212,0.8)" }} /></div>;
+    return <div className="text-center py-12"><div className="w-6 h-6 rounded-full border-2 animate-spin mx-auto" style={{ borderColor: "rgba(139,92,246,0.2)", borderTopColor: "rgba(139,92,246,0.8)" }} /></div>;
   }
 
   if (positions.length === 0) {
     return (
-      <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(155,127,212,0.35)" }}>
+      <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(139,92,246,0.35)" }}>
         <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
-          <Sprout className="w-8 h-8 mb-3" style={{ color: "rgba(196,168,240,0.5)" }} strokeWidth={1.5} />
-          <p className="font-grotesk uppercase text-[14px] tracking-wider" style={{ color: "#EDE0FF" }}>No Positions</p>
-          <p className="font-mono text-[11px] mt-1.5 max-w-[300px]" style={{ color: "rgba(196,168,240,0.55)" }}>Deposit into a farm to start earning streaming rewards.</p>
+          <Sprout className="w-8 h-8 mb-3" style={{ color: "rgba(255,255,255,0.5)" }} strokeWidth={1.5} />
+          <p className="font-grotesk uppercase text-[14px] tracking-wider" style={{ color: "#FFFFFF" }}>No Positions</p>
+          <p className="font-mono text-[11px] mt-1.5 max-w-[300px]" style={{ color: "rgba(255,255,255,0.55)" }}>Deposit into a farm to start earning streaming rewards.</p>
         </div>
       </div>
     );
@@ -482,7 +482,7 @@ function MyPositionsTab() {
 
   return (
     <div className="space-y-4">
-      <p className="font-mono text-[11px]" style={{ color: "rgba(196,168,240,0.6)" }}>{positions.length} position{positions.length !== 1 ? "s" : ""}</p>
+      <p className="font-mono text-[11px]" style={{ color: "rgba(255,255,255,0.6)" }}>{positions.length} position{positions.length !== 1 ? "s" : ""}</p>
       <div className="grid gap-4">
         {positions.map((id) => (
           <PositionCard
@@ -527,7 +527,7 @@ function PositionCard({ tokenId, onPositionChange }: { tokenId: bigint; onPositi
     }
   }, [withdrawRcpt.isSuccess]);
 
-  if (!posData) return <div className="rounded-xl p-5 animate-pulse h-28" style={{ border: "1px solid rgba(155,127,212,0.2)", background: "rgba(155,127,212,0.03)" }} />;
+  if (!posData) return <div className="rounded-xl p-5 animate-pulse h-28" style={{ border: "1px solid rgba(139,92,246,0.2)", background: "rgba(139,92,246,0.03)" }} />;
 
   const [farmId, amount, shares, depositTime, lockExpiry, boostMultiplier] = posData;
 
@@ -588,7 +588,7 @@ function PositionCardInner({ tokenId, farmId, amount, boost, locked, lockExpiry,
   const stakedFormatted = Number(formatUnits(amount ?? 0n, decimals)).toLocaleString();
 
   return (
-    <div className="rounded-xl p-5" style={{ border: "1px solid rgba(155,127,212,0.35)", background: "rgba(155,127,212,0.05)" }}>
+    <div className="rounded-xl p-5" style={{ border: "1px solid rgba(139,92,246,0.35)", background: "rgba(139,92,246,0.05)" }}>
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
@@ -598,10 +598,10 @@ function PositionCardInner({ tokenId, farmId, amount, boost, locked, lockExpiry,
             <NftImage contract={contracts.streamFarm} tokenId={tokenId} size={40} fallbackLetter={symbol} />
           )}
           <div className="min-w-0">
-            <p className="font-grotesk text-[14px] font-medium tracking-tight" style={{ color: "#EDE0FF" }}>
+            <p className="font-grotesk text-[14px] font-medium tracking-tight" style={{ color: "#FFFFFF" }}>
               {stakedFormatted} {symbol}
             </p>
-            <p className="font-mono text-[10px]" style={{ color: "rgba(196,168,240,0.45)" }}>
+            <p className="font-mono text-[10px]" style={{ color: "rgba(255,255,255,0.45)" }}>
               Position #{tokenId.toString()} · Farm #{farmId?.toString()}
               {boost > 1 && ` · ${boost}x boost`}
               {locked && ` · ${lockDaysLeft}d locked`}
@@ -612,18 +612,18 @@ function PositionCardInner({ tokenId, farmId, amount, boost, locked, lockExpiry,
           {hasPending && (
             <button onClick={onClaim} disabled={claimPending}
               className="px-3 py-1.5 rounded-xl font-grotesk text-[10px] uppercase tracking-wider transition hover:opacity-90 disabled:opacity-40"
-              style={{ background: "rgba(155,127,212,0.2)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.5)" }}>
+              style={{ background: "rgba(139,92,246,0.2)", color: "#FFFFFF", border: "1px solid rgba(139,92,246,0.5)" }}>
               {claimPending ? "..." : "Claim"}
             </button>
           )}
           <button onClick={onWithdraw} disabled={withdrawPending}
             className="px-3 py-1.5 rounded-xl font-grotesk text-[10px] uppercase tracking-wider transition hover:opacity-90 disabled:opacity-40"
-            style={{ background: "rgba(155,127,212,0.1)", color: "#C4A8F0", border: "1px solid rgba(155,127,212,0.3)" }}>
+            style={{ background: "rgba(139,92,246,0.1)", color: "#A78BFA", border: "1px solid rgba(139,92,246,0.3)" }}>
             {withdrawPending ? "..." : "Withdraw"}
           </button>
           <button onClick={() => setExpanded(!expanded)}
-            className="w-7 h-7 rounded-full flex items-center justify-center transition hover:bg-[rgba(155,127,212,0.15)]"
-            style={{ color: "rgba(196,168,240,0.5)" }}>
+            className="w-7 h-7 rounded-full flex items-center justify-center transition hover:bg-[rgba(139,92,246,0.15)]"
+            style={{ color: "rgba(255,255,255,0.5)" }}>
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ transform: expanded ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
               <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
@@ -633,18 +633,18 @@ function PositionCardInner({ tokenId, farmId, amount, boost, locked, lockExpiry,
 
       {/* Expanded details */}
       {expanded && (
-        <div className="mt-4 pt-3" style={{ borderTop: "1px solid rgba(155,127,212,0.12)" }}>
-          <div className="flex items-center gap-6 font-mono text-[11px] mb-3" style={{ color: "rgba(196,168,240,0.6)" }}>
-            <span>Staked <span style={{ color: "#EDE0FF" }}>{stakedFormatted} {symbol}</span></span>
-            <span>Boost <span style={{ color: "#EDE0FF" }}>{boost}x</span></span>
-            {locked && <span>Lock <span style={{ color: "#EDE0FF" }}>{lockDaysLeft}d left</span></span>}
+        <div className="mt-4 pt-3" style={{ borderTop: "1px solid rgba(139,92,246,0.12)" }}>
+          <div className="flex items-center gap-6 font-mono text-[11px] mb-3" style={{ color: "rgba(255,255,255,0.6)" }}>
+            <span>Staked <span style={{ color: "#FFFFFF" }}>{stakedFormatted} {symbol}</span></span>
+            <span>Boost <span style={{ color: "#FFFFFF" }}>{boost}x</span></span>
+            {locked && <span>Lock <span style={{ color: "#FFFFFF" }}>{lockDaysLeft}d left</span></span>}
           </div>
           {pendingAmounts.length > 0 && (
             <div>
-              <p className="font-mono text-[9px] uppercase tracking-wider mb-1.5" style={{ color: "rgba(196,168,240,0.4)" }}>Pending Rewards</p>
+              <p className="font-mono text-[9px] uppercase tracking-wider mb-1.5" style={{ color: "rgba(255,255,255,0.4)" }}>Pending Rewards</p>
               <div className="space-y-1">
                 {pendingAmounts.map((amt: bigint, i: number) => amt > 0n ? <PendingRewardLine key={i} token={pendingTokens[i]} amount={amt} /> : null)}
-                {!hasPending && <p className="font-mono text-[11px]" style={{ color: "rgba(196,168,240,0.4)" }}>None yet</p>}
+                {!hasPending && <p className="font-mono text-[11px]" style={{ color: "rgba(255,255,255,0.4)" }}>None yet</p>}
               </div>
             </div>
           )}
@@ -661,5 +661,5 @@ function PendingRewardLine({ token, amount }: { token: string; amount: bigint })
   const decimalsQ = useReadContract({ address: token as `0x${string}`, abi: ERC20_ABI, functionName: "decimals", query: { enabled: !!token } });
   const sym = (symbolQ.data as string) || "...";
   const dec = (decimalsQ.data as number) ?? 18;
-  return <p className="font-mono text-[11px]" style={{ color: "#EDE0FF" }}>{Number(formatUnits(amount, dec)).toLocaleString(undefined, { maximumFractionDigits: 6 })} {sym}</p>;
+  return <p className="font-mono text-[11px]" style={{ color: "#FFFFFF" }}>{Number(formatUnits(amount, dec)).toLocaleString(undefined, { maximumFractionDigits: 6 })} {sym}</p>;
 }

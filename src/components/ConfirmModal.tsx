@@ -39,7 +39,7 @@ export function ConfirmModal({
         onClick={(e) => e.stopPropagation()}
         className="w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl overflow-hidden"
         style={{
-          background: "#0D0B14",
+          background: "#0c0c10",
           border: "1px solid rgba(255,255,255,0.1)",
           borderBottom: "none",
           boxShadow: "0 -8px 40px rgba(0,0,0,0.5)",

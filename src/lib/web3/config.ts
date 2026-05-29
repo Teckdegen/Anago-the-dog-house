@@ -74,8 +74,8 @@ createAppKit({
   },
   themeMode: "dark",
   themeVariables: {
-    "--w3m-accent": "#9B7FD4",
-    "--w3m-color-mix": "#06040F",
+    "--w3m-accent": "#8B5CF6",
+    "--w3m-color-mix": "#000000",
     "--w3m-color-mix-strength": 20,
     "--w3m-border-radius-master": "2px",
   },

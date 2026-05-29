@@ -43,18 +43,18 @@ function OTCPage() {
       <div className="max-w-[1280px] mx-auto px-5 sm:px-8 lg:px-14 pt-8 pb-20">
         <div className="flex items-start justify-between gap-4 mb-7">
           <div>
-            <h1 className="font-grotesk uppercase text-[22px] sm:text-[28px] leading-none tracking-tight" style={{ color: "#EDE0FF" }}>OTC Market</h1>
-            <p className="font-mono text-[10px] mt-1 tracking-wide" style={{ color: "rgba(196,168,240,0.55)" }}>
+            <h1 className="font-grotesk uppercase text-[22px] sm:text-[28px] leading-none tracking-tight" style={{ color: "#FFFFFF" }}>OTC Market</h1>
+            <p className="font-mono text-[10px] mt-1 tracking-wide" style={{ color: "rgba(255,255,255,0.55)" }}>
               Buy and sell locked positions · Set your price · Peer-to-peer
             </p>
           </div>
         </div>
 
-        <div className="inline-flex items-center gap-0.5 p-1 rounded-full mb-6" style={{ background: "rgba(155,127,212,0.08)", border: "1px solid rgba(155,127,212,0.25)" }}>
+        <div className="inline-flex items-center gap-0.5 p-1 rounded-full mb-6" style={{ background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.25)" }}>
           {TABS.map((t) => (
             <button key={t} onClick={() => setActiveTab(t)}
               className="px-4 py-1.5 rounded-full font-grotesk text-[11px] uppercase tracking-wider transition whitespace-nowrap"
-              style={activeTab === t ? { background: "rgba(155,127,212,0.35)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.6)" } : { color: "rgba(196,168,240,0.5)" }}>
+              style={activeTab === t ? { background: "rgba(139,92,246,0.35)", color: "#FFFFFF", border: "1px solid rgba(139,92,246,0.6)" } : { color: "rgba(255,255,255,0.5)" }}>
               {t}
             </button>
           ))}
@@ -80,10 +80,10 @@ function BrowseTab({ totalListings }: { totalListings: number }) {
 
   if (activeIds.length === 0) {
     return (
-      <div className="rounded-xl py-20 text-center" style={{ border: "1px solid rgba(155,127,212,0.35)" }}>
-        <ShoppingBag className="w-8 h-8 mx-auto mb-3" style={{ color: "rgba(196,168,240,0.4)" }} strokeWidth={1.5} />
-        <p className="font-grotesk text-[14px]" style={{ color: "#EDE0FF" }}>No listings yet</p>
-        <p className="font-mono text-[11px] mt-1" style={{ color: "rgba(196,168,240,0.5)" }}>Be the first to list a position for sale.</p>
+      <div className="rounded-xl py-20 text-center" style={{ border: "1px solid rgba(139,92,246,0.35)" }}>
+        <ShoppingBag className="w-8 h-8 mx-auto mb-3" style={{ color: "rgba(255,255,255,0.4)" }} strokeWidth={1.5} />
+        <p className="font-grotesk text-[14px]" style={{ color: "#FFFFFF" }}>No listings yet</p>
+        <p className="font-mono text-[11px] mt-1" style={{ color: "rgba(255,255,255,0.5)" }}>Be the first to list a position for sale.</p>
       </div>
     );
   }
@@ -121,19 +121,19 @@ function MyListingsTab() {
 
   if (!address) {
     return (
-      <div className="rounded-xl py-20 text-center" style={{ border: "1px solid rgba(155,127,212,0.35)" }}>
-        <Wallet className="w-8 h-8 mx-auto mb-3" style={{ color: "rgba(196,168,240,0.4)" }} strokeWidth={1.5} />
-        <p className="font-grotesk text-[14px]" style={{ color: "#EDE0FF" }}>Connect Wallet</p>
+      <div className="rounded-xl py-20 text-center" style={{ border: "1px solid rgba(139,92,246,0.35)" }}>
+        <Wallet className="w-8 h-8 mx-auto mb-3" style={{ color: "rgba(255,255,255,0.4)" }} strokeWidth={1.5} />
+        <p className="font-grotesk text-[14px]" style={{ color: "#FFFFFF" }}>Connect Wallet</p>
       </div>
     );
   }
 
   if (activeMyIds.length === 0) {
     return (
-      <div className="rounded-xl py-20 text-center" style={{ border: "1px solid rgba(155,127,212,0.35)" }}>
-        <Tag className="w-8 h-8 mx-auto mb-3" style={{ color: "rgba(196,168,240,0.4)" }} strokeWidth={1.5} />
-        <p className="font-grotesk text-[14px]" style={{ color: "#EDE0FF" }}>No active listings</p>
-        <p className="font-mono text-[11px] mt-1" style={{ color: "rgba(196,168,240,0.5)" }}>Go to "Sell" to list a position.</p>
+      <div className="rounded-xl py-20 text-center" style={{ border: "1px solid rgba(139,92,246,0.35)" }}>
+        <Tag className="w-8 h-8 mx-auto mb-3" style={{ color: "rgba(255,255,255,0.4)" }} strokeWidth={1.5} />
+        <p className="font-grotesk text-[14px]" style={{ color: "#FFFFFF" }}>No active listings</p>
+        <p className="font-mono text-[11px] mt-1" style={{ color: "rgba(255,255,255,0.5)" }}>Go to "Sell" to list a position.</p>
       </div>
     );
   }
@@ -332,7 +332,7 @@ function ListingCard({ listingId, showBuy, showUnlist, showInactive }: { listing
   return (
     <>
     <SuccessModal open={successOpen} onClose={() => { setSuccessOpen(false); buyTx.reset(); pendingBuyHashRef.current = undefined; }} title="OTC Market" heading={successMsg.heading} subtext={successMsg.subtext} rows={[{ label: "Listing", value: `#${listingId.toString()}` }, { label: "Price", value: `${priceFormatted} ${paySym}` }]} />
-    <div className="rounded-xl p-5 flex items-center justify-between gap-4" style={{ border: "1px solid rgba(155,127,212,0.3)", background: "rgba(155,127,212,0.04)" }}>
+    <div className="rounded-xl p-5 flex items-center justify-between gap-4" style={{ border: "1px solid rgba(139,92,246,0.3)", background: "rgba(139,92,246,0.04)" }}>
       <div className="flex items-center gap-3 min-w-0">
         <NftImage
           contract={nftContract as `0x${string}`}
@@ -342,10 +342,10 @@ function ListingCard({ listingId, showBuy, showUnlist, showInactive }: { listing
         />
         <div className="min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <span className="px-2 py-0.5 rounded font-mono text-[9px] uppercase" style={{ background: "rgba(155,127,212,0.15)", color: "#C4A8F0", border: "1px solid rgba(155,127,212,0.3)" }}>{nftLabel}</span>
-            <p className="font-grotesk text-[14px] font-medium" style={{ color: "#EDE0FF" }}>#{tokenId?.toString()}</p>
+            <span className="px-2 py-0.5 rounded font-mono text-[9px] uppercase" style={{ background: "rgba(139,92,246,0.15)", color: "#A78BFA", border: "1px solid rgba(139,92,246,0.3)" }}>{nftLabel}</span>
+            <p className="font-grotesk text-[14px] font-medium" style={{ color: "#FFFFFF" }}>#{tokenId?.toString()}</p>
           </div>
-          <p className="font-mono text-[10px]" style={{ color: "rgba(196,168,240,0.5)" }}>
+          <p className="font-mono text-[10px]" style={{ color: "rgba(255,255,255,0.5)" }}>
             Seller: {shortAddr(seller)} · Price: {priceFormatted} {paySym}
             {showBuy && address && !isSeller && (
               <> · Balance: {Number(formatUnits(payBalance, payDec)).toLocaleString()} {paySym}</>
@@ -365,7 +365,7 @@ function ListingCard({ listingId, showBuy, showUnlist, showInactive }: { listing
               onClick={handleApproveAndBuy}
               disabled={!canBuy || approveTx.isPending || approveRcpt.isLoading || buyTx.isPending || buyRcpt.isLoading}
               className="px-4 py-2 rounded-xl font-grotesk text-[10px] uppercase tracking-wider transition disabled:opacity-40"
-              style={{ background: "rgba(155,127,212,0.2)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.5)" }}
+              style={{ background: "rgba(139,92,246,0.2)", color: "#FFFFFF", border: "1px solid rgba(139,92,246,0.5)" }}
             >
               {approveTx.isPending || approveRcpt.isLoading ? "Approving…" : buyTx.isPending || buyRcpt.isLoading ? "Buying…" : "Approve & Buy"}
             </button>
@@ -374,7 +374,7 @@ function ListingCard({ listingId, showBuy, showUnlist, showInactive }: { listing
               onClick={handleBuy}
               disabled={!canBuy || buyTx.isPending || buyRcpt.isLoading}
               className="px-4 py-2 rounded-xl font-grotesk text-[10px] uppercase tracking-wider transition disabled:opacity-40"
-              style={{ background: "rgba(155,127,212,0.2)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.5)" }}
+              style={{ background: "rgba(139,92,246,0.2)", color: "#FFFFFF", border: "1px solid rgba(139,92,246,0.5)" }}
             >
               {buyTx.isPending || buyRcpt.isLoading ? "Buying…" : "Buy"}
             </button>
@@ -383,11 +383,11 @@ function ListingCard({ listingId, showBuy, showUnlist, showInactive }: { listing
         {showUnlist && isSeller && (
           <button onClick={handleUnlist} disabled={unlistTx.isPending || unlistRcpt.isLoading}
             className="px-4 py-2 rounded-xl font-grotesk text-[10px] uppercase tracking-wider transition disabled:opacity-40"
-            style={{ background: "rgba(155,127,212,0.1)", color: "#C4A8F0", border: "1px solid rgba(155,127,212,0.3)" }}>
+            style={{ background: "rgba(139,92,246,0.1)", color: "#A78BFA", border: "1px solid rgba(139,92,246,0.3)" }}>
             {unlistTx.isPending ? "..." : "Unlist"}
           </button>
         )}
-        {isSeller && showBuy && <span className="font-mono text-[9px]" style={{ color: "rgba(196,168,240,0.4)" }}>Your listing</span>}
+        {isSeller && showBuy && <span className="font-mono text-[9px]" style={{ color: "rgba(255,255,255,0.4)" }}>Your listing</span>}
       </div>
     </div>
     </>
@@ -481,9 +481,9 @@ function SellTab() {
 
   if (!address) {
     return (
-      <div className="rounded-xl py-20 text-center" style={{ border: "1px solid rgba(155,127,212,0.35)" }}>
-        <Wallet className="w-8 h-8 mx-auto mb-3" style={{ color: "rgba(196,168,240,0.4)" }} strokeWidth={1.5} />
-        <p className="font-grotesk text-[14px]" style={{ color: "#EDE0FF" }}>Connect Wallet</p>
+      <div className="rounded-xl py-20 text-center" style={{ border: "1px solid rgba(139,92,246,0.35)" }}>
+        <Wallet className="w-8 h-8 mx-auto mb-3" style={{ color: "rgba(255,255,255,0.4)" }} strokeWidth={1.5} />
+        <p className="font-grotesk text-[14px]" style={{ color: "#FFFFFF" }}>Connect Wallet</p>
       </div>
     );
   }
@@ -493,22 +493,22 @@ function SellTab() {
     <SuccessModal open={listSuccess} onClose={() => setListSuccess(false)} title="OTC Market" heading="Position Listed" subtext="Your position is now for sale on the OTC market." rows={[{ label: "Type", value: selected?.label || "—" }, { label: "Token ID", value: `#${selected?.tokenId || "—"}` }]} />
     <div className="space-y-6">
       {/* Step 1: Pick a position */}
-      <div className="rounded-xl p-5" style={{ border: "1px solid rgba(155,127,212,0.35)", background: "rgba(155,127,212,0.04)" }}>
-        <p className="font-grotesk text-[14px] font-medium mb-4" style={{ color: "#EDE0FF" }}>Select Position to Sell</p>
+      <div className="rounded-xl p-5" style={{ border: "1px solid rgba(139,92,246,0.35)", background: "rgba(139,92,246,0.04)" }}>
+        <p className="font-grotesk text-[14px] font-medium mb-4" style={{ color: "#FFFFFF" }}>Select Position to Sell</p>
         <UserPositionsList selected={selected} onSelect={setSelected} />
       </div>
 
       {/* Step 2: Set price (only shows after selecting) */}
       {selected && (
-        <div className="rounded-xl p-5" style={{ border: "1px solid rgba(155,127,212,0.35)", background: "rgba(155,127,212,0.04)" }}>
-          <p className="font-grotesk text-[14px] font-medium mb-1" style={{ color: "#EDE0FF" }}>Set Price</p>
-          <p className="font-mono text-[10px] mb-4" style={{ color: "rgba(196,168,240,0.5)" }}>
+        <div className="rounded-xl p-5" style={{ border: "1px solid rgba(139,92,246,0.35)", background: "rgba(139,92,246,0.04)" }}>
+          <p className="font-grotesk text-[14px] font-medium mb-1" style={{ color: "#FFFFFF" }}>Set Price</p>
+          <p className="font-mono text-[10px] mb-4" style={{ color: "rgba(255,255,255,0.5)" }}>
             Selling: {selected.label} #{selected.tokenId}
           </p>
 
           <div className="space-y-4">
             <div>
-              <label className="font-mono text-[9px] uppercase tracking-wider mb-1.5 block" style={{ color: "rgba(196,168,240,0.55)" }}>
+              <label className="font-mono text-[9px] uppercase tracking-wider mb-1.5 block" style={{ color: "rgba(255,255,255,0.55)" }}>
                 Payment (MON or ERC-20 token)
               </label>
               <TokenPicker
@@ -530,10 +530,10 @@ function SellTab() {
               />
             </div>
             <div>
-              <label className="font-mono text-[9px] uppercase tracking-wider mb-1.5 block" style={{ color: "rgba(196,168,240,0.55)" }}>Price</label>
+              <label className="font-mono text-[9px] uppercase tracking-wider mb-1.5 block" style={{ color: "rgba(255,255,255,0.55)" }}>Price</label>
               <input type="text" value={price} onChange={(e) => setPrice(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="100"
                 className="w-full rounded-xl px-4 py-2.5 font-mono text-[12px] outline-none"
-                style={{ background: "rgba(155,127,212,0.06)", border: "1px solid rgba(155,127,212,0.3)", color: "#EDE0FF" }} />
+                style={{ background: "rgba(139,92,246,0.06)", border: "1px solid rgba(139,92,246,0.3)", color: "#FFFFFF" }} />
             </div>
 
             {!isApproved ? (
@@ -541,19 +541,19 @@ function SellTab() {
                 onClick={handleApproveAndList}
                 disabled={approveTx.isPending || approveRcpt.isLoading || listTx.isPending || listRcpt.isLoading}
                 className="w-full rounded-xl py-3 font-grotesk text-[11px] uppercase tracking-wider transition disabled:opacity-40"
-                style={{ background: "rgba(155,127,212,0.2)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.5)" }}
+                style={{ background: "rgba(139,92,246,0.2)", color: "#FFFFFF", border: "1px solid rgba(139,92,246,0.5)" }}
               >
                 {approveTx.isPending || approveRcpt.isLoading ? "Approving…" : listTx.isPending || listRcpt.isLoading ? "Listing…" : "Approve & List"}
               </button>
             ) : (
               <button onClick={handleList} disabled={!paymentToken || !price || listTx.isPending || listRcpt.isLoading}
                 className="w-full rounded-xl py-3 font-grotesk text-[11px] uppercase tracking-wider transition disabled:opacity-40"
-                style={{ background: "rgba(155,127,212,0.2)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.5)" }}>
+                style={{ background: "rgba(139,92,246,0.2)", color: "#FFFFFF", border: "1px solid rgba(139,92,246,0.5)" }}>
                 {listTx.isPending || listRcpt.isLoading ? "Listing..." : "List for Sale"}
               </button>
             )}
 
-            {listRcpt.isSuccess && <p className="font-mono text-[10px]" style={{ color: "#C4A8F0" }}>✓ Listed!</p>}
+            {listRcpt.isSuccess && <p className="font-mono text-[10px]" style={{ color: "#A78BFA" }}>✓ Listed!</p>}
             {(listTx.error || approveTx.error) && <p className="font-mono text-[10px]" style={{ color: "rgba(255,100,100,0.9)" }}>{((listTx.error || approveTx.error) as any)?.shortMessage || (listTx.error || approveTx.error)?.message}</p>}
           </div>
         </div>
@@ -610,7 +610,7 @@ function UserPositionsList({ selected, onSelect }: { selected: any; onSelect: (s
   ];
 
   if (allPositions.length === 0) {
-    return <p className="font-mono text-[11px] py-4 text-center" style={{ color: "rgba(196,168,240,0.5)" }}>No active positions found.</p>;
+    return <p className="font-mono text-[11px] py-4 text-center" style={{ color: "rgba(255,255,255,0.5)" }}>No active positions found.</p>;
   }
 
   return (
@@ -620,18 +620,18 @@ function UserPositionsList({ selected, onSelect }: { selected: any; onSelect: (s
         return (
           <button key={`${pos.contract}-${pos.tokenId}`} onClick={() => onSelect(isSelected ? null : pos)}
             className="w-full text-left p-3 rounded-xl transition"
-            style={{ background: isSelected ? "rgba(155,127,212,0.2)" : "rgba(155,127,212,0.06)", border: `1px solid ${isSelected ? "rgba(155,127,212,0.6)" : "rgba(155,127,212,0.2)"}` }}>
+            style={{ background: isSelected ? "rgba(139,92,246,0.2)" : "rgba(139,92,246,0.06)", border: `1px solid ${isSelected ? "rgba(139,92,246,0.6)" : "rgba(139,92,246,0.2)"}` }}>
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0">
                 <NftImage contract={pos.contract} tokenId={BigInt(pos.tokenId)} size={44} fallbackLetter={pos.label} />
                 <div className="min-w-0">
-                  <span className="px-2 py-0.5 rounded font-mono text-[8px] uppercase" style={{ background: "rgba(155,127,212,0.15)", color: "#C4A8F0" }}>{pos.label}</span>
-                  <span className="font-mono text-[12px] ml-2" style={{ color: "#EDE0FF" }}>#{pos.tokenId}</span>
+                  <span className="px-2 py-0.5 rounded font-mono text-[8px] uppercase" style={{ background: "rgba(139,92,246,0.15)", color: "#A78BFA" }}>{pos.label}</span>
+                  <span className="font-mono text-[12px] ml-2" style={{ color: "#FFFFFF" }}>#{pos.tokenId}</span>
                 </div>
               </div>
               {isSelected && (
-                <div className="w-4 h-4 rounded-full flex items-center justify-center" style={{ background: "#9B7FD4" }}>
-                  <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1.5 4L3.5 6L6.5 2" stroke="#0D0B14" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                <div className="w-4 h-4 rounded-full flex items-center justify-center" style={{ background: "#8B5CF6" }}>
+                  <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1.5 4L3.5 6L6.5 2" stroke="#0c0c10" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                 </div>
               )}
             </div>

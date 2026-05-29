@@ -31,7 +31,7 @@ export function NftImage({ contract, tokenId, size = 48, className = "", fallbac
     return (
       <div
         className={`rounded-lg shrink-0 animate-pulse ${className}`}
-        style={{ width: size, height: size, background: "rgba(155,127,212,0.12)" }}
+        style={{ width: size, height: size, background: "rgba(139,92,246,0.12)" }}
       />
     );
   }
@@ -44,7 +44,7 @@ export function NftImage({ contract, tokenId, size = 48, className = "", fallbac
         width={size}
         height={size}
         className={`rounded-lg shrink-0 object-cover ${className}`}
-        style={{ width: size, height: size, border: "1px solid rgba(155,127,212,0.35)" }}
+        style={{ width: size, height: size, border: "1px solid rgba(139,92,246,0.35)" }}
         onError={() => setFailed(true)}
       />
     );
@@ -57,9 +57,9 @@ export function NftImage({ contract, tokenId, size = 48, className = "", fallbac
         width: size,
         height: size,
         fontSize: size * 0.35,
-        background: "rgba(155,127,212,0.15)",
-        border: "1px solid rgba(155,127,212,0.35)",
-        color: "#C4A8F0",
+        background: "rgba(139,92,246,0.15)",
+        border: "1px solid rgba(139,92,246,0.35)",
+        color: "#A78BFA",
       }}
     >
       {letter}

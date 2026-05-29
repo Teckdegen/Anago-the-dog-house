@@ -213,8 +213,8 @@ function VestingRowUI({ symbol, decimals, logoUrl, vesting, totalAmount, claimed
 
   return (
     <div
-      className="px-5 py-4 hover:bg-[rgba(155,127,212,0.03)] transition-colors"
-      style={{ borderBottom: isLast ? "none" : "1px solid rgba(155,127,212,0.15)" }}
+      className="px-5 py-4 hover:bg-[rgba(139,92,246,0.03)] transition-colors"
+      style={{ borderBottom: isLast ? "none" : "1px solid rgba(139,92,246,0.15)" }}
     >
       {/* Compact row: token, progress bar, action */}
       <div className="flex items-center gap-3">
@@ -223,13 +223,13 @@ function VestingRowUI({ symbol, decimals, logoUrl, vesting, totalAmount, claimed
           <TokenIcon address={vesting.token} symbol={symbol} size={28} logoUrl={logoUrl} />
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <p className="font-grotesk uppercase text-[12px] tracking-wider truncate" style={{ color: "#EDE0FF" }}>{symbol}</p>
-              <span className="font-mono text-[9px]" style={{ color: "rgba(196,168,240,0.4)" }}>#{vesting.id.toString()}</span>
+              <p className="font-grotesk uppercase text-[12px] tracking-wider truncate" style={{ color: "#FFFFFF" }}>{symbol}</p>
+              <span className="font-mono text-[9px]" style={{ color: "rgba(255,255,255,0.4)" }}>#{vesting.id.toString()}</span>
             </div>
             {/* Progress bar inline */}
-            <div className="relative w-full h-1.5 rounded-full overflow-hidden mt-1.5" style={{ background: "rgba(155,127,212,0.12)" }}>
-              <div className="absolute left-0 top-0 h-full rounded-full transition-all duration-500" style={{ width: `${Math.min(vestedPct, 100)}%`, background: "rgba(155,127,212,0.45)" }} />
-              <div className="absolute left-0 top-0 h-full rounded-full transition-all duration-500" style={{ width: `${Math.min(claimedPct, 100)}%`, background: "#9B7FD4" }} />
+            <div className="relative w-full h-1.5 rounded-full overflow-hidden mt-1.5" style={{ background: "rgba(139,92,246,0.12)" }}>
+              <div className="absolute left-0 top-0 h-full rounded-full transition-all duration-500" style={{ width: `${Math.min(vestedPct, 100)}%`, background: "rgba(139,92,246,0.45)" }} />
+              <div className="absolute left-0 top-0 h-full rounded-full transition-all duration-500" style={{ width: `${Math.min(claimedPct, 100)}%`, background: "#8B5CF6" }} />
               {hasCliff && duration > 0 && (
                 <div className="absolute top-0 h-full w-px" style={{ left: `${Math.min((cliff / duration) * 100, 100)}%`, background: "rgba(255,180,50,0.7)" }} />
               )}
@@ -242,18 +242,18 @@ function VestingRowUI({ symbol, decimals, logoUrl, vesting, totalAmount, claimed
           {vesting.revoked ? (
             <span className="font-mono text-[9px] uppercase" style={{ color: "rgba(255,100,100,0.7)" }}>Revoked</span>
           ) : justClaimed ? (
-            <span className="font-mono text-[9px] uppercase" style={{ color: "#C4A8F0" }}>Claimed ✓</span>
+            <span className="font-mono text-[9px] uppercase" style={{ color: "#A78BFA" }}>Claimed ✓</span>
           ) : claimable > 0n ? (
             <button
               onClick={doClaim}
               disabled={txPending}
               className="px-3 py-1.5 rounded-full font-grotesk text-[10px] uppercase tracking-wider disabled:opacity-50 transition"
-              style={{ background: "rgba(155,127,212,0.25)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.6)" }}
+              style={{ background: "rgba(139,92,246,0.25)", color: "#FFFFFF", border: "1px solid rgba(139,92,246,0.6)" }}
             >
               {txPending ? "…" : "Claim"}
             </button>
           ) : (
-            <span className="font-mono text-[9px] uppercase" style={{ color: fullyVested ? "#C4A8F0" : "rgba(155,127,212,0.55)" }}>
+            <span className="font-mono text-[9px] uppercase" style={{ color: fullyVested ? "#A78BFA" : "rgba(139,92,246,0.55)" }}>
               {inCliff ? "In cliff" : fullyVested ? "Done ✓" : "Vesting"}
             </span>
           )}
@@ -261,8 +261,8 @@ function VestingRowUI({ symbol, decimals, logoUrl, vesting, totalAmount, claimed
           {/* More button */}
           <button
             onClick={() => setExpanded(!expanded)}
-            className="w-6 h-6 rounded-full flex items-center justify-center transition hover:bg-[rgba(155,127,212,0.15)]"
-            style={{ color: "rgba(196,168,240,0.5)" }}
+            className="w-6 h-6 rounded-full flex items-center justify-center transition hover:bg-[rgba(139,92,246,0.15)]"
+            style={{ color: "rgba(255,255,255,0.5)" }}
           >
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ transform: expanded ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
               <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -273,36 +273,36 @@ function VestingRowUI({ symbol, decimals, logoUrl, vesting, totalAmount, claimed
 
       {/* Expanded details */}
       {expanded && (
-        <div className="mt-3 pt-3" style={{ borderTop: "1px solid rgba(155,127,212,0.1)" }}>
+        <div className="mt-3 pt-3" style={{ borderTop: "1px solid rgba(139,92,246,0.1)" }}>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-2">
             <div>
-              <p className="font-mono text-[8px] uppercase tracking-wider" style={{ color: "rgba(196,168,240,0.4)" }}>Total</p>
-              <p className="font-mono text-[11px] mt-0.5" style={{ color: "#EDE0FF" }}>{formatAmount(totalAmount, decimals)} {symbol}</p>
-              <p className="font-mono text-[9px] mt-0.5" style={{ color: "rgba(196,168,240,0.55)" }}>
+              <p className="font-mono text-[8px] uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.4)" }}>Total</p>
+              <p className="font-mono text-[11px] mt-0.5" style={{ color: "#FFFFFF" }}>{formatAmount(totalAmount, decimals)} {symbol}</p>
+              <p className="font-mono text-[9px] mt-0.5" style={{ color: "rgba(255,255,255,0.55)" }}>
                 {priceLoading ? "…" : totalUsd > 0 ? formatUsdTable(totalUsd) : "—"}
               </p>
             </div>
             <div>
-              <p className="font-mono text-[8px] uppercase tracking-wider" style={{ color: "rgba(196,168,240,0.4)" }}>Claimed</p>
-              <p className="font-mono text-[11px] mt-0.5" style={{ color: "#EDE0FF" }}>{formatAmount(claimed, decimals)} {symbol}</p>
+              <p className="font-mono text-[8px] uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.4)" }}>Claimed</p>
+              <p className="font-mono text-[11px] mt-0.5" style={{ color: "#FFFFFF" }}>{formatAmount(claimed, decimals)} {symbol}</p>
             </div>
             <div>
-              <p className="font-mono text-[8px] uppercase tracking-wider" style={{ color: "rgba(196,168,240,0.4)" }}>Claimable</p>
-              <p className="font-mono text-[11px] mt-0.5" style={{ color: claimable > 0n ? "#C4A8F0" : "rgba(196,168,240,0.6)" }}>{formatAmount(claimable, decimals)} {symbol}</p>
-              <p className="font-mono text-[9px] mt-0.5" style={{ color: "rgba(196,168,240,0.55)" }}>
+              <p className="font-mono text-[8px] uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.4)" }}>Claimable</p>
+              <p className="font-mono text-[11px] mt-0.5" style={{ color: claimable > 0n ? "#A78BFA" : "rgba(255,255,255,0.6)" }}>{formatAmount(claimable, decimals)} {symbol}</p>
+              <p className="font-mono text-[9px] mt-0.5" style={{ color: "rgba(255,255,255,0.55)" }}>
                 {priceLoading ? "…" : claimableUsd > 0 ? formatUsdTable(claimableUsd) : "—"}
               </p>
             </div>
             <div>
-              <p className="font-mono text-[8px] uppercase tracking-wider" style={{ color: "rgba(196,168,240,0.4)" }}>End Date</p>
-              <p className="font-mono text-[11px] mt-0.5" style={{ color: fullyVested ? "#C4A8F0" : "rgba(196,168,240,0.6)" }}>{endDate}</p>
+              <p className="font-mono text-[8px] uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.4)" }}>End Date</p>
+              <p className="font-mono text-[11px] mt-0.5" style={{ color: fullyVested ? "#A78BFA" : "rgba(255,255,255,0.6)" }}>{endDate}</p>
             </div>
           </div>
           <div className="flex items-center justify-between">
-            <span className="font-mono text-[10px]" style={{ color: "rgba(196,168,240,0.6)" }}>
+            <span className="font-mono text-[10px]" style={{ color: "rgba(255,255,255,0.6)" }}>
               {claimedPct.toFixed(1)}% claimed · {vestedPct.toFixed(1)}% vested
             </span>
-            <span className="font-mono text-[9px]" style={{ color: inCliff ? "rgba(255,180,50,0.85)" : fullyVested ? "#C4A8F0" : "rgba(196,168,240,0.5)" }}>
+            <span className="font-mono text-[9px]" style={{ color: inCliff ? "rgba(255,180,50,0.85)" : fullyVested ? "#A78BFA" : "rgba(255,255,255,0.5)" }}>
               {timeLabel}{hasCliff && cliffDate ? ` · cliff ${cliffDate}` : ""}
             </span>
           </div>
@@ -355,10 +355,10 @@ function VestingPage() {
 
         <div className="flex items-center justify-between gap-3 mb-7">
           <div>
-            <h1 className="font-grotesk uppercase text-[22px] sm:text-[28px] leading-none tracking-tight" style={{ color: "#EDE0FF" }}>
+            <h1 className="font-grotesk uppercase text-[22px] sm:text-[28px] leading-none tracking-tight" style={{ color: "#FFFFFF" }}>
               Vesting
             </h1>
-            <p className="font-mono text-[10px] mt-1 tracking-wide" style={{ color: "rgba(196,168,240,0.55)" }}>
+            <p className="font-mono text-[10px] mt-1 tracking-wide" style={{ color: "rgba(255,255,255,0.55)" }}>
               Linear &amp; cliff vesting · NFT positions · transferable
             </p>
           </div>
@@ -368,7 +368,7 @@ function VestingPage() {
         <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
           <div
             className="flex items-center gap-0.5 p-1 rounded-full"
-            style={{ background: "rgba(155,127,212,0.08)", border: "1px solid rgba(155,127,212,0.25)" }}
+            style={{ background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.25)" }}
           >
             {TABS.map((t) => (
               <button
@@ -377,8 +377,8 @@ function VestingPage() {
                 className="px-4 py-1.5 rounded-full font-grotesk text-[11px] uppercase tracking-wider transition whitespace-nowrap"
                 style={
                   activeTab === t
-                    ? { background: "rgba(155,127,212,0.35)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.6)" }
-                    : { color: "rgba(196,168,240,0.5)" }
+                    ? { background: "rgba(139,92,246,0.35)", color: "#FFFFFF", border: "1px solid rgba(139,92,246,0.6)" }
+                    : { color: "rgba(255,255,255,0.5)" }
                 }
               >
                 {t}
@@ -387,28 +387,28 @@ function VestingPage() {
           </div>
           <div
             className="flex items-center gap-2 px-3 py-2 rounded-full"
-            style={{ background: "rgba(155,127,212,0.08)", border: "1px solid rgba(155,127,212,0.25)" }}
+            style={{ background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.25)" }}
           >
-            <Search className="w-3.5 h-3.5" style={{ color: "rgba(196,168,240,0.5)" }} strokeWidth={1.5} />
+            <Search className="w-3.5 h-3.5" style={{ color: "rgba(255,255,255,0.5)" }} strokeWidth={1.5} />
             <input
               type="text"
               placeholder="Search by token or NFT ID…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="bg-transparent font-mono text-[11px] outline-none w-40 sm:w-56"
-              style={{ color: "#EDE0FF" }}
+              style={{ color: "#FFFFFF" }}
             />
           </div>
         </div>
 
-        <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(155,127,212,0.35)" }}>
+        <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(139,92,246,0.35)" }}>
           {!address ? (
             <Empty title="Wallet not connected" sub="Connect your wallet to see your schedules." />
           ) : isLoading ? (
             <div className="flex items-center justify-center py-16">
               <div
                 className="w-5 h-5 rounded-full border-2 animate-spin"
-                style={{ borderColor: "rgba(155,127,212,0.2)", borderTopColor: "rgba(155,127,212,0.8)" }}
+                style={{ borderColor: "rgba(139,92,246,0.2)", borderTopColor: "rgba(139,92,246,0.8)" }}
               />
             </div>
           ) : filtered.length === 0 ? (
@@ -439,12 +439,12 @@ function Empty({ title, sub }: { title: string; sub: string }) {
     <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
       <div
         className="w-10 h-10 rounded-xl flex items-center justify-center mb-4"
-        style={{ background: "rgba(155,127,212,0.12)", border: "1px solid rgba(155,127,212,0.3)" }}
+        style={{ background: "rgba(139,92,246,0.12)", border: "1px solid rgba(139,92,246,0.3)" }}
       >
-        <Timer className="w-4 h-4" style={{ color: "rgba(196,168,240,0.6)" }} strokeWidth={1.5} />
+        <Timer className="w-4 h-4" style={{ color: "rgba(255,255,255,0.6)" }} strokeWidth={1.5} />
       </div>
-      <p className="font-grotesk uppercase text-[13px] tracking-wider" style={{ color: "#EDE0FF" }}>{title}</p>
-      <p className="font-mono text-[10px] mt-1.5 max-w-[220px]" style={{ color: "rgba(196,168,240,0.55)" }}>{sub}</p>
+      <p className="font-grotesk uppercase text-[13px] tracking-wider" style={{ color: "#FFFFFF" }}>{title}</p>
+      <p className="font-mono text-[10px] mt-1.5 max-w-[220px]" style={{ color: "rgba(255,255,255,0.55)" }}>{sub}</p>
     </div>
   );
 }

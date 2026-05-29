@@ -59,7 +59,7 @@ export function TokenIcon({
         width={size}
         height={size}
         className="rounded-full shrink-0 object-cover"
-        style={{ width: size, height: size, border: "1px solid rgba(155,127,212,0.25)" }}
+        style={{ width: size, height: size, border: "1px solid rgba(139,92,246,0.25)" }}
         onError={() => {
           if (!failedPrimary && fallbackLogoUrl && displayUrl !== fallbackLogoUrl) {
             setFailedPrimary(true);
@@ -79,9 +79,9 @@ export function TokenIcon({
         width: size,
         height: size,
         fontSize: size * 0.4,
-        background: "rgba(155,127,212,0.15)",
-        border: "1px solid rgba(155,127,212,0.35)",
-        color: "rgba(196,168,240,0.85)",
+        background: "rgba(139,92,246,0.15)",
+        border: "1px solid rgba(139,92,246,0.35)",
+        color: "rgba(255,255,255,0.85)",
       }}
     >
       {letter}

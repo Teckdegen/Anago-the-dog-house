@@ -22,10 +22,10 @@ const HLS_SRC = "https://stream.mux.com/4IMYGcL01xjs7ek5ANO17JC4VQVUTsojZlnw4fXz
 
 // Cycling words with their accent colors
 const CYCLE_WORDS = [
-  { word: "Vesting", color: "#9B7FD4", href: "/vesting" },
-  { word: "Token Lock", color: "#7C5CBF", href: "/lock" },
-  { word: "CLMM", color: "#5B4FE8", href: "/clmm" },
-  { word: "Yield Farm", color: "#E8A0B0", href: "/farm" },
+  { word: "Vesting", color: "#8B5CF6", href: "/vesting" },
+  { word: "Token Lock", color: "#6D28D9", href: "/lock" },
+  { word: "CLMM", color: "#7C3AED", href: "/clmm" },
+  { word: "Yield Farm", color: "#A78BFA", href: "/farm" },
 ] as const;
 
 function XIcon({ className }: { className?: string }) {
@@ -78,7 +78,7 @@ function Index() {
   const tvlDisplay = tvlUsd == null ? "…" : formatUsdHero(tvlUsd);
 
   return (
-    <main className="text-cream min-h-screen overflow-x-hidden" style={{ background: "#06040F" }}>
+    <main className="text-cream min-h-screen overflow-x-hidden" style={{ background: "#000000" }}>
       <div className="texture-overlay" aria-hidden="true" />
 
       {/* ══════════════════════════════════════
@@ -91,15 +91,15 @@ function Index() {
           <HlsVideo src={HLS_SRC} className="absolute inset-0 w-full h-full object-cover object-center" />
           {/* dark overlay — heavier on left/center for text */}
           <div className="absolute inset-0" style={{
-            background: "linear-gradient(105deg, rgba(6,4,15,0.94) 0%, rgba(6,4,15,0.7) 45%, rgba(6,4,15,0.15) 100%)"
+            background: "linear-gradient(105deg, rgba(0,0,0,0.94) 0%, rgba(0,0,0,0.7) 45%, rgba(0,0,0,0.15) 100%)"
           }} />
           {/* bottom fade */}
           <div className="absolute bottom-0 left-0 right-0 h-40" style={{
-            background: "linear-gradient(to bottom, transparent, #06040F)"
+            background: "linear-gradient(to bottom, transparent, #000000)"
           }} />
           {/* purple tint */}
           <div className="absolute inset-0 pointer-events-none" style={{
-            background: "linear-gradient(135deg, rgba(91,79,232,0.1) 0%, transparent 55%)",
+            background: "linear-gradient(135deg, rgba(124,58,237,0.1) 0%, transparent 55%)",
             mixBlendMode: "screen"
           }} />
         </div>
@@ -117,9 +117,9 @@ function Index() {
             href="/dashboard"
             className="rounded-full px-5 py-2.5 font-grotesk text-[11px] uppercase tracking-wider transition hover:opacity-85 whitespace-nowrap"
             style={{
-              background: "linear-gradient(135deg, #9B7FD4, #5B4FE8)",
-              color: "#F5F0FF",
-              boxShadow: "0 4px 16px rgba(91,79,232,0.4)",
+              background: "linear-gradient(135deg, #8B5CF6, #7C3AED)",
+              color: "#FFFFFF",
+              boxShadow: "0 4px 16px rgba(124,58,237,0.4)",
             }}
           >
             Launch App
@@ -136,9 +136,9 @@ function Index() {
           {/* tag */}
           <p
             className="font-mono text-[10px] sm:text-[11px] uppercase tracking-[0.22em] mb-4 flex items-center gap-2 justify-center"
-            style={{ color: "#9B7FD4" }}
+            style={{ color: "#8B5CF6" }}
           >
-            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 animate-pulse" style={{ background: "#9B7FD4" }} />
+            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 animate-pulse" style={{ background: "#8B5CF6" }} />
             Powered by $ANAGO · Live on Monad
           </p>
 
@@ -188,7 +188,7 @@ function Index() {
       {/* ══════════════════════════════════════
           FOOTER — directly after hero
       ══════════════════════════════════════ */}
-      <footer style={{ background: "#06040F", borderTop: "1px solid rgba(155,127,212,0.08)" }}>
+      <footer style={{ background: "#000000", borderTop: "1px solid rgba(139,92,246,0.08)" }}>
         <div className="max-w-[1280px] mx-auto px-5 sm:px-8 lg:px-14 py-7 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
             <img src="/logo.png" alt="" className="w-6 h-6 rounded-md opacity-50" />
@@ -204,12 +204,12 @@ function Index() {
           <div className="flex items-center gap-2">
             <a href="#" aria-label="X (Twitter)"
               className="w-8 h-8 rounded-full flex items-center justify-center text-cream/30 hover:text-cream/70 transition"
-              style={{ border: "1px solid rgba(155,127,212,0.14)", background: "rgba(155,127,212,0.04)" }}>
+              style={{ border: "1px solid rgba(139,92,246,0.14)", background: "rgba(139,92,246,0.04)" }}>
               <XIcon className="w-3 h-3" />
             </a>
             <a href="#" aria-label="Telegram"
               className="w-8 h-8 rounded-full flex items-center justify-center text-cream/30 hover:text-cream/70 transition"
-              style={{ border: "1px solid rgba(155,127,212,0.14)", background: "rgba(155,127,212,0.04)" }}>
+              style={{ border: "1px solid rgba(139,92,246,0.14)", background: "rgba(139,92,246,0.04)" }}>
               <Send className="w-3 h-3" />
             </a>
           </div>

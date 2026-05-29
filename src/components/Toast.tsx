@@ -82,9 +82,9 @@ const KIND_STYLES: Record<ToastKind, {
   },
   info: {
     icon: Info,
-    iconColor: "rgba(155,127,212,0.9)",
-    border: "rgba(155,127,212,0.35)",
-    glow: "rgba(155,127,212,0.06)",
+    iconColor: "rgba(139,92,246,0.9)",
+    border: "rgba(139,92,246,0.35)",
+    glow: "rgba(139,92,246,0.06)",
     bg: "rgba(13,11,20,0.97)",
   },
 };
@@ -135,11 +135,11 @@ function ToastCard({ item, onDismiss }: { item: ToastItem; onDismiss: (id: numbe
 
       {/* Text */}
       <div className="flex-1 min-w-0">
-        <p className="font-grotesk uppercase text-[12px] tracking-wider leading-tight" style={{ color: "#EDE0FF" }}>
+        <p className="font-grotesk uppercase text-[12px] tracking-wider leading-tight" style={{ color: "#FFFFFF" }}>
           {item.title}
         </p>
         {item.body && (
-          <p className="font-mono text-[10px] mt-1 leading-relaxed" style={{ color: "rgba(196,168,240,0.65)" }}>
+          <p className="font-mono text-[10px] mt-1 leading-relaxed" style={{ color: "rgba(255,255,255,0.65)" }}>
             {item.body}
           </p>
         )}
@@ -159,7 +159,7 @@ function ToastCard({ item, onDismiss }: { item: ToastItem; onDismiss: (id: numbe
       <button
         onClick={handleDismiss}
         className="shrink-0 mt-0.5 transition hover:opacity-70"
-        style={{ color: "rgba(196,168,240,0.45)" }}
+        style={{ color: "rgba(255,255,255,0.45)" }}
         aria-label="Dismiss"
       >
         <X className="w-3.5 h-3.5" />

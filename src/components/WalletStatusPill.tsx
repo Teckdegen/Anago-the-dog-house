@@ -12,8 +12,8 @@ const triggerClass =
 
 const menuPanelStyle = {
   background: "#120E1F",
-  border: "1px solid rgba(155,127,212,0.28)",
-  color: "#EDE0FF",
+  border: "1px solid rgba(139,92,246,0.28)",
+  color: "#FFFFFF",
 } as const;
 
 /**
@@ -54,7 +54,7 @@ export function WalletStatusPill() {
         type="button"
         onClick={() => open()}
         className={`${triggerClass} uppercase font-grotesk text-[11px] tracking-wider`}
-        style={{ color: "#EDE0FF" }}
+        style={{ color: "#FFFFFF" }}
         aria-label="Connect wallet"
       >
         Connect
@@ -77,7 +77,7 @@ export function WalletStatusPill() {
       <button
         type="button"
         className={triggerClass}
-        style={{ color: "#EDE0FF" }}
+        style={{ color: "#FFFFFF" }}
         aria-label="Wallet menu"
         aria-expanded={menuOpen}
         aria-haspopup="menu"
@@ -97,12 +97,12 @@ export function WalletStatusPill() {
           style={menuPanelStyle}
         >
           <div className="px-2.5 py-2">
-            <p className="font-mono text-[11px] break-all" style={{ color: "#EDE0FF" }}>
+            <p className="font-mono text-[11px] break-all" style={{ color: "#FFFFFF" }}>
               {address}
             </p>
           </div>
 
-          <div className="my-1 h-px" style={{ background: "rgba(155,127,212,0.15)" }} />
+          <div className="my-1 h-px" style={{ background: "rgba(139,92,246,0.15)" }} />
 
           <ProfileMenuItem
             icon={<Settings2 className="w-4 h-4" />}
@@ -125,7 +125,7 @@ export function WalletStatusPill() {
             }}
           />
 
-          <div className="my-1 h-px" style={{ background: "rgba(155,127,212,0.15)" }} />
+          <div className="my-1 h-px" style={{ background: "rgba(139,92,246,0.15)" }} />
 
           <ProfileMenuItem
             icon={<LogOut className="w-4 h-4" />}
@@ -158,11 +158,11 @@ function ProfileMenuItem({
       type="button"
       role="menuitem"
       onClick={onClick}
-      className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 cursor-pointer font-mono text-[11px] outline-none hover:bg-[rgba(155,127,212,0.18)] text-left"
-      style={{ color: destructive ? "#F87171" : "#EDE0FF" }}
+      className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 cursor-pointer font-mono text-[11px] outline-none hover:bg-[rgba(139,92,246,0.18)] text-left"
+      style={{ color: destructive ? "#F87171" : "#FFFFFF" }}
     >
       {icon != null && (
-        <span style={{ color: destructive ? "#F87171" : "#9B7FD4" }}>{icon}</span>
+        <span style={{ color: destructive ? "#F87171" : "#8B5CF6" }}>{icon}</span>
       )}
       {label}
     </button>

@@ -176,7 +176,7 @@ export function SwapPanel({
             className="w-full py-3.5 rounded-2xl font-grotesk text-[11px] uppercase disabled:opacity-40"
             style={{
               background: compact ? clmm.purpleBtn : clmm.purpleSolid,
-              color: compact ? "#06040F" : clmm.text,
+              color: compact ? "#000000" : clmm.text,
               border: compact ? "none" : `1px solid ${clmm.borderStrong}`,
             }}
           >

@@ -184,7 +184,7 @@ function DashboardPage() {
         : activeLocks.length > 0
           ? `${activeLocks.length} active lock${activeLocks.length === 1 ? "" : "s"}`
           : "no active locks",
-      color: "#C4A8F0",
+      color: "#A78BFA",
       icon: LockKeyhole,
       href: "/lock",
     },
@@ -198,7 +198,7 @@ function DashboardPage() {
         activeVestings.length > 0
           ? `${activeVestings.length} schedule${activeVestings.length === 1 ? "" : "s"} · unclaimed`
           : "no active vestings",
-      color: "#9B7FD4",
+      color: "#8B5CF6",
       icon: Timer,
       href: "/vesting",
     },
@@ -216,7 +216,7 @@ function DashboardPage() {
           : farmStats.count > 0
             ? `${farmStats.count} deposit${farmStats.count === 1 ? "" : "s"} · ${farmStats.farmCount} farm${farmStats.farmCount === 1 ? "" : "s"} live`
             : `${farmStats.farmCount} farm${farmStats.farmCount === 1 ? "" : "s"} · deposit to earn`,
-      color: "#6B4FA8",
+      color: "#5B21B6",
       icon: Sprout,
       href: "/farm",
     },
@@ -232,7 +232,7 @@ function DashboardPage() {
         : clmmStats.count > 0
           ? `${clmmStats.count} Capricorn LP position${clmmStats.count === 1 ? "" : "s"} on Monad`
           : "explore pools · add liquidity",
-      color: "#4A2D7A",
+      color: "#4C1D95",
       icon: BarChart2,
       href: "/clmm",
     },
@@ -247,14 +247,14 @@ function DashboardPage() {
           <div className="flex items-center gap-3 mb-2">
             <p
               className="font-mono text-[9px] uppercase tracking-[0.22em]"
-              style={{ color: "rgba(196,168,240,0.7)" }}
+              style={{ color: "rgba(255,255,255,0.7)" }}
             >
               Net Worth
             </p>
             {/* USD / MON toggle */}
             <div
               className="flex items-center gap-0.5 p-0.5 rounded-full"
-              style={{ background: "rgba(155,127,212,0.12)", border: "1px solid rgba(155,127,212,0.3)" }}
+              style={{ background: "rgba(139,92,246,0.12)", border: "1px solid rgba(139,92,246,0.3)" }}
             >
               {(["USD", "MON"] as const).map((u) => (
                 <button
@@ -263,8 +263,8 @@ function DashboardPage() {
                   className="px-2.5 py-0.5 rounded-full font-mono text-[9px] uppercase tracking-wider transition"
                   style={
                     unit === u
-                      ? { background: "rgba(155,127,212,0.45)", color: "#EDE0FF" }
-                      : { color: "rgba(196,168,240,0.5)" }
+                      ? { background: "rgba(139,92,246,0.45)", color: "#FFFFFF" }
+                      : { color: "rgba(255,255,255,0.5)" }
                   }
                 >
                   {u}
@@ -275,13 +275,13 @@ function DashboardPage() {
           <p className="font-grotesk text-cream leading-none tracking-tight text-[42px] sm:text-[54px]">
             {displayValue}
           </p>
-          <p className="font-mono text-[9px] mt-2" style={{ color: "rgba(196,168,240,0.65)" }}>
+          <p className="font-mono text-[9px] mt-2" style={{ color: "rgba(255,255,255,0.65)" }}>
             {subtitle}
           </p>
         </div>
 
         {/* ── BREAKDOWN BAR ── */}
-        <div className="flex w-full h-2.5 rounded-full overflow-hidden gap-px mb-6" style={{ background: "rgba(155,127,212,0.1)" }}>
+        <div className="flex w-full h-2.5 rounded-full overflow-hidden gap-px mb-6" style={{ background: "rgba(139,92,246,0.1)" }}>
           {POSITIONS.map((p) => (
             <div
               key={p.label}
@@ -294,7 +294,7 @@ function DashboardPage() {
         {/* ── VALUE ROWS ── */}
         <div
           className="rounded-xl overflow-hidden"
-          style={{ border: "1px solid rgba(155,127,212,0.35)", background: "rgba(155,127,212,0.03)" }}
+          style={{ border: "1px solid rgba(139,92,246,0.35)", background: "rgba(139,92,246,0.03)" }}
         >
           {POSITIONS.map((p, i) => {
             const Icon = p.icon;
@@ -302,9 +302,9 @@ function DashboardPage() {
               <Link
                 key={p.label}
                 to={p.href}
-                className="flex items-center justify-between px-6 py-5 hover:bg-[rgba(155,127,212,0.06)] transition-colors"
+                className="flex items-center justify-between px-6 py-5 hover:bg-[rgba(139,92,246,0.06)] transition-colors"
                 style={{
-                  borderBottom: i < POSITIONS.length - 1 ? "1px solid rgba(155,127,212,0.15)" : "none",
+                  borderBottom: i < POSITIONS.length - 1 ? "1px solid rgba(139,92,246,0.15)" : "none",
                   display: "flex",
                 }}
               >
@@ -315,10 +315,10 @@ function DashboardPage() {
                   />
                   <Icon className="w-4 h-4" style={{ color: p.color }} strokeWidth={1.5} />
                   <div>
-                    <p className="font-grotesk uppercase text-[13px] tracking-wider" style={{ color: "#EDE0FF" }}>
+                    <p className="font-grotesk uppercase text-[13px] tracking-wider" style={{ color: "#FFFFFF" }}>
                       {p.label}
                     </p>
-                    <p className="font-mono text-[11px] mt-0.5" style={{ color: "rgba(196,168,240,0.65)" }}>
+                    <p className="font-mono text-[11px] mt-0.5" style={{ color: "rgba(255,255,255,0.65)" }}>
                       {p.sub}
                     </p>
                   </div>
@@ -326,7 +326,7 @@ function DashboardPage() {
                 <div className="flex items-center gap-4">
                   <p
                     className="font-grotesk text-[18px] leading-none tabular-nums"
-                    style={{ color: "#EDE0FF", opacity: isConnected ? 1 : 0.55 }}
+                    style={{ color: "#FFFFFF", opacity: isConnected ? 1 : 0.55 }}
                   >
                     {p.value}
                   </p>

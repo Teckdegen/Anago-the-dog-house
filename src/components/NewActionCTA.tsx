@@ -11,9 +11,9 @@ export function DesktopCTA({ label, onClick }: Props) {
       onClick={onClick}
       className="hidden lg:inline-flex items-center gap-2 rounded-xl px-4 py-2.5 font-grotesk text-[12px] uppercase tracking-wider transition active:scale-[0.98] hover:opacity-90"
       style={{
-        background: "rgba(155,127,212,0.2)",
-        color: "#EDE0FF",
-        border: "1px solid rgba(155,127,212,0.5)",
+        background: "rgba(139,92,246,0.2)",
+        color: "#FFFFFF",
+        border: "1px solid rgba(139,92,246,0.5)",
       }}
     >
       <Plus className="w-3.5 h-3.5" strokeWidth={2.2} />
@@ -31,9 +31,9 @@ export function MobileFAB({ label, onClick }: Props) {
       style={{
         bottom: "calc(76px + env(safe-area-inset-bottom, 0px) + 16px)",
         padding: "12px 18px",
-        background: "rgba(155,127,212,0.9)",
-        color: "#0D0B14",
-        boxShadow: "0 12px 32px rgba(0,0,0,0.45), 0 0 0 1px rgba(155,127,212,0.3) inset",
+        background: "rgba(139,92,246,0.85)",
+        color: "#FFFFFF",
+        boxShadow: "0 12px 32px rgba(0,0,0,0.45), 0 0 0 1px rgba(139,92,246,0.3) inset",
       }}
     >
       <Plus className="w-4 h-4" strokeWidth={2.4} />

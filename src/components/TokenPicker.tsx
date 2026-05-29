@@ -96,16 +96,16 @@ export function TokenPicker({ selected, onSelect, excludeNative, compact }: Prop
     <div className="space-y-3">
       <div
         className="flex items-center gap-2 px-3 py-2.5 rounded-xl"
-        style={{ background: "rgba(155,127,212,0.07)", border: "1px solid rgba(155,127,212,0.3)" }}
+        style={{ background: "rgba(139,92,246,0.07)", border: "1px solid rgba(139,92,246,0.3)" }}
       >
-        <Search className="w-3.5 h-3.5 shrink-0" style={{ color: "rgba(196,168,240,0.5)" }} strokeWidth={1.5} />
+        <Search className="w-3.5 h-3.5 shrink-0" style={{ color: "rgba(255,255,255,0.5)" }} strokeWidth={1.5} />
         <input
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Search your tokens…"
-          className="flex-1 bg-transparent font-mono text-[11px] outline-none placeholder:text-[rgba(155,127,212,0.4)]"
-          style={{ color: "#EDE0FF" }}
+          className="flex-1 bg-transparent font-mono text-[11px] outline-none placeholder:text-[rgba(139,92,246,0.4)]"
+          style={{ color: "#FFFFFF" }}
           spellCheck={false}
         />
         {input && (
@@ -113,7 +113,7 @@ export function TokenPicker({ selected, onSelect, excludeNative, compact }: Prop
             type="button"
             onClick={() => setInput("")}
             className="font-mono text-[10px] transition hover:opacity-80"
-            style={{ color: "rgba(196,168,240,0.45)" }}
+            style={{ color: "rgba(255,255,255,0.45)" }}
           >
             ✕
           </button>
@@ -121,7 +121,7 @@ export function TokenPicker({ selected, onSelect, excludeNative, compact }: Prop
       </div>
 
       {!wallet && (
-        <p className="font-mono text-[10px] text-center py-4" style={{ color: "rgba(196,168,240,0.55)" }}>
+        <p className="font-mono text-[10px] text-center py-4" style={{ color: "rgba(255,255,255,0.55)" }}>
           Connect wallet to load your token balances
         </p>
       )}
@@ -133,26 +133,26 @@ export function TokenPicker({ selected, onSelect, excludeNative, compact }: Prop
       )}
 
       {wallet && !hasBvKey && import.meta.env.DEV && (
-        <p className="font-mono text-[9px] text-center" style={{ color: "rgba(196,168,240,0.45)" }}>
+        <p className="font-mono text-[9px] text-center" style={{ color: "rgba(255,255,255,0.45)" }}>
           Add BLOCKVISION_API_KEY to .env.local (vite proxies /bv)
         </p>
       )}
 
       <div
         className={`rounded-xl overflow-hidden ${maxH} overflow-y-auto`}
-        style={{ border: "1px solid rgba(155,127,212,0.3)" }}
+        style={{ border: "1px solid rgba(139,92,246,0.3)" }}
       >
         {!wallet ? null : loadingBalances ? (
           <div className="flex flex-col items-center justify-center py-8">
-            <Loader2 className="w-5 h-5 animate-spin mb-2" style={{ color: "rgba(155,127,212,0.7)" }} />
-            <p className="font-mono text-[10px]" style={{ color: "rgba(196,168,240,0.6)" }}>
+            <Loader2 className="w-5 h-5 animate-spin mb-2" style={{ color: "rgba(139,92,246,0.7)" }} />
+            <p className="font-mono text-[10px]" style={{ color: "rgba(255,255,255,0.6)" }}>
               Loading balances from Zerion…
             </p>
           </div>
         ) : searchFiltered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 px-4">
-            <Coins className="w-6 h-6 mb-2" style={{ color: "rgba(155,127,212,0.5)" }} strokeWidth={1.5} />
-            <p className="font-mono text-[10px] text-center" style={{ color: "rgba(196,168,240,0.6)" }}>
+            <Coins className="w-6 h-6 mb-2" style={{ color: "rgba(139,92,246,0.5)" }} strokeWidth={1.5} />
+            <p className="font-mono text-[10px] text-center" style={{ color: "rgba(255,255,255,0.6)" }}>
               {input ? "No matching tokens" : "No tokens in this wallet"}
             </p>
             {!input && (
@@ -160,7 +160,7 @@ export function TokenPicker({ selected, onSelect, excludeNative, compact }: Prop
                 type="button"
                 onClick={() => setShowManual(true)}
                 className="mt-3 font-mono text-[9px] uppercase tracking-wider transition hover:opacity-80"
-                style={{ color: "rgba(155,127,212,0.7)" }}
+                style={{ color: "rgba(139,92,246,0.7)" }}
               >
                 + Add by contract address
               </button>
@@ -175,16 +175,16 @@ export function TokenPicker({ selected, onSelect, excludeNative, compact }: Prop
                 key={token.address}
                 type="button"
                 onClick={() => onSelect(token)}
-                className="w-full text-left p-3 relative transition hover:bg-[rgba(155,127,212,0.08)]"
+                className="w-full text-left p-3 relative transition hover:bg-[rgba(139,92,246,0.08)]"
                 style={{
-                  background: isSel ? "rgba(155,127,212,0.12)" : "transparent",
-                  borderBottom: i < searchFiltered.length - 1 ? "1px solid rgba(155,127,212,0.15)" : "none",
+                  background: isSel ? "rgba(139,92,246,0.12)" : "transparent",
+                  borderBottom: i < searchFiltered.length - 1 ? "1px solid rgba(139,92,246,0.15)" : "none",
                 }}
               >
                 {isSel && (
                   <span
                     className="absolute top-3 right-3 w-4 h-4 rounded-full flex items-center justify-center"
-                    style={{ background: "#9B7FD4", color: "#0D0B14" }}
+                    style={{ background: "#8B5CF6", color: "#0c0c10" }}
                   >
                     <Check className="w-2.5 h-2.5" strokeWidth={3} />
                   </span>
@@ -192,18 +192,18 @@ export function TokenPicker({ selected, onSelect, excludeNative, compact }: Prop
                 <div className="flex items-center gap-2.5 pr-6">
                   <TokenIcon address={token.address} symbol={token.symbol} size={32} logoUrl={token.logoURI} />
                   <div className="min-w-0 flex-1">
-                    <p className="font-grotesk text-[12px] uppercase tracking-wider" style={{ color: "#EDE0FF" }}>
+                    <p className="font-grotesk text-[12px] uppercase tracking-wider" style={{ color: "#FFFFFF" }}>
                       {token.symbol}
                     </p>
-                    <p className="font-mono text-[9px] truncate" style={{ color: "rgba(196,168,240,0.45)" }}>
+                    <p className="font-mono text-[9px] truncate" style={{ color: "rgba(255,255,255,0.45)" }}>
                       {token.name}
                     </p>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="font-mono text-[11px] tabular-nums" style={{ color: "rgba(237,224,255,0.85)" }}>
+                    <p className="font-mono text-[11px] tabular-nums" style={{ color: "rgba(255,255,255,0.85)" }}>
                       {token.balanceFormatted}
                     </p>
-                    <p className="font-mono text-[8px]" style={{ color: "rgba(196,168,240,0.4)" }}>
+                    <p className="font-mono text-[8px]" style={{ color: "rgba(255,255,255,0.4)" }}>
                       {usd ?? "balance"}
                     </p>
                   </div>
@@ -218,46 +218,46 @@ export function TokenPicker({ selected, onSelect, excludeNative, compact }: Prop
         <button
           type="button"
           onClick={() => setShowManual(true)}
-          className="w-full text-center py-2 rounded-xl transition hover:bg-[rgba(155,127,212,0.08)]"
-          style={{ border: "1px dashed rgba(155,127,212,0.3)" }}
+          className="w-full text-center py-2 rounded-xl transition hover:bg-[rgba(139,92,246,0.08)]"
+          style={{ border: "1px dashed rgba(139,92,246,0.3)" }}
         >
-          <p className="font-mono text-[9px] uppercase tracking-wider" style={{ color: "rgba(196,168,240,0.6)" }}>
+          <p className="font-mono text-[9px] uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.6)" }}>
             + Add by contract address
           </p>
         </button>
       )}
 
       {showManual && (
-        <div className="space-y-2 pt-2" style={{ borderTop: "1px solid rgba(155,127,212,0.2)" }}>
+        <div className="space-y-2 pt-2" style={{ borderTop: "1px solid rgba(139,92,246,0.2)" }}>
           <div className="flex items-center justify-between">
-            <p className="font-mono text-[9px] uppercase tracking-wider" style={{ color: "rgba(196,168,240,0.5)" }}>
+            <p className="font-mono text-[9px] uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.5)" }}>
               Contract address
             </p>
             <button
               type="button"
               onClick={() => setShowManual(false)}
               className="font-mono text-[9px] uppercase tracking-wider transition hover:opacity-80"
-              style={{ color: "rgba(196,168,240,0.5)" }}
+              style={{ color: "rgba(255,255,255,0.5)" }}
             >
               Cancel
             </button>
           </div>
           <div
             className="flex items-center gap-2 px-3 py-2.5 rounded-xl"
-            style={{ background: "rgba(155,127,212,0.07)", border: "1px solid rgba(155,127,212,0.3)" }}
+            style={{ background: "rgba(139,92,246,0.07)", border: "1px solid rgba(139,92,246,0.3)" }}
           >
             {loading ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" style={{ color: "rgba(196,168,240,0.6)" }} />
+              <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" style={{ color: "rgba(255,255,255,0.6)" }} />
             ) : (
-              <Search className="w-3.5 h-3.5 shrink-0" style={{ color: "rgba(196,168,240,0.5)" }} strokeWidth={1.5} />
+              <Search className="w-3.5 h-3.5 shrink-0" style={{ color: "rgba(255,255,255,0.5)" }} strokeWidth={1.5} />
             )}
             <input
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value.trim())}
               placeholder="0x…"
-              className="flex-1 bg-transparent font-mono text-[11px] outline-none placeholder:text-[rgba(155,127,212,0.4)]"
-              style={{ color: "#EDE0FF" }}
+              className="flex-1 bg-transparent font-mono text-[11px] outline-none placeholder:text-[rgba(139,92,246,0.4)]"
+              style={{ color: "#FFFFFF" }}
               spellCheck={false}
             />
           </div>
@@ -277,21 +277,21 @@ export function TokenPicker({ selected, onSelect, excludeNative, compact }: Prop
               }}
               className="w-full text-left rounded-xl p-3 transition active:scale-[0.99]"
               style={{
-                background: "rgba(155,127,212,0.1)",
-                border: "1px solid rgba(155,127,212,0.4)",
+                background: "rgba(139,92,246,0.1)",
+                border: "1px solid rgba(139,92,246,0.4)",
               }}
             >
               <div className="flex items-center gap-2.5">
                 <TokenIcon address={manualResolved.address} symbol={manualResolved.symbol} size={32} />
                 <div className="min-w-0 flex-1">
-                  <p className="font-grotesk text-[13px] uppercase tracking-wider" style={{ color: "#EDE0FF" }}>
+                  <p className="font-grotesk text-[13px] uppercase tracking-wider" style={{ color: "#FFFFFF" }}>
                     {manualResolved.symbol}
                   </p>
-                  <p className="font-mono text-[9px] truncate" style={{ color: "rgba(196,168,240,0.5)" }}>
+                  <p className="font-mono text-[9px] truncate" style={{ color: "rgba(255,255,255,0.5)" }}>
                     {manualResolved.name}
                   </p>
                 </div>
-                <p className="font-mono text-[11px] tabular-nums" style={{ color: "rgba(237,224,255,0.85)" }}>
+                <p className="font-mono text-[11px] tabular-nums" style={{ color: "rgba(255,255,255,0.85)" }}>
                   {formatAmount(manualResolved.balance, manualResolved.decimals)}
                 </p>
               </div>
@@ -301,7 +301,7 @@ export function TokenPicker({ selected, onSelect, excludeNative, compact }: Prop
       )}
 
       {!loadingBalances && filteredBalances.length > 0 && !showManual && (
-        <p className="font-mono text-[9px] text-center" style={{ color: "rgba(196,168,240,0.45)" }}>
+        <p className="font-mono text-[9px] text-center" style={{ color: "rgba(255,255,255,0.45)" }}>
           {filteredBalances.length} token{filteredBalances.length !== 1 ? "s" : ""} · Zerion
         </p>
       )}

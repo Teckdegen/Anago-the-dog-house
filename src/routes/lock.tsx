@@ -35,8 +35,8 @@ export const Route = createFileRoute("/lock")({
   }),
 });
 
-const ACCENT = "#9B7FD4";
-const ACCENT_DIM = "rgba(155,127,212,0.55)";
+const ACCENT = "#8B5CF6";
+const ACCENT_DIM = "rgba(139,92,246,0.55)";
 const TABS = [
   "All Locks",
   "My Locks",
@@ -54,7 +54,7 @@ function RankBadge({ rank }: { rank: number }) {
     2: { bg: "rgba(192,192,192,0.15)", color: "#C0C0C0" },
     3: { bg: "rgba(205,127,50,0.15)", color: "#CD7F32" },
   };
-  const s = styles[rank] ?? { bg: "rgba(155,127,212,0.12)", color: "rgba(196,168,240,0.6)" };
+  const s = styles[rank] ?? { bg: "rgba(139,92,246,0.12)", color: "rgba(255,255,255,0.6)" };
   return (
     <span
       className="inline-flex items-center justify-center w-6 h-6 rounded-full font-grotesk text-[10px]"
@@ -185,8 +185,8 @@ function LockRow({
       />
 
       <div
-        className="grid sm:grid-cols-[2fr_1fr_1fr_1fr_1fr_100px] grid-cols-2 gap-2 px-5 py-3.5 items-center hover:bg-[rgba(155,127,212,0.04)] transition-colors"
-        style={{ borderBottom: isLast ? "none" : "1px solid rgba(155,127,212,0.15)" }}
+        className="grid sm:grid-cols-[2fr_1fr_1fr_1fr_1fr_100px] grid-cols-2 gap-2 px-5 py-3.5 items-center hover:bg-[rgba(139,92,246,0.04)] transition-colors"
+        style={{ borderBottom: isLast ? "none" : "1px solid rgba(139,92,246,0.15)" }}
       >
       <div className="flex items-center gap-2.5">
         <TokenIcon
@@ -196,27 +196,27 @@ function LockRow({
           logoUrl={logoUrl}
         />
         <div className="min-w-0">
-          <p className="font-grotesk uppercase text-[12px] tracking-wider truncate" style={{ color: "#EDE0FF" }}>{symbol}</p>
-          <p className="font-mono text-[9px] truncate" style={{ color: "rgba(196,168,240,0.5)" }}>
+          <p className="font-grotesk uppercase text-[12px] tracking-wider truncate" style={{ color: "#FFFFFF" }}>{symbol}</p>
+          <p className="font-mono text-[9px] truncate" style={{ color: "rgba(255,255,255,0.5)" }}>
             #{lockId.toString()} · {shortAddr(owner)}{isOwner ? " (you)" : ""}
           </p>
         </div>
       </div>
-      <div className="text-right font-grotesk text-[12px] tabular-nums" style={{ color: "rgba(237,224,255,0.9)" }}>
+      <div className="text-right font-grotesk text-[12px] tabular-nums" style={{ color: "rgba(255,255,255,0.9)" }}>
         {formatAmount(amount, decimals)}
       </div>
-      <div className="hidden sm:block text-right font-mono text-[10px] tabular-nums" style={{ color: "rgba(196,168,240,0.75)" }}>
+      <div className="hidden sm:block text-right font-mono text-[10px] tabular-nums" style={{ color: "rgba(255,255,255,0.75)" }}>
         {priceLoading ? "…" : lockUsd > 0 ? formatUsdTable(lockUsd) : "—"}
       </div>
-      <div className="hidden sm:block text-right font-mono text-[10px]" style={{ color: "rgba(196,168,240,0.6)" }}>
+      <div className="hidden sm:block text-right font-mono text-[10px]" style={{ color: "rgba(255,255,255,0.6)" }}>
         {formatDate(unlockAt)}
       </div>
-      <div className="hidden sm:block text-right font-mono text-[10px]" style={{ color: unlocked ? "#C4A8F0" : "rgba(196,168,240,0.6)" }}>
+      <div className="hidden sm:block text-right font-mono text-[10px]" style={{ color: unlocked ? "#A78BFA" : "rgba(255,255,255,0.6)" }}>
         {timeUntil(unlockAt)}
       </div>
       <div className="col-span-2 sm:col-span-1 flex sm:justify-end items-center gap-2">
         {localWithdrawn ? (
-          <span className="font-mono text-[9px] uppercase" style={{ color: "#C4A8F0" }}>Claimed ✓</span>
+          <span className="font-mono text-[9px] uppercase" style={{ color: "#A78BFA" }}>Claimed ✓</span>
         ) : canClaim ? (
           <button
             type="button"
@@ -224,16 +224,16 @@ function LockRow({
             disabled={tx.isPending || rcpt.isLoading}
             className="px-4 py-2 rounded-full font-grotesk text-[10px] uppercase tracking-wider disabled:opacity-50 shrink-0"
             style={{
-              background: "rgba(155,127,212,0.35)",
-              color: "#EDE0FF",
-              border: "1px solid rgba(155,127,212,0.7)",
-              boxShadow: "0 0 12px rgba(155,127,212,0.25)",
+              background: "rgba(139,92,246,0.35)",
+              color: "#FFFFFF",
+              border: "1px solid rgba(139,92,246,0.7)",
+              boxShadow: "0 0 12px rgba(139,92,246,0.25)",
             }}
           >
             {tx.isPending || rcpt.isLoading ? "Claiming…" : "Claim"}
           </button>
         ) : (
-          <span className="font-mono text-[9px] uppercase" style={{ color: unlocked ? "#C4A8F0" : "rgba(155,127,212,0.45)" }}>
+          <span className="font-mono text-[9px] uppercase" style={{ color: unlocked ? "#A78BFA" : "rgba(139,92,246,0.45)" }}>
             {unlocked ? (isOwner ? "Ready to claim" : "Unlocked") : timeUntil(unlockAt)}
           </span>
         )}
@@ -262,9 +262,9 @@ function TokenLeaderboard({
   });
 
   return (
-    <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(155,127,212,0.35)" }}>
+    <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(139,92,246,0.35)" }}>
       <div className="hidden sm:grid px-5 py-3 text-[9px] font-mono uppercase tracking-[0.2em]"
-        style={{ gridTemplateColumns: "40px 2fr 1fr 1fr", borderBottom: "1px solid rgba(155,127,212,0.2)", background: "rgba(155,127,212,0.08)", color: "rgba(196,168,240,0.6)" }}>
+        style={{ gridTemplateColumns: "40px 2fr 1fr 1fr", borderBottom: "1px solid rgba(139,92,246,0.2)", background: "rgba(139,92,246,0.08)", color: "rgba(255,255,255,0.6)" }}>
         <div>#</div>
         <div>Token</div>
         <div className="text-right">Total Locked</div>
@@ -295,23 +295,23 @@ function TokenLeaderboard({
 
           return (
             <div key={row.address}
-              className="grid sm:grid-cols-[40px_2fr_1fr_1fr] grid-cols-[40px_1fr_1fr] px-5 py-3.5 items-center hover:bg-[rgba(155,127,212,0.04)] transition-colors"
-              style={{ borderBottom: i < tokenLb.length - 1 ? "1px solid rgba(155,127,212,0.15)" : "none" }}>
+              className="grid sm:grid-cols-[40px_2fr_1fr_1fr] grid-cols-[40px_1fr_1fr] px-5 py-3.5 items-center hover:bg-[rgba(139,92,246,0.04)] transition-colors"
+              style={{ borderBottom: i < tokenLb.length - 1 ? "1px solid rgba(139,92,246,0.15)" : "none" }}>
               <RankBadge rank={i + 1} />
               <div className="flex items-center gap-2.5 min-w-0">
                 <TokenIcon address={row.address} symbol={sym} size={28} logoUrl={logoUrl} />
                 <div className="min-w-0">
-                  <p className="font-grotesk uppercase text-[12px] tracking-wider" style={{ color: "#EDE0FF" }}>{sym}</p>
-                  <p className="font-mono text-[9px] truncate" style={{ color: "rgba(196,168,240,0.45)" }}>{row.address}</p>
+                  <p className="font-grotesk uppercase text-[12px] tracking-wider" style={{ color: "#FFFFFF" }}>{sym}</p>
+                  <p className="font-mono text-[9px] truncate" style={{ color: "rgba(255,255,255,0.45)" }}>{row.address}</p>
                 </div>
               </div>
-              <div className="text-right font-grotesk text-[12px] tabular-nums" style={{ color: "rgba(237,224,255,0.9)" }}>
-                {formatAmount(row.amount, dec)} <span className="font-mono text-[9px]" style={{ color: "rgba(196,168,240,0.45)" }}>{sym}</span>
+              <div className="text-right font-grotesk text-[12px] tabular-nums" style={{ color: "rgba(255,255,255,0.9)" }}>
+                {formatAmount(row.amount, dec)} <span className="font-mono text-[9px]" style={{ color: "rgba(255,255,255,0.45)" }}>{sym}</span>
               </div>
               <div className="hidden sm:flex items-center justify-end gap-2">
                 {pct !== null ? (
                   <>
-                    <div className="w-16 h-1 rounded-full overflow-hidden" style={{ background: "rgba(155,127,212,0.2)" }}>
+                    <div className="w-16 h-1 rounded-full overflow-hidden" style={{ background: "rgba(139,92,246,0.2)" }}>
                       <div className="h-full rounded-full" style={{ width: `${Math.min(pct, 100)}%`, background: ACCENT }} />
                     </div>
                     <span className="font-mono text-[10px]" style={{ color: ACCENT_DIM }}>
@@ -319,7 +319,7 @@ function TokenLeaderboard({
                     </span>
                   </>
                 ) : (
-                  <span className="font-mono text-[10px]" style={{ color: "rgba(155,127,212,0.35)" }}>—</span>
+                  <span className="font-mono text-[10px]" style={{ color: "rgba(139,92,246,0.35)" }}>—</span>
                 )}
               </div>
             </div>
@@ -368,9 +368,9 @@ function UserLeaderboard({
   }, [uniqueTokens, tokenReads.data, tokenMeta]);
 
   return (
-    <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(155,127,212,0.35)" }}>
+    <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(139,92,246,0.35)" }}>
       <div className="hidden sm:grid px-5 py-3 text-[9px] font-mono uppercase tracking-[0.2em]"
-        style={{ gridTemplateColumns: "40px 2fr 1fr 1fr", borderBottom: "1px solid rgba(155,127,212,0.2)", background: "rgba(155,127,212,0.08)", color: "rgba(196,168,240,0.6)" }}>
+        style={{ gridTemplateColumns: "40px 2fr 1fr 1fr", borderBottom: "1px solid rgba(139,92,246,0.2)", background: "rgba(139,92,246,0.08)", color: "rgba(255,255,255,0.6)" }}>
         <div>#</div>
         <div>Locker</div>
         <div className="text-right">Locks</div>
@@ -392,33 +392,33 @@ function UserLeaderboard({
 
           return (
             <div key={row.address}
-              className="grid sm:grid-cols-[40px_2fr_1fr_1fr] grid-cols-[40px_1fr_1fr] px-5 py-3.5 items-start hover:bg-[rgba(155,127,212,0.04)] transition-colors"
-              style={{ borderBottom: i < userLb.length - 1 ? "1px solid rgba(155,127,212,0.15)" : "none" }}>
+              className="grid sm:grid-cols-[40px_2fr_1fr_1fr] grid-cols-[40px_1fr_1fr] px-5 py-3.5 items-start hover:bg-[rgba(139,92,246,0.04)] transition-colors"
+              style={{ borderBottom: i < userLb.length - 1 ? "1px solid rgba(139,92,246,0.15)" : "none" }}>
               <RankBadge rank={i + 1} />
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <p className="font-mono text-[11px] truncate" style={{ color: "#EDE0FF" }}>{shortAddr(row.address)}</p>
+                  <p className="font-mono text-[11px] truncate" style={{ color: "#FFFFFF" }}>{shortAddr(row.address)}</p>
                   {isMe && (
                     <span className="font-mono text-[9px] px-1.5 py-0.5 rounded"
-                      style={{ background: "rgba(155,127,212,0.2)", color: "#C4A8F0", border: "1px solid rgba(155,127,212,0.4)" }}>
+                      style={{ background: "rgba(139,92,246,0.2)", color: "#A78BFA", border: "1px solid rgba(139,92,246,0.4)" }}>
                       you
                     </span>
                   )}
                 </div>
-                <p className="font-mono text-[9px] mt-0.5 truncate" style={{ color: "rgba(196,168,240,0.4)" }}>{row.address}</p>
+                <p className="font-mono text-[9px] mt-0.5 truncate" style={{ color: "rgba(255,255,255,0.4)" }}>{row.address}</p>
               </div>
-              <div className="text-right font-mono text-[11px]" style={{ color: "rgba(196,168,240,0.65)" }}>
+              <div className="text-right font-mono text-[11px]" style={{ color: "rgba(255,255,255,0.65)" }}>
                 {userLocks.length}
               </div>
               <div className="text-right space-y-0.5">
                 {tokenEntries.length === 0 ? (
-                  <p className="font-mono text-[10px]" style={{ color: "rgba(155,127,212,0.4)" }}>—</p>
+                  <p className="font-mono text-[10px]" style={{ color: "rgba(139,92,246,0.4)" }}>—</p>
                 ) : tokenEntries.map(([tok, amt]) => {
                   const info = tokenInfo[tok] ?? { symbol: tok.slice(0, 6), decimals: 18 };
                   return (
-                    <p key={tok} className="font-grotesk text-[12px] tabular-nums" style={{ color: "rgba(237,224,255,0.9)" }}>
+                    <p key={tok} className="font-grotesk text-[12px] tabular-nums" style={{ color: "rgba(255,255,255,0.9)" }}>
                       {formatAmount(amt, info.decimals)}{" "}
-                      <span className="font-mono text-[9px]" style={{ color: "rgba(196,168,240,0.5)" }}>{info.symbol}</span>
+                      <span className="font-mono text-[9px]" style={{ color: "rgba(255,255,255,0.5)" }}>{info.symbol}</span>
                     </p>
                   );
                 })}
@@ -491,10 +491,10 @@ function LockPage() {
       <div className="max-w-[1280px] mx-auto px-5 sm:px-8 lg:px-14 pt-8 pb-20">
         <div className="flex items-center justify-between gap-3 mb-7">
           <div>
-            <h1 className="font-grotesk uppercase text-[22px] sm:text-[28px] leading-none tracking-tight" style={{ color: "#EDE0FF" }}>
+            <h1 className="font-grotesk uppercase text-[22px] sm:text-[28px] leading-none tracking-tight" style={{ color: "#FFFFFF" }}>
               Token Lock
             </h1>
-            <p className="font-mono text-[10px] mt-1 tracking-wide" style={{ color: "rgba(196,168,240,0.55)" }}>
+            <p className="font-mono text-[10px] mt-1 tracking-wide" style={{ color: "rgba(255,255,255,0.55)" }}>
               Time-based locks · transparent on-chain unlock schedules
             </p>
           </div>
@@ -504,7 +504,7 @@ function LockPage() {
         <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
           <div
             className="flex items-center gap-0.5 p-1 rounded-full overflow-x-auto max-w-full"
-            style={{ background: "rgba(155,127,212,0.08)", border: "1px solid rgba(155,127,212,0.25)" }}
+            style={{ background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.25)" }}
           >
             {TABS.map((t) => (
               <button
@@ -513,8 +513,8 @@ function LockPage() {
                 className="px-4 py-1.5 rounded-full font-grotesk text-[11px] uppercase tracking-wider transition whitespace-nowrap inline-flex items-center gap-1.5"
                 style={
                   activeTab === t
-                    ? { background: "rgba(155,127,212,0.35)", color: "#EDE0FF", border: "1px solid rgba(155,127,212,0.6)" }
-                    : { color: "rgba(196,168,240,0.5)" }
+                    ? { background: "rgba(139,92,246,0.35)", color: "#FFFFFF", border: "1px solid rgba(139,92,246,0.6)" }
+                    : { color: "rgba(255,255,255,0.5)" }
                 }
               >
                 {t}
@@ -532,16 +532,16 @@ function LockPage() {
           {showSearch && (
             <div
               className="flex items-center gap-2 px-3 py-2 rounded-full"
-              style={{ background: "rgba(155,127,212,0.08)", border: "1px solid rgba(155,127,212,0.25)" }}
+              style={{ background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.25)" }}
             >
-              <Search className="w-3.5 h-3.5" style={{ color: "rgba(196,168,240,0.5)" }} strokeWidth={1.5} />
+              <Search className="w-3.5 h-3.5" style={{ color: "rgba(255,255,255,0.5)" }} strokeWidth={1.5} />
               <input
                 type="text"
                 placeholder="Search by token or address…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="bg-transparent font-mono text-[11px] outline-none w-40 sm:w-56"
-                style={{ color: "#EDE0FF" }}
+                style={{ color: "#FFFFFF" }}
               />
             </div>
           )}
@@ -561,14 +561,14 @@ function LockPage() {
         {(activeTab === "All Locks" ||
           activeTab === "My Locks" ||
           activeTab === "Unlocking Soon") && (
-          <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(155,127,212,0.35)" }}>
+          <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(139,92,246,0.35)" }}>
             <div
               className="hidden sm:grid px-5 py-3 text-[9px] font-mono uppercase tracking-[0.2em]"
               style={{
                 gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr 100px",
-                borderBottom: "1px solid rgba(155,127,212,0.2)",
-                background: "rgba(155,127,212,0.08)",
-                color: "rgba(196,168,240,0.6)",
+                borderBottom: "1px solid rgba(139,92,246,0.2)",
+                background: "rgba(139,92,246,0.08)",
+                color: "rgba(255,255,255,0.6)",
               }}
             >
               <div>Token</div>
@@ -647,12 +647,12 @@ function Empty({ title, sub }: { title: string; sub: string }) {
     <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
       <div
         className="w-10 h-10 rounded-xl flex items-center justify-center mb-4"
-        style={{ background: "rgba(155,127,212,0.12)", border: "1px solid rgba(155,127,212,0.3)" }}
+        style={{ background: "rgba(139,92,246,0.12)", border: "1px solid rgba(139,92,246,0.3)" }}
       >
-        <LockKeyhole className="w-4 h-4" style={{ color: "rgba(196,168,240,0.6)" }} strokeWidth={1.5} />
+        <LockKeyhole className="w-4 h-4" style={{ color: "rgba(255,255,255,0.6)" }} strokeWidth={1.5} />
       </div>
-      <p className="font-grotesk uppercase text-[13px] tracking-wider" style={{ color: "#EDE0FF" }}>{title}</p>
-      <p className="font-mono text-[10px] mt-1.5 max-w-[260px]" style={{ color: "rgba(196,168,240,0.55)" }}>
+      <p className="font-grotesk uppercase text-[13px] tracking-wider" style={{ color: "#FFFFFF" }}>{title}</p>
+      <p className="font-mono text-[10px] mt-1.5 max-w-[260px]" style={{ color: "rgba(255,255,255,0.55)" }}>
         {sub}
       </p>
     </div>
@@ -662,9 +662,9 @@ function Empty({ title, sub }: { title: string; sub: string }) {
 function EmptyLeaderboard({ label }: { label: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
-      <Trophy className="w-8 h-8 mb-3" style={{ color: "rgba(155,127,212,0.45)" }} strokeWidth={1} />
-      <p className="font-grotesk uppercase text-[12px] tracking-wider" style={{ color: "#EDE0FF" }}>{label}</p>
-      <p className="font-mono text-[10px] mt-1" style={{ color: "rgba(196,168,240,0.55)" }}>
+      <Trophy className="w-8 h-8 mb-3" style={{ color: "rgba(139,92,246,0.45)" }} strokeWidth={1} />
+      <p className="font-grotesk uppercase text-[12px] tracking-wider" style={{ color: "#FFFFFF" }}>{label}</p>
+      <p className="font-mono text-[10px] mt-1" style={{ color: "rgba(255,255,255,0.55)" }}>
         Leaderboard populates as tokens get locked.
       </p>
     </div>
