@@ -799,7 +799,6 @@ function AddRewardStreamForm({ farmId }: { farmId: number }) {
           {addTx.isPending || addRcpt.isLoading ? "Adding…" : "Add reward stream"}
         </button>
       )}
-      )}
     </div>
     </>
   );
