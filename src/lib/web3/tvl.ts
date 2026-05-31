@@ -13,20 +13,40 @@ import { stubPoolsFromAddresses } from "@/lib/capricorn/pools";
 
 const ZERO = "0x0000000000000000000000000000000000000000" as const;
 const NATIVE = ZERO;
+const ALL_TOKENS_PAGE = 100n;
 
 // ── Token Lock TVL ────────────────────────────────────────────────────────
 export function useLocksTVL(): { usd: number; isLoading: boolean } {
   const { tokenLock } = useContractAddresses();
   const monPrice = useMonPrice();
 
-  const allTokensQ = useReadContract({
+  const tokensLenQ = useReadContract({
     address: tokenLock,
     abi: TOKEN_LOCK_ABI,
-    functionName: "allTokens",
+    functionName: "tokensLength",
     query: { enabled: tokenLock !== ZERO, refetchInterval: 30_000 },
   });
 
-  const tokenAddrs = (allTokensQ.data as `0x${string}`[] | undefined) ?? [];
+  const tokensLen = Number(tokensLenQ.data ?? 0n);
+  const pageCount = Math.ceil(tokensLen / Number(ALL_TOKENS_PAGE)) || 0;
+
+  const tokenPagesQ = useReadContracts({
+    allowFailure: true,
+    contracts: Array.from({ length: pageCount }, (_, i) => ({
+      address: tokenLock,
+      abi: TOKEN_LOCK_ABI,
+      functionName: "allTokens" as const,
+      args: [BigInt(i) * ALL_TOKENS_PAGE, ALL_TOKENS_PAGE] as const,
+    })),
+    query: { enabled: tokenLock !== ZERO && pageCount > 0, refetchInterval: 30_000 },
+  });
+
+  const tokenAddrs = useMemo(() => {
+    if (!tokenPagesQ.data) return [] as `0x${string}`[];
+    return tokenPagesQ.data.flatMap((r) =>
+      r?.status === "success" ? (r.result as `0x${string}`[]) : [],
+    );
+  }, [tokenPagesQ.data]);
 
   const lockIdsQ = useReadContracts({
     allowFailure: true,
@@ -115,7 +135,8 @@ export function useLocksTVL(): { usd: number; isLoading: boolean } {
   return {
     usd,
     isLoading:
-      allTokensQ.isLoading ||
+      tokensLenQ.isLoading ||
+      tokenPagesQ.isLoading ||
       lockIdsQ.isLoading ||
       lockDetailsQ.isLoading ||
       decimalsReads.isLoading,

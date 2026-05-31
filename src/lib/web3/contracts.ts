@@ -1,7 +1,7 @@
 /**
  * Deployed contract addresses — Monad mainnet (chainId 143).
- * StreamFarm: `deployments.generated.ts` only (run `cd contracts && npm run deploy:stream-farm`).
- * Other contracts may still be overridden via optional VITE_* in .env.local.
+ * Canonical addresses: `deployments.generated.ts` (from `cd contracts && npm run deploy:mainnet`).
+ * Optional VITE_* in `.env.local` override tokenLock / vestingNFT / otcMarket only.
  */
 
 import { MAINNET_DEPLOYMENTS } from "./deployments.generated";
@@ -240,14 +240,20 @@ export const TOKEN_LOCK_ABI = [
     type: "function",
     name: "allTokens",
     stateMutability: "view",
-    inputs: [],
+    inputs: [
+      { name: "offset", type: "uint256" },
+      { name: "limit", type: "uint256" },
+    ],
     outputs: [{ type: "address[]" }],
   },
   {
     type: "function",
     name: "allLockers",
     stateMutability: "view",
-    inputs: [],
+    inputs: [
+      { name: "offset", type: "uint256" },
+      { name: "limit", type: "uint256" },
+    ],
     outputs: [{ type: "address[]" }],
   },
   // ── Events ─────────────────────────────────────────────────────────────
@@ -325,6 +331,13 @@ export const VESTING_NFT_ABI = [
     inputs: [{ name: "tokenId", type: "uint256" }],
     outputs: [],
   },
+  {
+    type: "function",
+    name: "revokeVesting",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "tokenId", type: "uint256" }],
+    outputs: [],
+  },
   // ── Read ───────────────────────────────────────────────────────────────
   {
     type: "function",
@@ -336,6 +349,7 @@ export const VESTING_NFT_ABI = [
         type: "tuple",
         components: [
           { name: "token",         type: "address" },
+          { name: "creator",       type: "address" },
           { name: "totalAmount",   type: "uint256" },
           { name: "startTime",     type: "uint256" },
           { name: "duration",      type: "uint256" },
@@ -477,8 +491,16 @@ export const STREAM_FARM_ABI = [
       { name: "endTime", type: "uint256" },
       { name: "totalBudget", type: "uint256" },
       { name: "totalDistributed", type: "uint256" },
+      { name: "totalClaimed", type: "uint256" },
       { name: "accRewardPerShare", type: "uint256" },
     ],
+  },
+  {
+    type: "function",
+    name: "recoverableBalance",
+    stateMutability: "view",
+    inputs: [{ name: "token", type: "address" }],
+    outputs: [{ type: "uint256" }],
   },
   {
     type: "function", name: "getPosition", stateMutability: "view",
@@ -545,6 +567,7 @@ export const STREAM_FARM_ABI = [
     outputs: [{ name: "tokenId", type: "uint256" }],
   },
   { type: "function", name: "withdraw", stateMutability: "nonpayable", inputs: [{ name: "tokenId", type: "uint256" }], outputs: [] },
+  { type: "function", name: "emergencyWithdraw", stateMutability: "nonpayable", inputs: [{ name: "tokenId", type: "uint256" }], outputs: [] },
   { type: "function", name: "claim", stateMutability: "nonpayable", inputs: [{ name: "tokenId", type: "uint256" }], outputs: [] },
   {
     type: "function",
@@ -631,7 +654,34 @@ export const OTC_MARKET_ABI = [
   },
   { type: "function", name: "buy", stateMutability: "payable", inputs: [{ name: "listingId", type: "uint256" }], outputs: [] },
   { type: "function", name: "unlist", stateMutability: "nonpayable", inputs: [{ name: "listingId", type: "uint256" }], outputs: [] },
+  {
+    type: "function", name: "pendingNativePayments", stateMutability: "view",
+    inputs: [{ name: "recipient", type: "address" }],
+    outputs: [{ type: "uint256" }],
+  },
+  { type: "function", name: "withdrawNativePayments", stateMutability: "nonpayable", inputs: [], outputs: [] },
+  {
+    type: "function", name: "pendingTokenPayments", stateMutability: "view",
+    inputs: [{ name: "token", type: "address" }, { name: "recipient", type: "address" }],
+    outputs: [{ type: "uint256" }],
+  },
+  {
+    type: "function", name: "withdrawTokenPayments", stateMutability: "nonpayable",
+    inputs: [{ name: "token", type: "address" }],
+    outputs: [],
+  },
+  {
+    type: "function", name: "recoverStuckERC20", stateMutability: "nonpayable",
+    inputs: [
+      { name: "token", type: "address" },
+      { name: "amount", type: "uint256" },
+      { name: "to", type: "address" },
+    ],
+    outputs: [],
+  },
   { type: "event", name: "Listed", inputs: [{ name: "listingId", type: "uint256", indexed: true }, { name: "seller", type: "address", indexed: true }, { name: "nftContract", type: "address", indexed: false }, { name: "tokenId", type: "uint256", indexed: false }, { name: "paymentToken", type: "address", indexed: false }, { name: "price", type: "uint256", indexed: false }] },
+  { type: "event", name: "NativePaymentWithdrawn", inputs: [{ name: "recipient", type: "address", indexed: true }, { name: "amount", type: "uint256", indexed: false }] },
+  { type: "event", name: "TokenPaymentWithdrawn", inputs: [{ name: "token", type: "address", indexed: true }, { name: "recipient", type: "address", indexed: true }, { name: "amount", type: "uint256", indexed: false }] },
   { type: "event", name: "Sold", inputs: [{ name: "listingId", type: "uint256", indexed: true }, { name: "buyer", type: "address", indexed: true }, { name: "seller", type: "address", indexed: true }, { name: "price", type: "uint256", indexed: false }, { name: "fee", type: "uint256", indexed: false }] },
   { type: "event", name: "Unlisted", inputs: [{ name: "listingId", type: "uint256", indexed: true }, { name: "seller", type: "address", indexed: true }] },
 ] as const;

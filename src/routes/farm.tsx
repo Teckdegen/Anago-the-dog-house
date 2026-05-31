@@ -248,14 +248,18 @@ function RewardStreams({ farmId, count }: { farmId: number; count: number }) {
       {Array.from({ length: count }, (_, i) => {
         const d = streamsQ.data?.[i];
         if (d?.status !== "success") return null;
-        const [token, rewardRate, startTime, endTime, totalBudget, totalDistributed] = d.result as any;
-        return <RewardStreamRow key={i} token={token} rewardRate={rewardRate} startTime={startTime} endTime={endTime} totalBudget={totalBudget} totalDistributed={totalDistributed} />;
+        const [token, rewardRate, startTime, endTime, totalBudget, , totalClaimed] = d.result as readonly [
+          `0x${string}`, bigint, bigint, bigint, bigint, bigint, bigint, bigint,
+        ];
+        return <RewardStreamRow key={i} token={token} rewardRate={rewardRate} startTime={startTime} endTime={endTime} totalBudget={totalBudget} totalClaimed={totalClaimed} />;
       })}
     </div>
   );
 }
 
-function RewardStreamRow({ token, rewardRate, startTime, endTime, totalBudget, totalDistributed }: any) {
+function RewardStreamRow({ token, rewardRate, startTime, endTime, totalBudget, totalClaimed }: {
+  token: `0x${string}`; rewardRate: bigint; startTime: bigint; endTime: bigint; totalBudget: bigint; totalClaimed: bigint;
+}) {
   const symbolQ = useReadContract({ address: token, abi: ERC20_ABI, functionName: "symbol", query: { enabled: !!token } });
   const decimalsQ = useReadContract({ address: token, abi: ERC20_ABI, functionName: "decimals", query: { enabled: !!token } });
   const getRemoteMeta = useRemoteTokenMeta([token]);
@@ -283,7 +287,7 @@ function RewardStreamRow({ token, rewardRate, startTime, endTime, totalBudget, t
         </div>
       </div>
       <p className="font-mono text-[10px] shrink-0" style={{ color: "rgba(255,255,255,0.5)" }}>
-        {Number(formatUnits(totalDistributed, dec)).toLocaleString()} / {Number(formatUnits(totalBudget, dec)).toLocaleString()} {sym}
+        {Number(formatUnits(totalClaimed, dec)).toLocaleString()} / {Number(formatUnits(totalBudget, dec)).toLocaleString()} {sym} claimed
       </p>
     </div>
   );
@@ -539,6 +543,8 @@ function PositionCard({ tokenId, onPositionChange }: { tokenId: bigint; onPositi
   const claimRcpt = useWaitForTransactionReceipt({ hash: claimTx.data });
   const withdrawTx = useWriteContract();
   const withdrawRcpt = useWaitForTransactionReceipt({ hash: withdrawTx.data });
+  const emergencyTx = useWriteContract();
+  const emergencyRcpt = useWaitForTransactionReceipt({ hash: emergencyTx.data });
 
   // IMPORTANT: All hooks MUST be above any early return
   useEffect(() => {
@@ -549,11 +555,11 @@ function PositionCard({ tokenId, onPositionChange }: { tokenId: bigint; onPositi
   }, [claimRcpt.isSuccess]);
 
   useEffect(() => {
-    if (withdrawRcpt.isSuccess) {
+    if (withdrawRcpt.isSuccess || emergencyRcpt.isSuccess) {
       toast("success", "Withdrawn!", "Position closed and tokens returned.");
       onPositionChange?.();
     }
-  }, [withdrawRcpt.isSuccess]);
+  }, [withdrawRcpt.isSuccess, emergencyRcpt.isSuccess]);
 
   if (!posData) return <div className="rounded-xl p-5 animate-pulse h-28" style={{ border: "1px solid rgba(139,92,246,0.2)", background: "rgba(139,92,246,0.03)" }} />;
 
@@ -570,6 +576,7 @@ function PositionCard({ tokenId, onPositionChange }: { tokenId: bigint; onPositi
       ...gas,
     });
   };
+
   const handleWithdraw = async () => {
     if (!publicClient) return;
     const gas = await prepareTransactionWithGas(publicClient);
@@ -582,18 +589,32 @@ function PositionCard({ tokenId, onPositionChange }: { tokenId: bigint; onPositi
     });
   };
 
+  const handleEmergencyWithdraw = async () => {
+    if (!publicClient) return;
+    const gas = await prepareTransactionWithGas(publicClient);
+    emergencyTx.writeContract({
+      address: contracts.streamFarm,
+      abi: STREAM_FARM_ABI,
+      functionName: "emergencyWithdraw",
+      args: [tokenId],
+      ...gas,
+    });
+  };
+
   const now = Math.floor(Date.now() / 1000);
   const locked = Number(lockExpiry) > now;
   const boost = Number(boostMultiplier) / 1e18;
 
   return (
     <PositionCardInner tokenId={tokenId} farmId={farmId} amount={amount} boost={boost} locked={locked} lockExpiry={lockExpiry} pendingData={pendingData}
-      onClaim={handleClaim} onWithdraw={handleWithdraw} claimPending={claimTx.isPending || claimRcpt.isLoading} withdrawPending={withdrawTx.isPending || withdrawRcpt.isLoading}
-      error={claimTx.error || withdrawTx.error} />
+      onClaim={handleClaim} onWithdraw={handleWithdraw} onEmergencyWithdraw={handleEmergencyWithdraw}
+      claimPending={claimTx.isPending || claimRcpt.isLoading}
+      withdrawPending={withdrawTx.isPending || withdrawRcpt.isLoading || emergencyTx.isPending || emergencyRcpt.isLoading}
+      error={claimTx.error || withdrawTx.error || emergencyTx.error} />
   );
 }
 
-function PositionCardInner({ tokenId, farmId, amount, boost, locked, lockExpiry, pendingData, onClaim, onWithdraw, claimPending, withdrawPending, error }: any) {
+function PositionCardInner({ tokenId, farmId, amount, boost, locked, lockExpiry, pendingData, onClaim, onWithdraw, onEmergencyWithdraw, claimPending, withdrawPending, error }: any) {
   const [expanded, setExpanded] = useState(false);
   const contracts = useContracts();
   const farmQ = useReadContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "getFarm", args: [farmId], query: { ...LIVE_CHAIN_QUERY, refetchInterval: 10_000 } });
@@ -692,6 +713,17 @@ function PositionCardInner({ tokenId, farmId, amount, boost, locked, lockExpiry,
               </div>
             </div>
           )}
+          <p className="font-mono text-[9px] mt-3 mb-2" style={{ color: "rgba(255,255,255,0.45)" }}>
+            If normal withdraw fails (too many reward streams), use emergency withdraw — returns stake only, skips unclaimed rewards.
+          </p>
+          <button
+            onClick={onEmergencyWithdraw}
+            disabled={withdrawPending}
+            className="px-3 py-1.5 rounded-xl font-grotesk text-[10px] uppercase tracking-wider transition hover:opacity-90 disabled:opacity-40"
+            style={{ background: "rgba(255,120,80,0.12)", color: "#FCA5A5", border: "1px solid rgba(255,120,80,0.35)" }}
+          >
+            Emergency withdraw
+          </button>
         </div>
       )}
 

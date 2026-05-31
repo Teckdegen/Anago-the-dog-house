@@ -142,7 +142,67 @@ function MyListingsTab() {
 
   return (
     <div className="space-y-3">
+      <PendingPaymentsPanel />
       {activeMyIds.map((id) => <ListingCard key={id.toString()} listingId={id} showUnlist />)}
+    </div>
+  );
+}
+
+function PendingPaymentsPanel() {
+  const { address } = useAccount();
+  const publicClient = usePublicClient();
+  const contracts = useContracts();
+  const { toast } = useToast();
+
+  const pendingMonQ = useReadContract({
+    address: contracts.otcMarket,
+    abi: OTC_MARKET_ABI,
+    functionName: "pendingNativePayments",
+    args: address ? [address] : undefined,
+    query: { enabled: !!address, refetchInterval: 10_000 },
+  });
+  const pendingMon = (pendingMonQ.data as bigint) ?? 0n;
+
+  const withdrawTx = useWriteContract();
+  const withdrawRcpt = useWaitForTransactionReceipt({ hash: withdrawTx.data });
+
+  useEffect(() => {
+    if (withdrawRcpt.isSuccess) toast("success", "Withdrawn", "Sale proceeds sent to your wallet.");
+  }, [withdrawRcpt.isSuccess, toast]);
+
+  if (!address || pendingMon === 0n) return null;
+
+  const handleWithdraw = async () => {
+    if (!publicClient) return;
+    try {
+      const gas = await prepareTransactionWithGas(publicClient);
+      withdrawTx.writeContract({
+        address: contracts.otcMarket,
+        abi: OTC_MARKET_ABI,
+        functionName: "withdrawNativePayments",
+        ...gas,
+      });
+    } catch {
+      toast("error", "Withdraw Failed", "Could not prepare withdrawal transaction.");
+    }
+  };
+
+  return (
+    <div className="rounded-xl p-4 flex items-center justify-between gap-4" style={{ border: "1px solid rgba(139,92,246,0.4)", background: "rgba(139,92,246,0.08)" }}>
+      <div>
+        <p className="font-grotesk text-[12px]" style={{ color: "#FFFFFF" }}>Pending sale proceeds</p>
+        <p className="font-mono text-[11px] mt-0.5" style={{ color: "#A78BFA" }}>
+          {Number(formatUnits(pendingMon, 18)).toLocaleString()} MON ready to withdraw
+        </p>
+      </div>
+      <button
+        onClick={handleWithdraw}
+        disabled={withdrawTx.isPending || withdrawRcpt.isLoading}
+        className="px-4 py-2 rounded-xl font-grotesk text-[10px] uppercase tracking-wider transition disabled:opacity-40"
+        style={{ background: "rgba(139,92,246,0.2)", color: "#FFFFFF", border: "1px solid rgba(139,92,246,0.5)" }}
+      >
+        {withdrawTx.isPending || withdrawRcpt.isLoading ? "Withdrawing…" : "Withdraw MON"}
+      </button>
     </div>
   );
 }
@@ -163,6 +223,29 @@ function ListingCard({ listingId, showBuy, showUnlist, showInactive }: { listing
 
   const listingQ = useReadContract({ address: contracts.otcMarket, abi: OTC_MARKET_ABI, functionName: "getListing", args: [listingId], query: { refetchInterval: 10_000 } });
   const listing = parseListingTuple(listingQ.data);
+  const isVestingNft = listing?.nftContract?.toLowerCase() === contracts.vestingNFT.toLowerCase();
+  const isLockNft = listing?.nftContract?.toLowerCase() === contracts.tokenLock.toLowerCase();
+  const vestingQ = useReadContract({
+    address: contracts.vestingNFT,
+    abi: VESTING_NFT_ABI,
+    functionName: "getVesting",
+    args: listing?.tokenId !== undefined ? [listing.tokenId] : undefined,
+    query: { enabled: !!listing && isVestingNft, refetchInterval: 10_000 },
+  });
+  const lockQ = useReadContract({
+    address: contracts.tokenLock,
+    abi: TOKEN_LOCK_ABI,
+    functionName: "getLock",
+    args: listing?.tokenId !== undefined ? [listing.tokenId] : undefined,
+    query: { enabled: !!listing && isLockNft, refetchInterval: 10_000 },
+  });
+  const vestingData = vestingQ.data as { revoked?: boolean; claimed?: bigint; totalAmount?: bigint } | undefined;
+  const lockData = lockQ.data as { withdrawn?: boolean } | undefined;
+  const vestingRevoked = isVestingNft && !!vestingData?.revoked;
+  const vestingComplete = isVestingNft && vestingData?.totalAmount != null
+    && BigInt(vestingData.claimed ?? 0) >= BigInt(vestingData.totalAmount);
+  const lockWithdrawn = isLockNft && !!lockData?.withdrawn;
+  const listingInvalid = vestingRevoked || vestingComplete || lockWithdrawn;
   const openExplorer = useOpenNftExplorer(
     (listing?.nftContract ?? "0x0000000000000000000000000000000000000000") as `0x${string}`,
     listing?.tokenId ?? 0n,
@@ -281,7 +364,7 @@ function ListingCard({ listingId, showBuy, showUnlist, showInactive }: { listing
   const payBalance = isNativePayment ? (monBalQ.data?.value ?? 0n) : ((balanceQ.data as bigint) ?? 0n);
   const needsApproval = hasErc20Payment && price > 0n && allowance < price;
   const insufficientBalance = price > 0n && payBalance < price;
-  const canBuy = !insufficientBalance && price > 0n;
+  const canBuy = !insufficientBalance && price > 0n && !listingInvalid;
   const isSeller = address?.toLowerCase() === seller?.toLowerCase();
 
   const nftLabel = (() => {
@@ -374,7 +457,11 @@ function ListingCard({ listingId, showBuy, showUnlist, showInactive }: { listing
 
       <div className="flex items-center gap-2 shrink-0" onClick={stopPositionRowClick}>
         {showBuy && !isSeller && (
-          insufficientBalance ? (
+          listingInvalid ? (
+            <span className="font-mono text-[9px] px-3 py-2 rounded-xl" style={{ color: "rgba(255,120,120,0.9)", border: "1px solid rgba(255,120,120,0.35)" }}>
+              {lockWithdrawn ? "Lock empty" : vestingComplete ? "Vesting complete" : "Vesting revoked"}
+            </span>
+          ) : insufficientBalance ? (
             <span className="font-mono text-[9px] px-3 py-2 rounded-xl" style={{ color: "rgba(255,120,120,0.9)", border: "1px solid rgba(255,120,120,0.35)" }}>
               Insufficient {paySym}
             </span>

@@ -31,7 +31,13 @@ export const MAINNET_DEPLOYMENTS = {
 }
 
 async function main() {
-  const [deployer] = await ethers.getSigners();
+  const signers = await ethers.getSigners();
+  if (signers.length === 0) {
+    throw new Error(
+      "No deployer account. Set PRIVATE_KEY in contracts/.env (see .env.example).",
+    );
+  }
+  const deployer = signers[0];
   const net = await ethers.provider.getNetwork();
   const chainId = Number(net.chainId);
 

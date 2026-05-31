@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/access/Ownable2Step.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
@@ -18,7 +18,7 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
  *   - Optional lock boost multipliers.
  *   - Minimal storage, minimal gas.
  */
-contract StreamFarm is ERC721, Ownable, ReentrancyGuard {
+contract StreamFarm is ERC721, Ownable2Step, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -43,7 +43,8 @@ contract StreamFarm is ERC721, Ownable, ReentrancyGuard {
         uint256 lastUpdateTime;     // Last time accRewardPerShare was updated
         uint256 accRewardPerShare;  // Accumulated reward per share (1e36 precision)
         uint256 totalBudget;        // Total reward tokens deposited
-        uint256 totalDistributed;   // Total paid out
+        uint256 totalDistributed;   // Total accrued into accRewardPerShare (not yet claimed)
+        uint256 totalClaimed;       // Total actually transferred to stakers
     }
 
     struct Position {
@@ -67,6 +68,10 @@ contract StreamFarm is ERC721, Ownable, ReentrancyGuard {
     uint256 public nextTokenId;
     uint256 public constant BASIS_POINTS = 10000;
     uint256 public constant PRECISION = 1e36;
+    /// @dev Max boost multiplier (5x) — prevents admin from setting extreme tiers
+    uint256 public constant MAX_BOOST_MULTIPLIER = 5e18;
+    /// @dev Cap reward streams per farm — prevents gas-griefing via unbounded loops
+    uint256 public constant MAX_REWARD_STREAMS_PER_FARM = 16;
 
     // Protocol admins: whitelist operators, add admins, recover tokens, boost tiers
     mapping(address => bool) public admins;
@@ -94,6 +99,7 @@ contract StreamFarm is ERC721, Ownable, ReentrancyGuard {
     event AdminAdded(address indexed admin);
     event AdminRemoved(address indexed admin);
     event FarmOperatorUpdated(address indexed operator, bool allowed);
+    event EmergencyWithdrawn(uint256 indexed tokenId, uint256 indexed farmId, address indexed user, uint256 amount);
 
     // ═══════════════════════════════════════════════════════════════════════
     //                          MODIFIERS
@@ -231,13 +237,17 @@ contract StreamFarm is ERC721, Ownable, ReentrancyGuard {
     ) external onlyFarmCreator(farmId) nonReentrant {
         require(address(rewardToken) != address(0), "Invalid reward token");
         require(endTime > startTime, "End must be after start");
+        require(startTime >= block.timestamp, "Start in past");
         require(totalBudget > 0, "Budget must be > 0");
+        require(farmRewards[farmId].length < MAX_REWARD_STREAMS_PER_FARM, "Max streams");
 
-        // Transfer reward tokens in
+        uint256 balBefore = rewardToken.balanceOf(address(this));
         rewardToken.safeTransferFrom(msg.sender, address(this), totalBudget);
+        uint256 received = rewardToken.balanceOf(address(this)) - balBefore;
+        require(received > 0, "Zero received");
 
         uint256 duration = endTime - startTime;
-        uint256 rewardRate = (totalBudget * 1e18) / duration; // scaled by 1e18
+        uint256 rewardRate = (received * 1e18) / duration;
 
         farmRewards[farmId].push(RewardStream({
             token: rewardToken,
@@ -246,8 +256,9 @@ contract StreamFarm is ERC721, Ownable, ReentrancyGuard {
             endTime: endTime,
             lastUpdateTime: startTime,
             accRewardPerShare: 0,
-            totalBudget: totalBudget,
-            totalDistributed: 0
+            totalBudget: received,
+            totalDistributed: 0,
+            totalClaimed: 0
         }));
 
         uint256 rewardIdx = farmRewards[farmId].length - 1;
@@ -279,7 +290,9 @@ contract StreamFarm is ERC721, Ownable, ReentrancyGuard {
         delete boostDurations;
         delete boostMultipliers;
         for (uint256 i = 0; i < durations.length; i++) {
+            require(durations[i] > 0, "Zero duration");
             require(multipliers[i] >= 1e18, "Min 1x boost");
+            require(multipliers[i] <= MAX_BOOST_MULTIPLIER, "Max 5x boost");
             boostDurations.push(durations[i]);
             boostMultipliers.push(multipliers[i]);
         }
@@ -304,28 +317,40 @@ contract StreamFarm is ERC721, Ownable, ReentrancyGuard {
         // Update all reward streams for this farm
         _updateFarmRewards(farmId);
 
-        // Transfer stake tokens
+        uint256 balBefore = farm.stakeToken.balanceOf(address(this));
         farm.stakeToken.safeTransferFrom(msg.sender, address(this), amount);
+        uint256 received = farm.stakeToken.balanceOf(address(this)) - balBefore;
+        require(received > 0, "Zero received");
 
-        // Calculate boost
+        // Calculate boost — farm lock duration is a floor; tier cannot shorten it
         uint256 boost = 1e18; // base 1x
         uint256 lockExpiry = 0;
 
-        if (lockTier > 0 && lockTier <= boostDurations.length) {
+        if (lockTier > 0) {
+            require(lockTier <= boostDurations.length, "Invalid lock tier");
             uint256 tierIdx = lockTier - 1;
+            uint256 tierDuration = boostDurations[tierIdx];
+            if (farm.lockDuration > 0) {
+                require(tierDuration >= farm.lockDuration, "Tier below farm lock");
+            }
             boost = boostMultipliers[tierIdx];
-            lockExpiry = block.timestamp + boostDurations[tierIdx];
-        } else if (farm.lockDuration > 0) {
-            lockExpiry = block.timestamp + farm.lockDuration;
+            lockExpiry = block.timestamp + tierDuration;
         }
 
-        uint256 shares = (amount * boost) / 1e18;
+        if (farm.lockDuration > 0) {
+            uint256 farmExpiry = block.timestamp + farm.lockDuration;
+            if (lockExpiry < farmExpiry) {
+                lockExpiry = farmExpiry;
+            }
+        }
+
+        uint256 shares = (received * boost) / 1e18;
 
         // Mint NFT position
         tokenId = nextTokenId++;
         positions[tokenId] = Position({
             farmId: farmId,
-            amount: amount,
+            amount: received,
             shares: shares,
             depositTime: block.timestamp,
             lockExpiry: lockExpiry,
@@ -340,10 +365,10 @@ contract StreamFarm is ERC721, Ownable, ReentrancyGuard {
 
         // Update farm totals
         farm.totalShares += shares;
-        farm.totalStaked += amount;
+        farm.totalStaked += received;
 
-        _safeMint(msg.sender, tokenId);
-        emit Deposited(tokenId, farmId, msg.sender, amount, shares);
+        _mint(msg.sender, tokenId);
+        emit Deposited(tokenId, farmId, msg.sender, received, shares);
     }
 
     /**
@@ -363,16 +388,27 @@ contract StreamFarm is ERC721, Ownable, ReentrancyGuard {
         uint256 amount = pos.amount;
         uint256 penalty = 0;
 
-        // Check lock and apply penalty if early
-        if (pos.lockExpiry > 0 && block.timestamp < pos.lockExpiry && farm.earlyWithdrawBps > 0) {
-            penalty = (amount * farm.earlyWithdrawBps) / BASIS_POINTS;
+        // Enforce lock: boosted positions cannot withdraw early; base lock requires penalty or wait
+        if (pos.lockExpiry > 0 && block.timestamp < pos.lockExpiry) {
+            if (pos.boostMultiplier > 1e18) {
+                revert("Boost lock active");
+            }
+            if (farm.earlyWithdrawBps > 0) {
+                penalty = (amount * farm.earlyWithdrawBps) / BASIS_POINTS;
+            } else {
+                revert("Still locked");
+            }
         }
 
         // Update farm totals
         farm.totalShares -= pos.shares;
         farm.totalStaked -= amount;
 
-        // Clean up
+        // Clean up position and reward debt
+        uint256 rewardCount = farmRewards[pos.farmId].length;
+        for (uint256 i = 0; i < rewardCount; i++) {
+            delete rewardDebt[tokenId][i];
+        }
         delete positions[tokenId];
         _burn(tokenId);
 
@@ -382,6 +418,46 @@ contract StreamFarm is ERC721, Ownable, ReentrancyGuard {
 
         // Penalty stays in contract (can be recovered by admin)
         emit Withdrawn(tokenId, pos.farmId, msg.sender, userAmount, penalty);
+    }
+
+    /**
+     * @notice Escape hatch: withdraw staked principal without updating reward streams.
+     *         Skips pending reward accrual/claims — use when stream spam bricks normal withdraw.
+     */
+    function emergencyWithdraw(uint256 tokenId) external nonReentrant {
+        require(_ownerOf(tokenId) == msg.sender, "Not position owner");
+
+        Position storage pos = positions[tokenId];
+        Farm storage farm = farms[pos.farmId];
+
+        uint256 amount = pos.amount;
+        uint256 penalty = 0;
+
+        if (pos.lockExpiry > 0 && block.timestamp < pos.lockExpiry) {
+            if (pos.boostMultiplier > 1e18) {
+                revert("Boost lock active");
+            }
+            if (farm.earlyWithdrawBps > 0) {
+                penalty = (amount * farm.earlyWithdrawBps) / BASIS_POINTS;
+            } else {
+                revert("Still locked");
+            }
+        }
+
+        farm.totalShares -= pos.shares;
+        farm.totalStaked -= amount;
+
+        uint256 rewardCount = farmRewards[pos.farmId].length;
+        for (uint256 i = 0; i < rewardCount; i++) {
+            delete rewardDebt[tokenId][i];
+        }
+        delete positions[tokenId];
+        _burn(tokenId);
+
+        uint256 userAmount = amount - penalty;
+        farm.stakeToken.safeTransfer(msg.sender, userAmount);
+
+        emit EmergencyWithdrawn(tokenId, pos.farmId, msg.sender, userAmount);
     }
 
     /**
@@ -433,6 +509,7 @@ contract StreamFarm is ERC721, Ownable, ReentrancyGuard {
         uint256 endTime,
         uint256 totalBudget,
         uint256 totalDistributed,
+        uint256 totalClaimed,
         uint256 accRewardPerShare
     ) {
         require(farmId < farms.length, "Invalid farm");
@@ -445,6 +522,7 @@ contract StreamFarm is ERC721, Ownable, ReentrancyGuard {
             r.endTime,
             r.totalBudget,
             r.totalDistributed,
+            r.totalClaimed,
             r.accRewardPerShare
         );
     }
@@ -489,9 +567,14 @@ contract StreamFarm is ERC721, Ownable, ReentrancyGuard {
                 uint256 timeStart = stream.lastUpdateTime < stream.startTime ? stream.startTime : stream.lastUpdateTime;
                 if (timeEnd > timeStart) {
                     uint256 elapsed = timeEnd - timeStart;
-                    uint256 reward = (elapsed * stream.rewardRate) / 1e18;
                     uint256 remaining = stream.totalBudget - stream.totalDistributed;
-                    if (reward > remaining) reward = remaining;
+                    uint256 reward;
+                    if (timeEnd >= stream.endTime && remaining > 0) {
+                        reward = remaining;
+                    } else {
+                        reward = (elapsed * stream.rewardRate) / 1e18;
+                        if (reward > remaining) reward = remaining;
+                    }
                     accPerShare += (reward * PRECISION) / farms[farmId].totalShares;
                 }
             }
@@ -557,7 +640,7 @@ contract StreamFarm is ERC721, Ownable, ReentrancyGuard {
             uint256 streamLen = streams.length;
             for (uint256 r = 0; r < streamLen; r++) {
                 if (address(streams[r].token) == address(token)) {
-                    uint256 remaining = streams[r].totalBudget - streams[r].totalDistributed;
+                    uint256 remaining = streams[r].totalBudget - streams[r].totalClaimed;
                     liability += remaining;
                 }
             }
@@ -595,11 +678,14 @@ contract StreamFarm is ERC721, Ownable, ReentrancyGuard {
         }
 
         uint256 elapsed = timeEnd - timeStart;
-        uint256 reward = (elapsed * stream.rewardRate) / 1e18;
-
-        // Cap at remaining budget
         uint256 remaining = stream.totalBudget - stream.totalDistributed;
-        if (reward > remaining) reward = remaining;
+        uint256 reward;
+        if (timeEnd >= stream.endTime && remaining > 0) {
+            reward = remaining;
+        } else {
+            reward = (elapsed * stream.rewardRate) / 1e18;
+            if (reward > remaining) reward = remaining;
+        }
 
         if (reward > 0) {
             stream.accRewardPerShare += (reward * PRECISION) / farm.totalShares;
@@ -610,10 +696,13 @@ contract StreamFarm is ERC721, Ownable, ReentrancyGuard {
     }
 
     function _claimRewards(uint256 tokenId) internal {
+        _claimRewardsTo(tokenId, _ownerOf(tokenId));
+    }
+
+    function _claimRewardsTo(uint256 tokenId, address recipient) internal {
         Position storage pos = positions[tokenId];
         uint256 farmId = pos.farmId;
         uint256 rewardCount = farmRewards[farmId].length;
-        address owner = _ownerOf(tokenId);
 
         for (uint256 i = 0; i < rewardCount; i++) {
             RewardStream storage stream = farmRewards[farmId][i];
@@ -622,12 +711,24 @@ contract StreamFarm is ERC721, Ownable, ReentrancyGuard {
 
             if (pending > 0) {
                 rewardDebt[tokenId][i] = accumulated;
-                stream.token.safeTransfer(owner, pending);
-                emit RewardsClaimed(tokenId, owner, address(stream.token), pending);
+                stream.token.safeTransfer(recipient, pending);
+                stream.totalClaimed += pending;
+                emit RewardsClaimed(tokenId, recipient, address(stream.token), pending);
             } else {
                 rewardDebt[tokenId][i] = accumulated;
             }
         }
+    }
+
+    /// @dev Auto-claim pending rewards to the outgoing owner on NFT transfer.
+    function _update(address to, uint256 tokenId, address auth) internal override returns (address) {
+        address from = _ownerOf(tokenId);
+        if (from != address(0) && to != address(0)) {
+            Position storage pos = positions[tokenId];
+            _updateFarmRewards(pos.farmId);
+            _claimRewardsTo(tokenId, from);
+        }
+        return super._update(to, tokenId, auth);
     }
 
     function tokenURI(uint256 tokenId) public view override returns (string memory) {

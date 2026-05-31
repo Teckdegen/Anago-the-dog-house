@@ -1,9 +1,11 @@
 import "@nomicfoundation/hardhat-toolbox";
 import "@nomicfoundation/hardhat-verify";
 import * as dotenv from "dotenv";
+import path from "path";
 import type { HardhatUserConfig } from "hardhat/config";
 
-dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, ".env") });
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const PRIVATE_KEY = process.env.PRIVATE_KEY ?? "";
 const MONAD_TESTNET_RPC =
