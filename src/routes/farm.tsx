@@ -14,7 +14,7 @@ import type { TokenInfo } from "@/lib/web3/tokens";
 import { TokenIcon } from "@/components/TokenIcon";
 import { useRemoteTokenMeta } from "@/lib/web3/useRemoteTokenMeta";
 import { FarmManagePanel } from "@/components/FarmManagePanel";
-import { useIsFarmOperator } from "@/lib/web3/useStreamFarmRoles";
+import { useIsFarmOperator, useIsStreamFarmAdmin } from "@/lib/web3/useStreamFarmRoles";
 
 export const Route = createFileRoute("/farm")({
   component: FarmPage,
@@ -37,20 +37,23 @@ function FarmPage() {
   const { address } = useAccount();
   const contracts = useContracts();
   const { isFarmOperator, isLoading: operatorLoading } = useIsFarmOperator();
+  const { isAdmin, isLoading: adminLoading } = useIsStreamFarmAdmin();
+  const canManage = isFarmOperator || isAdmin;
+  const manageLoading = operatorLoading || adminLoading;
 
   const visibleTabs = useMemo((): Tab[] => {
     const tabs: Tab[] = [ALL_FARMS_TAB];
-    if (isFarmOperator) tabs.push(CREATE_TAB);
+    if (canManage) tabs.push(CREATE_TAB);
     tabs.push(MY_POSITIONS_TAB);
     return tabs;
-  }, [isFarmOperator]);
+  }, [canManage]);
 
   useEffect(() => {
-    if (operatorLoading) return;
-    if (activeTab === CREATE_TAB && !isFarmOperator) {
+    if (manageLoading) return;
+    if (activeTab === CREATE_TAB && !canManage) {
       setActiveTab(ALL_FARMS_TAB);
     }
-  }, [operatorLoading, isFarmOperator, activeTab]);
+  }, [manageLoading, canManage, activeTab]);
 
   const farmCountQ = useReadContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "farmCount", query: { ...LIVE_CHAIN_QUERY, refetchInterval: 10_000 } });
   const farmCount = Number(farmCountQ.data ?? 0);
@@ -87,7 +90,7 @@ function FarmPage() {
         </div>
 
         {activeTab === ALL_FARMS_TAB && <AllFarmsTab farmCount={farmCount} />}
-        {activeTab === CREATE_TAB && (isFarmOperator ? <FarmManagePanel /> : operatorLoading ? (
+        {activeTab === CREATE_TAB && (canManage ? <FarmManagePanel /> : manageLoading ? (
           <div className="flex justify-center py-16">
             <div className="w-6 h-6 rounded-full border-2 animate-spin" style={{ borderColor: "rgba(139,92,246,0.2)", borderTopColor: "#8B5CF6" }} />
           </div>

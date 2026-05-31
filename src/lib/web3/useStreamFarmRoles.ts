@@ -6,6 +6,29 @@ function streamFarmAddress(chainId: number): `0x${string}` {
   return (CONTRACTS[chainId] ?? CONTRACTS[143]).streamFarm;
 }
 
+/** Contract deployer (owner()) — only they can add/remove protocol admins. */
+export function useIsStreamFarmOwner() {
+  const { address } = useAccount();
+  const chainId = useChainId();
+  const streamFarm = streamFarmAddress(chainId);
+
+  const q = useReadContract({
+    address: streamFarm,
+    abi: STREAM_FARM_ABI,
+    functionName: "owner",
+    query: { ...LIVE_CHAIN_QUERY, refetchInterval: 30_000 },
+  });
+
+  const owner = q.data as `0x${string}` | undefined;
+  const isOwner = !!address && !!owner && owner.toLowerCase() === address.toLowerCase();
+
+  return {
+    isOwner,
+    owner,
+    isLoading: q.isLoading,
+  };
+}
+
 /** On-chain StreamFarm protocol admin (owner or admins mapping). */
 export function useIsStreamFarmAdmin() {
   const { address } = useAccount();

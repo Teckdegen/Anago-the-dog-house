@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Settings2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Settings2, ChevronLeft, ChevronRight, Shield, UserPlus } from "lucide-react";
 import {
   useAccount,
   useChainId,
@@ -18,6 +18,9 @@ import { TokenPicker } from "@/components/TokenPicker";
 import { TokenIcon } from "@/components/TokenIcon";
 import { useRemoteTokenMeta } from "@/lib/web3/useRemoteTokenMeta";
 import type { TokenInfo } from "@/lib/web3/tokens";
+import { useIsFarmOperator, useIsStreamFarmAdmin, useIsStreamFarmOwner } from "@/lib/web3/useStreamFarmRoles";
+
+const isEthAddress = (s: string) => /^0x[a-fA-F0-9]{40}$/.test(s);
 
 function useContracts() {
   const chainId = useChainId();
@@ -214,9 +217,11 @@ function RewardStreamFields({
   );
 }
 
-/** Create / manage farms — only rendered when `isFarmOperator` is true on the farm page. */
+/** Create / manage farms — shown on Create & Manage tab for operators and protocol admins. */
 export function FarmManagePanel() {
   const { address } = useAccount();
+  const { isFarmOperator } = useIsFarmOperator();
+  const { isAdmin } = useIsStreamFarmAdmin();
 
   if (!address) {
     return (
@@ -228,8 +233,305 @@ export function FarmManagePanel() {
 
   return (
     <div className="space-y-6">
-      <CreateFarmForm />
-      <MyFarmsList />
+      {isAdmin && <FarmAdminSettings />}
+      {isFarmOperator ? (
+        <>
+          <CreateFarmForm />
+          <MyFarmsList />
+        </>
+      ) : isAdmin ? (
+        <div
+          className="rounded-xl p-5 text-center"
+          style={{ border: "1px solid rgba(139,92,246,0.25)", background: "rgba(139,92,246,0.05)" }}
+        >
+          <p className="font-grotesk text-[13px] font-medium" style={{ color: "#FFFFFF" }}>
+            You are a protocol admin
+          </p>
+          <p className="font-mono text-[11px] mt-2" style={{ color: "rgba(255,255,255,0.5)" }}>
+            Use the panel above to whitelist wallets. Only whitelisted creators can launch farms.
+          </p>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function FarmAdminSettings() {
+  const { toast } = useToast();
+  const contracts = useContracts();
+  const publicClient = usePublicClient();
+  const { isOwner, owner } = useIsStreamFarmOwner();
+  const [open, setOpen] = useState(false);
+  const [operatorAddr, setOperatorAddr] = useState("");
+  const [adminAddr, setAdminAddr] = useState("");
+
+  const allowTx = useWriteContract();
+  const allowRcpt = useWaitForTransactionReceipt({ hash: allowTx.data });
+  const revokeTx = useWriteContract();
+  const revokeRcpt = useWaitForTransactionReceipt({ hash: revokeTx.data });
+  const addAdminTx = useWriteContract();
+  const addAdminRcpt = useWaitForTransactionReceipt({ hash: addAdminTx.data });
+  const removeAdminTx = useWriteContract();
+  const removeAdminRcpt = useWaitForTransactionReceipt({ hash: removeAdminTx.data });
+
+  const operatorCheck = (operatorAddr || "0x0000000000000000000000000000000000000000") as `0x${string}`;
+  const operatorQ = useReadContract({
+    address: contracts.streamFarm,
+    abi: STREAM_FARM_ABI,
+    functionName: "farmOperators",
+    args: [operatorCheck],
+    query: { enabled: isEthAddress(operatorAddr), refetchInterval: 5_000 },
+  });
+  const operatorIsAdminQ = useReadContract({
+    address: contracts.streamFarm,
+    abi: STREAM_FARM_ABI,
+    functionName: "isAdmin",
+    args: [operatorCheck],
+    query: { enabled: isEthAddress(operatorAddr), refetchInterval: 5_000 },
+  });
+  const operatorIsOperatorQ = useReadContract({
+    address: contracts.streamFarm,
+    abi: STREAM_FARM_ABI,
+    functionName: "isFarmOperator",
+    args: [operatorCheck],
+    query: { enabled: isEthAddress(operatorAddr), refetchInterval: 5_000 },
+  });
+
+  const adminCheck = (adminAddr || "0x0000000000000000000000000000000000000000") as `0x${string}`;
+  const adminQ = useReadContract({
+    address: contracts.streamFarm,
+    abi: STREAM_FARM_ABI,
+    functionName: "admins",
+    args: [adminCheck],
+    query: { enabled: isEthAddress(adminAddr), refetchInterval: 5_000 },
+  });
+
+  const isWhitelisted = operatorQ.data === true;
+  const canCreateFarms = operatorIsOperatorQ.data === true;
+  const isProtocolAdmin = adminQ.data === true || (!!owner && adminAddr.toLowerCase() === owner.toLowerCase());
+
+  const inputStyle = {
+    background: "rgba(0,0,0,0.45)",
+    border: "1px solid rgba(139,92,246,0.45)",
+    color: "#FFFFFF",
+  };
+
+  const writeSetFarmOperator = async (operator: `0x${string}`, allowed: boolean) => {
+    if (!publicClient) return;
+    try {
+      const gas = await prepareTransactionWithGas(publicClient);
+      (allowed ? allowTx : revokeTx).writeContract({
+        address: contracts.streamFarm,
+        abi: STREAM_FARM_ABI,
+        functionName: "setFarmOperator",
+        args: [operator, allowed],
+        ...gas,
+      });
+    } catch (e) {
+      toast("error", "Transaction failed", (e as Error).message?.slice(0, 120) ?? "Failed");
+    }
+  };
+
+  const writeAddAdmin = async (admin: `0x${string}`) => {
+    if (!publicClient) return;
+    try {
+      const gas = await prepareTransactionWithGas(publicClient);
+      addAdminTx.writeContract({
+        address: contracts.streamFarm,
+        abi: STREAM_FARM_ABI,
+        functionName: "addAdmin",
+        args: [admin],
+        ...gas,
+      });
+    } catch (e) {
+      toast("error", "Add admin failed", (e as Error).message?.slice(0, 120) ?? "Failed");
+    }
+  };
+
+  const writeRemoveAdmin = async (admin: `0x${string}`) => {
+    if (!publicClient) return;
+    try {
+      const gas = await prepareTransactionWithGas(publicClient);
+      removeAdminTx.writeContract({
+        address: contracts.streamFarm,
+        abi: STREAM_FARM_ABI,
+        functionName: "removeAdmin",
+        args: [admin],
+        ...gas,
+      });
+    } catch (e) {
+      toast("error", "Remove admin failed", (e as Error).message?.slice(0, 120) ?? "Failed");
+    }
+  };
+
+  useEffect(() => {
+    if (allowRcpt.isSuccess) toast("success", "Whitelisted", "Wallet can now create farms.");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allowRcpt.isSuccess]);
+
+  useEffect(() => {
+    if (revokeRcpt.isSuccess) toast("success", "Revoked", "Wallet can no longer create farms.");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [revokeRcpt.isSuccess]);
+
+  useEffect(() => {
+    if (addAdminRcpt.isSuccess) toast("success", "Admin added", "Wallet is now a protocol admin.");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [addAdminRcpt.isSuccess]);
+
+  useEffect(() => {
+    if (removeAdminRcpt.isSuccess) toast("success", "Admin removed", "Wallet is no longer a protocol admin.");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [removeAdminRcpt.isSuccess]);
+
+  const operatorBusy = allowTx.isPending || allowRcpt.isLoading || revokeTx.isPending || revokeRcpt.isLoading;
+  const adminBusy = addAdminTx.isPending || addAdminRcpt.isLoading || removeAdminTx.isPending || removeAdminRcpt.isLoading;
+
+  return (
+    <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(139,92,246,0.45)", background: "rgba(0,0,0,0.35)" }}>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between gap-3 p-5"
+        style={{ background: "rgba(139,92,246,0.12)" }}
+      >
+        <div className="flex items-center gap-2">
+          <Shield className="w-4 h-4" style={{ color: "#A78BFA" }} />
+          <span className="font-grotesk text-[15px] font-semibold uppercase tracking-wider" style={{ color: "#FFFFFF" }}>
+            Protocol admin
+          </span>
+          {isOwner && (
+            <span
+              className="font-mono text-[9px] uppercase px-2 py-0.5 rounded-full"
+              style={{ color: "#C4B5FD", background: "rgba(139,92,246,0.25)", border: "1px solid rgba(139,92,246,0.4)" }}
+            >
+              Deployer
+            </span>
+          )}
+        </div>
+        <span className="font-grotesk text-[11px] font-medium uppercase" style={{ color: "rgba(255,255,255,0.55)" }}>
+          {open ? "Hide" : "Show"}
+        </span>
+      </button>
+
+      {open && (
+        <div className="p-5 sm:p-6 space-y-8" style={{ borderTop: "1px solid rgba(139,92,246,0.25)" }}>
+          <div className="space-y-4">
+            <div>
+              <h3 className="font-grotesk text-[18px] sm:text-[20px] font-semibold" style={{ color: "#FFFFFF" }}>
+                Whitelist farm creators
+              </h3>
+              <p className="font-mono text-[11px] mt-1" style={{ color: "rgba(255,255,255,0.5)" }}>
+                Allow a wallet to create and manage its own farms on Stream Farms.
+              </p>
+            </div>
+
+            <div>
+              <FarmFieldLabel title="Wallet address" hint="Paste the full 0x address." />
+              <input
+                value={operatorAddr}
+                onChange={(e) => setOperatorAddr(e.target.value.trim())}
+                placeholder="0x…"
+                className={farmInput}
+                style={inputStyle}
+              />
+            </div>
+
+            {isEthAddress(operatorAddr) && (
+              <p className="font-mono text-[11px]" style={{ color: canCreateFarms ? "#6EE7B7" : "rgba(255,255,255,0.45)" }}>
+                {operatorQ.isLoading || operatorIsOperatorQ.isLoading
+                  ? "Checking on-chain…"
+                  : canCreateFarms
+                    ? operatorIsAdminQ.data
+                      ? "Can create farms (protocol admin)"
+                      : isWhitelisted
+                        ? "Whitelisted — can create farms"
+                        : "Can create farms (owner)"
+                    : "Not whitelisted — cannot create farms"}
+              </p>
+            )}
+
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                type="button"
+                onClick={() => writeSetFarmOperator(operatorAddr as `0x${string}`, true)}
+                disabled={!isEthAddress(operatorAddr) || operatorBusy}
+                className="flex-1 rounded-xl py-3 font-grotesk text-[12px] font-semibold uppercase tracking-wider disabled:opacity-40"
+                style={{ background: "rgba(139,92,246,0.35)", color: "#FFFFFF", border: "1px solid rgba(139,92,246,0.65)" }}
+              >
+                {allowTx.isPending || allowRcpt.isLoading ? "Whitelisting…" : "Whitelist wallet"}
+              </button>
+              <button
+                type="button"
+                onClick={() => writeSetFarmOperator(operatorAddr as `0x${string}`, false)}
+                disabled={!isEthAddress(operatorAddr) || operatorBusy}
+                className="flex-1 rounded-xl py-3 font-grotesk text-[12px] font-semibold uppercase tracking-wider disabled:opacity-40"
+                style={{ background: "rgba(248,113,113,0.12)", color: "#F87171", border: "1px solid rgba(248,113,113,0.35)" }}
+              >
+                {revokeTx.isPending || revokeRcpt.isLoading ? "Revoking…" : "Revoke access"}
+              </button>
+            </div>
+          </div>
+
+          {isOwner && (
+            <div className="space-y-4 pt-6" style={{ borderTop: "1px solid rgba(139,92,246,0.2)" }}>
+              <div>
+                <h3 className="font-grotesk text-[18px] sm:text-[20px] font-semibold flex items-center gap-2" style={{ color: "#FFFFFF" }}>
+                  <UserPlus className="w-5 h-5" style={{ color: "#A78BFA" }} />
+                  Manage protocol admins
+                </h3>
+                <p className="font-mono text-[11px] mt-1" style={{ color: "rgba(255,255,255,0.5)" }}>
+                  Only the deployer can add or remove admins. Admins can whitelist farm creators.
+                </p>
+              </div>
+
+              <div>
+                <FarmFieldLabel title="Admin wallet address" />
+                <input
+                  value={adminAddr}
+                  onChange={(e) => setAdminAddr(e.target.value.trim())}
+                  placeholder="0x…"
+                  className={farmInput}
+                  style={inputStyle}
+                />
+              </div>
+
+              {isEthAddress(adminAddr) && (
+                <p className="font-mono text-[11px]" style={{ color: isProtocolAdmin ? "#6EE7B7" : "rgba(255,255,255,0.45)" }}>
+                  {adminQ.isLoading
+                    ? "Checking on-chain…"
+                    : isProtocolAdmin
+                      ? adminAddr.toLowerCase() === owner?.toLowerCase()
+                        ? "Contract deployer (owner)"
+                        : "Already a protocol admin"
+                      : "Not a protocol admin"}
+                </p>
+              )}
+
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  type="button"
+                  onClick={() => writeAddAdmin(adminAddr as `0x${string}`)}
+                  disabled={!isEthAddress(adminAddr) || adminBusy}
+                  className="flex-1 rounded-xl py-3 font-grotesk text-[12px] font-semibold uppercase tracking-wider disabled:opacity-40"
+                  style={{ background: "rgba(139,92,246,0.35)", color: "#FFFFFF", border: "1px solid rgba(139,92,246,0.65)" }}
+                >
+                  {addAdminTx.isPending || addAdminRcpt.isLoading ? "Adding…" : "Add admin"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => writeRemoveAdmin(adminAddr as `0x${string}`)}
+                  disabled={!isEthAddress(adminAddr) || adminBusy || adminAddr.toLowerCase() === owner?.toLowerCase()}
+                  className="flex-1 rounded-xl py-3 font-grotesk text-[12px] font-semibold uppercase tracking-wider disabled:opacity-40"
+                  style={{ background: "rgba(248,113,113,0.12)", color: "#F87171", border: "1px solid rgba(248,113,113,0.35)" }}
+                >
+                  {removeAdminTx.isPending || removeAdminRcpt.isLoading ? "Removing…" : "Remove admin"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
