@@ -87,7 +87,11 @@ function FarmPage() {
         </div>
 
         {activeTab === ALL_FARMS_TAB && <AllFarmsTab farmCount={farmCount} />}
-        {activeTab === CREATE_TAB && isFarmOperator && <FarmManagePanel />}
+        {activeTab === CREATE_TAB && (isFarmOperator ? <FarmManagePanel /> : operatorLoading ? (
+          <div className="flex justify-center py-16">
+            <div className="w-6 h-6 rounded-full border-2 animate-spin" style={{ borderColor: "rgba(139,92,246,0.2)", borderTopColor: "#8B5CF6" }} />
+          </div>
+        ) : null)}
         {activeTab === MY_POSITIONS_TAB && <MyPositionsTab />}
       </div>
     </AppShell>
