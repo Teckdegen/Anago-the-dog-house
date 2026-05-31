@@ -24,7 +24,7 @@ import { TokenIcon } from "@/components/TokenIcon";
 import { bigintToUsd, useTokenPriceUsdLive } from "@/lib/web3/prices";
 import { formatUsdTable } from "@/lib/capricorn/poolMetrics";
 import { useRemoteTokenMeta } from "@/lib/web3/useRemoteTokenMeta";
-import { NftExplorerLink } from "@/components/NftExplorerLink";
+import { useOpenNftExplorer, stopPositionRowClick } from "@/components/NftExplorerLink";
 
 export const Route = createFileRoute("/lock")({
   component: LockPage,
@@ -145,6 +145,7 @@ function LockRow({
   const [localWithdrawn, setLocalWithdrawn] = useState(withdrawn);
   const [successOpen, setSuccessOpen] = useState(false);
   const { toast } = useToast();
+  const openExplorer = useOpenNftExplorer(tokenLock, lockId);
 
   useEffect(() => {
     setLocalWithdrawn(withdrawn);
@@ -186,8 +187,18 @@ function LockRow({
       />
 
       <div
-        className="grid sm:grid-cols-[2fr_1fr_1fr_1fr_1fr_100px] grid-cols-2 gap-2 px-5 py-3.5 items-center hover:bg-[rgba(139,92,246,0.04)] transition-colors"
+        className="grid sm:grid-cols-[2fr_1fr_1fr_1fr_1fr_100px] grid-cols-2 gap-2 px-5 py-3.5 items-center hover:bg-[rgba(139,92,246,0.04)] transition-colors cursor-pointer"
         style={{ borderBottom: isLast ? "none" : "1px solid rgba(139,92,246,0.15)" }}
+        onClick={openExplorer}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            openExplorer();
+          }
+        }}
+        role="link"
+        tabIndex={0}
+        title="View on MonadScan"
       >
       <div className="flex items-center gap-2.5">
         <TokenIcon
@@ -198,12 +209,9 @@ function LockRow({
         />
         <div className="min-w-0">
           <p className="font-grotesk uppercase text-[12px] tracking-wider truncate" style={{ color: "#FFFFFF" }}>{symbol}</p>
-          <div className="flex items-center gap-1.5 min-w-0">
-            <p className="font-mono text-[9px] truncate" style={{ color: "rgba(255,255,255,0.5)" }}>
-              #{lockId.toString()} · {shortAddr(owner)}{isOwner ? " (you)" : ""}
-            </p>
-            <NftExplorerLink contract={tokenLock} tokenId={lockId} />
-          </div>
+          <p className="font-mono text-[9px] truncate" style={{ color: "rgba(255,255,255,0.5)" }}>
+            #{lockId.toString()} · {shortAddr(owner)}{isOwner ? " (you)" : ""}
+          </p>
         </div>
       </div>
       <div className="text-right font-grotesk text-[12px] tabular-nums" style={{ color: "rgba(255,255,255,0.9)" }}>
@@ -224,7 +232,7 @@ function LockRow({
         ) : canClaim ? (
           <button
             type="button"
-            onClick={doWithdraw}
+            onClick={(e) => { stopPositionRowClick(e); void doWithdraw(); }}
             disabled={tx.isPending || rcpt.isLoading}
             className="px-4 py-2 rounded-full font-grotesk text-[10px] uppercase tracking-wider disabled:opacity-50 shrink-0"
             style={{

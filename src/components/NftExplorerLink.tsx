@@ -1,43 +1,43 @@
-import { ExternalLink } from "lucide-react";
+import { useCallback } from "react";
+import type { KeyboardEvent, MouseEvent } from "react";
 import { useChainId } from "wagmi";
 import { explorerNftUrl } from "@/lib/web3/explorer";
 
-type Props = {
-  contract: `0x${string}`;
-  tokenId: bigint | string | number;
-  /** Accessible label override */
-  label?: string;
-  className?: string;
-  /** Show "MonadScan" text beside icon */
-  showLabel?: boolean;
-};
-
-export function NftExplorerLink({
-  contract,
-  tokenId,
-  label,
-  className = "",
-  showLabel = false,
-}: Props) {
+export function useNftExplorerUrl(
+  contract: `0x${string}`,
+  tokenId: bigint | string | number,
+): string {
   const chainId = useChainId();
-  const idStr = typeof tokenId === "bigint" ? tokenId.toString() : String(tokenId);
-  const href = explorerNftUrl(contract, tokenId, chainId);
-  const aria =
-    label ?? `View NFT #${idStr} on MonadScan`;
+  return explorerNftUrl(contract, tokenId, chainId);
+}
 
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      title={aria}
-      aria-label={aria}
-      onClick={(e) => e.stopPropagation()}
-      className={`inline-flex items-center gap-1 shrink-0 rounded-md px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider transition hover:bg-[rgba(139,92,246,0.2)] ${className}`}
-      style={{ color: "#A78BFA", border: "1px solid rgba(139,92,246,0.35)" }}
-    >
-      {showLabel && <span>MonadScan</span>}
-      <ExternalLink className="w-3 h-3" strokeWidth={2} />
-    </a>
-  );
+export function useOpenNftExplorer(
+  contract: `0x${string}`,
+  tokenId: bigint | string | number,
+) {
+  const href = useNftExplorerUrl(contract, tokenId);
+  return useCallback(() => {
+    window.open(href, "_blank", "noopener,noreferrer");
+  }, [href]);
+}
+
+/** Prevent action buttons from triggering the position row explorer click. */
+export function stopPositionRowClick(e: MouseEvent | KeyboardEvent) {
+  e.stopPropagation();
+}
+
+export function positionExplorerRowProps(open: () => void, className = "") {
+  return {
+    role: "link" as const,
+    tabIndex: 0,
+    onClick: open,
+    onKeyDown: (e: KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        open();
+      }
+    },
+    className: `cursor-pointer ${className}`.trim(),
+    title: "View on MonadScan",
+  };
 }

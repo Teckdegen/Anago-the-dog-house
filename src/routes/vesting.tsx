@@ -16,7 +16,7 @@ import { formatAmount } from "@/lib/web3/format";
 import { prepareTransactionWithGas } from "@/lib/web3/gasUtils";
 import { bigintToUsd, useTokenPriceUsdLive } from "@/lib/web3/prices";
 import { formatUsdTable } from "@/lib/capricorn/poolMetrics";
-import { NftExplorerLink } from "@/components/NftExplorerLink";
+import { useOpenNftExplorer, stopPositionRowClick } from "@/components/NftExplorerLink";
 
 export const Route = createFileRoute("/vesting")({
   component: VestingPage,
@@ -212,11 +212,22 @@ function VestingRow({
 
 function VestingRowUI({ nftContract, symbol, decimals, logoUrl, vesting, totalAmount, claimed, claimable, vestedPct, claimedPct, inCliff, fullyVested, hasCliff, cliff, duration, endDate, cliffDate, timeLabel, justClaimed, doClaim, txPending, isLast }: any) {
   const [expanded, setExpanded] = useState(false);
+  const openExplorer = useOpenNftExplorer(nftContract, vesting.id);
 
   return (
     <div
-      className="px-5 py-4 hover:bg-[rgba(139,92,246,0.03)] transition-colors"
+      className="px-5 py-4 hover:bg-[rgba(139,92,246,0.03)] transition-colors cursor-pointer"
       style={{ borderBottom: isLast ? "none" : "1px solid rgba(139,92,246,0.15)" }}
+      onClick={openExplorer}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          openExplorer();
+        }
+      }}
+      role="link"
+      tabIndex={0}
+      title="View on MonadScan"
     >
       {/* Compact row: token, progress bar, action */}
       <div className="flex items-center gap-3">
@@ -227,7 +238,6 @@ function VestingRowUI({ nftContract, symbol, decimals, logoUrl, vesting, totalAm
             <div className="flex items-center gap-2">
               <p className="font-grotesk uppercase text-[12px] tracking-wider truncate" style={{ color: "#FFFFFF" }}>{symbol}</p>
               <span className="font-mono text-[9px]" style={{ color: "rgba(255,255,255,0.4)" }}>#{vesting.id.toString()}</span>
-              <NftExplorerLink contract={nftContract} tokenId={vesting.id} />
             </div>
             {/* Progress bar inline */}
             <div className="relative w-full h-1.5 rounded-full overflow-hidden mt-1.5" style={{ background: "rgba(139,92,246,0.12)" }}>
@@ -241,7 +251,7 @@ function VestingRowUI({ nftContract, symbol, decimals, logoUrl, vesting, totalAm
         </div>
 
         {/* Status + action */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0" onClick={stopPositionRowClick}>
           {vesting.revoked ? (
             <span className="font-mono text-[9px] uppercase" style={{ color: "rgba(255,100,100,0.7)" }}>Revoked</span>
           ) : justClaimed ? (

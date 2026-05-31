@@ -19,7 +19,7 @@ import {
 } from "@/lib/capricorn";
 import { NPM_ABI } from "@/lib/capricorn/abis";
 import { clmm } from "./clmmTheme";
-import { NftExplorerLink } from "@/components/NftExplorerLink";
+import { useOpenNftExplorer, stopPositionRowClick } from "@/components/NftExplorerLink";
 
 export function PositionCards({
   positions,
@@ -97,6 +97,7 @@ function PositionCard({ position: pos }: { position: LpPosition }) {
   const canRemove = pos.liquidity > 0n;
   const owed0Label = formatTokenAmount(pos.tokensOwed0, pos.token0Decimals);
   const owed1Label = formatTokenAmount(pos.tokensOwed1, pos.token1Decimals);
+  const openExplorer = useOpenNftExplorer(positionManager, pos.tokenId);
 
   const runCollect = async () => {
     if (!address || !publicClient) return;
@@ -155,8 +156,18 @@ function PositionCard({ position: pos }: { position: LpPosition }) {
 
   return (
     <div
-      className="rounded-xl p-5 flex flex-col h-full"
+      className="rounded-xl p-5 flex flex-col h-full cursor-pointer transition hover:bg-[rgba(139,92,246,0.06)]"
       style={{ border: `1px solid ${clmm.border}`, background: clmm.purpleBg }}
+      onClick={openExplorer}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          openExplorer();
+        }
+      }}
+      role="link"
+      tabIndex={0}
+      title="View on MonadScan"
     >
       <div className="flex items-center gap-3 mb-3">
         <div className="relative flex shrink-0">
@@ -169,12 +180,9 @@ function PositionCard({ position: pos }: { position: LpPosition }) {
           <p className="font-grotesk text-[15px] font-medium truncate" style={{ color: clmm.text }}>
             {pos.token0Symbol}/{pos.token1Symbol}
           </p>
-          <div className="flex items-center gap-1.5">
-            <p className="font-mono text-[9px]" style={{ color: clmm.textDim }}>
-              NFT #{pos.tokenId.toString()}
-            </p>
-            <NftExplorerLink contract={positionManager} tokenId={pos.tokenId} />
-          </div>
+          <p className="font-mono text-[9px]" style={{ color: clmm.textDim }}>
+            NFT #{pos.tokenId.toString()}
+          </p>
         </div>
       </div>
 
@@ -198,7 +206,7 @@ function PositionCard({ position: pos }: { position: LpPosition }) {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 pt-3" style={{ borderTop: `1px solid ${clmm.border}` }}>
+      <div className="flex flex-wrap gap-2 pt-3" style={{ borderTop: `1px solid ${clmm.border}` }} onClick={stopPositionRowClick}>
         <button
           type="button"
           onClick={runCollect}

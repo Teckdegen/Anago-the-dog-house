@@ -5,7 +5,7 @@ import { useAccount, useReadContract, useReadContracts, useWriteContract, useWai
 import { prepareTransactionWithGas } from "@/lib/web3/gasUtils";
 import { LIVE_CHAIN_QUERY } from "@/lib/web3/nftImage";
 import { NftImage } from "@/components/NftImage";
-import { NftExplorerLink } from "@/components/NftExplorerLink";
+import { useOpenNftExplorer, stopPositionRowClick } from "@/components/NftExplorerLink";
 import { parseUnits, formatUnits } from "viem";
 import { AppShell } from "@/components/AppShell";
 import { useToast } from "@/components/Toast";
@@ -611,9 +611,23 @@ function PositionCardInner({ tokenId, farmId, amount, boost, locked, lockExpiry,
   const now = Math.floor(Date.now() / 1000);
   const lockDaysLeft = locked ? Math.ceil((Number(lockExpiry) - now) / 86400) : 0;
   const stakedFormatted = Number(formatUnits(amount ?? 0n, decimals)).toLocaleString();
+  const openExplorer = useOpenNftExplorer(contracts.streamFarm, tokenId);
 
   return (
-    <div className="rounded-xl p-5" style={{ border: "1px solid rgba(139,92,246,0.35)", background: "rgba(139,92,246,0.05)" }}>
+    <div
+      className="rounded-xl p-5 cursor-pointer transition hover:bg-[rgba(139,92,246,0.08)]"
+      style={{ border: "1px solid rgba(139,92,246,0.35)", background: "rgba(139,92,246,0.05)" }}
+      onClick={openExplorer}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          openExplorer();
+        }
+      }}
+      role="link"
+      tabIndex={0}
+      title="View on MonadScan"
+    >
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
@@ -632,11 +646,10 @@ function PositionCardInner({ tokenId, farmId, amount, boost, locked, lockExpiry,
                 {boost > 1 && ` · ${boost}x boost`}
                 {locked && ` · ${lockDaysLeft}d locked`}
               </p>
-              <NftExplorerLink contract={contracts.streamFarm} tokenId={tokenId} />
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0" onClick={stopPositionRowClick}>
           {hasPending && (
             <button onClick={onClaim} disabled={claimPending}
               className="px-3 py-1.5 rounded-xl font-grotesk text-[10px] uppercase tracking-wider transition hover:opacity-90 disabled:opacity-40"

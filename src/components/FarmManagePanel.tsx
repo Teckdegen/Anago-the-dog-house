@@ -13,6 +13,7 @@ import { STREAM_FARM_ABI, CONTRACTS, ERC20_ABI } from "@/lib/web3/contracts";
 import { LIVE_CHAIN_QUERY } from "@/lib/web3/nftImage";
 import { prepareTransactionWithGas } from "@/lib/web3/gasUtils";
 import { useToast } from "@/components/Toast";
+import { SuccessModal } from "@/components/SuccessModal";
 import { TokenPicker } from "@/components/TokenPicker";
 import { TokenIcon } from "@/components/TokenIcon";
 import { useRemoteTokenMeta } from "@/lib/web3/useRemoteTokenMeta";
@@ -203,6 +204,8 @@ function CreateFarmForm() {
   const [days, setDays] = useState("30");
   const [delayHours, setDelayHours] = useState("0");
   const [open, setOpen] = useState(false);
+  const [successOpen, setSuccessOpen] = useState(false);
+  const [successRows, setSuccessRows] = useState<{ label: string; value: string }[]>([]);
 
   const createTx = useWriteContract();
   const createRcpt = useWaitForTransactionReceipt({ hash: createTx.data });
@@ -335,7 +338,14 @@ function CreateFarmForm() {
 
   useEffect(() => {
     if (!addRcpt.isSuccess) return;
-    toast("success", "Farm live!", "Farm created and reward stream funded.");
+    const farmId = pendingFarmIdRef.current;
+    setSuccessRows([
+      { label: "Stake token", value: token?.symbol ?? "—" },
+      { label: "Reward token", value: rewardToken?.symbol ?? "—" },
+      { label: "Reward budget", value: budget ? `${budget} ${rewardToken?.symbol ?? ""}`.trim() : "—" },
+      { label: "Farm ID", value: farmId != null ? `#${farmId.toString()}` : "—" },
+    ]);
+    setSuccessOpen(true);
     resetForm();
     createTx.reset();
     approveTx.reset();
@@ -361,6 +371,15 @@ function CreateFarmForm() {
   const canSubmit = !!token && !!rewardToken && rewardBudget.validBudget && !busy;
 
   return (
+    <>
+      <SuccessModal
+        open={successOpen}
+        onClose={() => setSuccessOpen(false)}
+        title="Stream Farms"
+        heading="Farm Created"
+        subtext="Your farm is live and the initial reward stream has been funded."
+        rows={successRows}
+      />
     <div className="rounded-xl p-5" style={{ border: "1px solid rgba(139,92,246,0.35)", background: "rgba(139,92,246,0.05)" }}>
       <button
         type="button"
@@ -453,6 +472,7 @@ function CreateFarmForm() {
         </div>
       )}
     </div>
+    </>
   );
 }
 
@@ -654,6 +674,8 @@ function AddRewardStreamForm({ farmId }: { farmId: number }) {
   const addTx = useWriteContract();
   const addRcpt = useWaitForTransactionReceipt({ hash: addTx.data });
   const autoAddAfterApproveRef = useRef(false);
+  const [successOpen, setSuccessOpen] = useState(false);
+  const [successRows, setSuccessRows] = useState<{ label: string; value: string }[]>([]);
 
   const budgetMeta = useRewardBudget(token, budget);
   const { parsedBudget, validBudget } = budgetMeta;
@@ -713,9 +735,36 @@ function AddRewardStreamForm({ farmId }: { farmId: number }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [approveRcpt.isSuccess]);
 
+  useEffect(() => {
+    if (!addRcpt.isSuccess) return;
+    setSuccessRows([
+      { label: "Farm", value: `#${farmId}` },
+      { label: "Token", value: token?.symbol ?? "—" },
+      { label: "Budget", value: budget ? `${budget} ${token?.symbol ?? ""}`.trim() : "—" },
+      { label: "Duration", value: `${days} days` },
+    ]);
+    setSuccessOpen(true);
+    setBudget("");
+    setDays("30");
+    setDelayHours("0");
+    setToken(null);
+    addTx.reset();
+    approveTx.reset();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [addRcpt.isSuccess]);
+
   const busy = approveTx.isPending || approveRcpt.isLoading || addTx.isPending || addRcpt.isLoading;
 
   return (
+    <>
+      <SuccessModal
+        open={successOpen}
+        onClose={() => setSuccessOpen(false)}
+        title="Stream Farms"
+        heading="Rewards Added"
+        subtext="Your reward stream is funded and emissions will begin on schedule."
+        rows={successRows}
+      />
     <div className="mt-4 pt-4 space-y-3" style={{ borderTop: "1px solid rgba(139,92,246,0.12)" }}>
       <RewardStreamFields
         token={token}
@@ -750,11 +799,8 @@ function AddRewardStreamForm({ farmId }: { farmId: number }) {
           {addTx.isPending || addRcpt.isLoading ? "Adding…" : "Add reward stream"}
         </button>
       )}
-      {addRcpt.isSuccess && (
-        <p className="font-mono text-[10px]" style={{ color: "#A78BFA" }}>
-          Reward stream added.
-        </p>
       )}
     </div>
+    </>
   );
 }

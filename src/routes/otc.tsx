@@ -11,7 +11,8 @@ import { shortAddr } from "@/lib/web3/format";
 import { prepareTransactionWithGas } from "@/lib/web3/gasUtils";
 import { LIVE_CHAIN_QUERY } from "@/lib/web3/nftImage";
 import { NftImage } from "@/components/NftImage";
-import { NftExplorerLink } from "@/components/NftExplorerLink";
+import { useOpenNftExplorer, stopPositionRowClick } from "@/components/NftExplorerLink";
+import { explorerNftUrl } from "@/lib/web3/explorer";
 import { TokenPicker } from "@/components/TokenPicker";
 import { parseListingTuple } from "@/lib/web3/parseOtc";
 
@@ -162,6 +163,10 @@ function ListingCard({ listingId, showBuy, showUnlist, showInactive }: { listing
 
   const listingQ = useReadContract({ address: contracts.otcMarket, abi: OTC_MARKET_ABI, functionName: "getListing", args: [listingId], query: { refetchInterval: 10_000 } });
   const listing = parseListingTuple(listingQ.data);
+  const openExplorer = useOpenNftExplorer(
+    (listing?.nftContract ?? "0x0000000000000000000000000000000000000000") as `0x${string}`,
+    listing?.tokenId ?? 0n,
+  );
 
   const paymentToken = listing?.paymentToken ?? NATIVE_PAYMENT;
   const isNativePayment = isNativePaymentToken(paymentToken);
@@ -334,7 +339,19 @@ function ListingCard({ listingId, showBuy, showUnlist, showInactive }: { listing
     <>
     <SuccessModal open={successOpen} onClose={() => { setSuccessOpen(false); buyTx.reset(); pendingBuyHashRef.current = undefined; }} title="OTC Market" heading={successMsg.heading} subtext={successMsg.subtext} rows={[{ label: "Listing", value: `#${listingId.toString()}` }, { label: "Price", value: `${priceFormatted} ${paySym}` }]} />
     <div className="rounded-xl p-5 flex items-center justify-between gap-4" style={{ border: "1px solid rgba(139,92,246,0.3)", background: "rgba(139,92,246,0.04)" }}>
-      <div className="flex items-center gap-3 min-w-0">
+      <div
+        className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer"
+        onClick={() => listing && openExplorer()}
+        onKeyDown={(e) => {
+          if ((e.key === "Enter" || e.key === " ") && listing) {
+            e.preventDefault();
+            openExplorer();
+          }
+        }}
+        role="link"
+        tabIndex={0}
+        title="View on MonadScan"
+      >
         <NftImage
           contract={nftContract as `0x${string}`}
           tokenId={BigInt(tokenId ?? 0)}
@@ -345,7 +362,6 @@ function ListingCard({ listingId, showBuy, showUnlist, showInactive }: { listing
           <div className="flex items-center gap-2 mb-1">
             <span className="px-2 py-0.5 rounded font-mono text-[9px] uppercase" style={{ background: "rgba(139,92,246,0.15)", color: "#A78BFA", border: "1px solid rgba(139,92,246,0.3)" }}>{nftLabel}</span>
             <p className="font-grotesk text-[14px] font-medium" style={{ color: "#FFFFFF" }}>#{tokenId?.toString()}</p>
-            <NftExplorerLink contract={nftContract as `0x${string}`} tokenId={tokenId ?? 0n} showLabel />
           </div>
           <p className="font-mono text-[10px]" style={{ color: "rgba(255,255,255,0.5)" }}>
             Seller: {shortAddr(seller)} · Price: {priceFormatted} {paySym}
@@ -356,7 +372,7 @@ function ListingCard({ listingId, showBuy, showUnlist, showInactive }: { listing
         </div>
       </div>
 
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="flex items-center gap-2 shrink-0" onClick={stopPositionRowClick}>
         {showBuy && !isSeller && (
           insufficientBalance ? (
             <span className="font-mono text-[9px] px-3 py-2 rounded-xl" style={{ color: "rgba(255,120,120,0.9)", border: "1px solid rgba(255,120,120,0.35)" }}>
@@ -568,6 +584,7 @@ function SellTab() {
 
 function UserPositionsList({ selected, onSelect }: { selected: any; onSelect: (s: any) => void }) {
   const { address } = useAccount();
+  const chainId = useChainId();
   const contracts = useContracts();
 
   const locksQ = useReadContract({ address: contracts.tokenLock, abi: TOKEN_LOCK_ABI, functionName: "locksOf", args: address ? [address] : undefined, query: { ...LIVE_CHAIN_QUERY, enabled: !!address, refetchInterval: 10_000 } });
@@ -620,16 +637,22 @@ function UserPositionsList({ selected, onSelect }: { selected: any; onSelect: (s
       {allPositions.map((pos) => {
         const isSelected = selected?.contract === pos.contract && selected?.tokenId === pos.tokenId;
         return (
-          <button key={`${pos.contract}-${pos.tokenId}`} onClick={() => onSelect(isSelected ? null : pos)}
-            className="w-full text-left p-3 rounded-xl transition"
-            style={{ background: isSelected ? "rgba(139,92,246,0.2)" : "rgba(139,92,246,0.06)", border: `1px solid ${isSelected ? "rgba(139,92,246,0.6)" : "rgba(139,92,246,0.2)"}` }}>
+          <button
+            key={`${pos.contract}-${pos.tokenId}`}
+            onClick={() => {
+              window.open(explorerNftUrl(pos.contract, pos.tokenId, chainId), "_blank", "noopener,noreferrer");
+              onSelect(isSelected ? null : pos);
+            }}
+            className="w-full text-left p-3 rounded-xl transition cursor-pointer"
+            style={{ background: isSelected ? "rgba(139,92,246,0.2)" : "rgba(139,92,246,0.06)", border: `1px solid ${isSelected ? "rgba(139,92,246,0.6)" : "rgba(139,92,246,0.2)"}` }}
+            title="View on MonadScan · click to select for listing"
+          >
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0">
                 <NftImage contract={pos.contract} tokenId={BigInt(pos.tokenId)} size={44} fallbackLetter={pos.label} />
                 <div className="min-w-0">
                   <span className="px-2 py-0.5 rounded font-mono text-[8px] uppercase" style={{ background: "rgba(139,92,246,0.15)", color: "#A78BFA" }}>{pos.label}</span>
                   <span className="font-mono text-[12px] ml-2" style={{ color: "#FFFFFF" }}>#{pos.tokenId}</span>
-                  <NftExplorerLink contract={pos.contract} tokenId={pos.tokenId} />
                 </div>
               </div>
               {isSelected && (
