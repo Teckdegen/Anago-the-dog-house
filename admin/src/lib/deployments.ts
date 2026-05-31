@@ -11,10 +11,8 @@ function addr(envKey: string, fallback: `0x${string}`): `0x${string}` {
   return fallback;
 }
 
-export const STREAM_FARM_ADDRESS = addr(
-  "NEXT_PUBLIC_STREAM_FARM_ADDRESS",
-  MAINNET_DEPLOYMENTS.streamFarm,
-);
+/** Same address as main app — from deployments.generated.ts (no .env override) */
+export const STREAM_FARM_ADDRESS = MAINNET_DEPLOYMENTS.streamFarm;
 export const TOKEN_LOCK_ADDRESS = addr(
   "NEXT_PUBLIC_TOKEN_LOCK_ADDRESS",
   MAINNET_DEPLOYMENTS.tokenLock,

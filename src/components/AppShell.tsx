@@ -1,6 +1,6 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import type { ReactNode } from "react";
-import { LayoutDashboard, Timer, LockKeyhole, Sprout, Send, ShoppingBag, BarChart2 } from "lucide-react";
+import { LayoutDashboard, Timer, LockKeyhole, Sprout, ShoppingBag, BarChart2 } from "lucide-react";
 import { WalletStatusPill } from "./WalletStatusPill";
 import { NetworkRouteBanner } from "./NetworkRouteBanner";
 import { theme } from "@/lib/theme";
@@ -12,7 +12,6 @@ const NAV = [
   { label: "Yield Farm", href: "/farm" },
   { label: "OTC", href: "/otc" },
   { label: "CLMM", href: "/clmm" },
-  { label: "Transfer", href: "/transfer" },
 ] as const;
 
 const BOTTOM_NAV = [
@@ -22,7 +21,6 @@ const BOTTOM_NAV = [
   { label: "Farm", href: "/farm", icon: Sprout },
   { label: "OTC", href: "/otc", icon: ShoppingBag },
   { label: "CLMM", href: "/clmm", icon: BarChart2 },
-  { label: "Transfer", href: "/transfer", icon: Send },
 ] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {

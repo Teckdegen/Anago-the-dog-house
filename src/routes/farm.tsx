@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Search, Sprout, Plus, X, Clock, Wallet } from "lucide-react";
 import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt, useChainId, usePublicClient } from "wagmi";
 import { prepareTransactionWithGas } from "@/lib/web3/gasUtils";
 import { LIVE_CHAIN_QUERY } from "@/lib/web3/nftImage";
 import { NftImage } from "@/components/NftImage";
+import { NftExplorerLink } from "@/components/NftExplorerLink";
 import { parseUnits, formatUnits } from "viem";
 import { AppShell } from "@/components/AppShell";
 import { useToast } from "@/components/Toast";
@@ -12,14 +13,18 @@ import { STREAM_FARM_ABI, CONTRACTS, ERC20_ABI } from "@/lib/web3/contracts";
 import type { TokenInfo } from "@/lib/web3/tokens";
 import { TokenIcon } from "@/components/TokenIcon";
 import { useRemoteTokenMeta } from "@/lib/web3/useRemoteTokenMeta";
+import { FarmManagePanel } from "@/components/FarmManagePanel";
+import { useIsFarmOperator } from "@/lib/web3/useStreamFarmRoles";
 
 export const Route = createFileRoute("/farm")({
   component: FarmPage,
   head: () => ({ meta: [{ title: "Stream Farms — The Dog House" }, { name: "description", content: "Streaming reward farms on Monad." }] }),
 });
 
-const TABS = ["All Farms", "My Positions"] as const;
-type Tab = (typeof TABS)[number];
+const CREATE_TAB = "Create & Manage" as const;
+const ALL_FARMS_TAB = "All Farms" as const;
+const MY_POSITIONS_TAB = "My Positions" as const;
+type Tab = typeof ALL_FARMS_TAB | typeof CREATE_TAB | typeof MY_POSITIONS_TAB;
 
 function useContracts() {
   const chainId = useChainId();
@@ -27,10 +32,25 @@ function useContracts() {
 }
 
 function FarmPage() {
-  const [activeTab, setActiveTab] = useState<Tab>("All Farms");
+  const [activeTab, setActiveTab] = useState<Tab>(ALL_FARMS_TAB);
   const [search, setSearch] = useState("");
   const { address } = useAccount();
   const contracts = useContracts();
+  const { isFarmOperator, isLoading: operatorLoading } = useIsFarmOperator();
+
+  const visibleTabs = useMemo((): Tab[] => {
+    const tabs: Tab[] = [ALL_FARMS_TAB];
+    if (isFarmOperator) tabs.push(CREATE_TAB);
+    tabs.push(MY_POSITIONS_TAB);
+    return tabs;
+  }, [isFarmOperator]);
+
+  useEffect(() => {
+    if (operatorLoading) return;
+    if (activeTab === CREATE_TAB && !isFarmOperator) {
+      setActiveTab(ALL_FARMS_TAB);
+    }
+  }, [operatorLoading, isFarmOperator, activeTab]);
 
   const farmCountQ = useReadContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "farmCount", query: { ...LIVE_CHAIN_QUERY, refetchInterval: 10_000 } });
   const farmCount = Number(farmCountQ.data ?? 0);
@@ -49,7 +69,7 @@ function FarmPage() {
 
         <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
           <div className="flex items-center gap-0.5 p-1 rounded-full" style={{ background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.25)" }}>
-            {TABS.map((t) => (
+            {visibleTabs.map((t) => (
               <button key={t} onClick={() => setActiveTab(t)}
                 className="px-4 py-1.5 rounded-full font-grotesk text-[11px] uppercase tracking-wider transition whitespace-nowrap"
                 style={activeTab === t ? { background: "rgba(139,92,246,0.35)", color: "#FFFFFF", border: "1px solid rgba(139,92,246,0.6)" } : { color: "rgba(255,255,255,0.5)" }}>
@@ -57,7 +77,7 @@ function FarmPage() {
               </button>
             ))}
           </div>
-          {activeTab === "All Farms" && (
+          {activeTab === ALL_FARMS_TAB && (
             <div className="flex items-center gap-2 px-3 py-2 rounded-full" style={{ background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.25)" }}>
               <Search className="w-3.5 h-3.5" style={{ color: "rgba(255,255,255,0.5)" }} strokeWidth={1.5} />
               <input type="text" placeholder="Search farms…" value={search} onChange={(e) => setSearch(e.target.value)}
@@ -66,8 +86,9 @@ function FarmPage() {
           )}
         </div>
 
-        {activeTab === "All Farms" && <AllFarmsTab farmCount={farmCount} />}
-        {activeTab === "My Positions" && <MyPositionsTab />}
+        {activeTab === ALL_FARMS_TAB && <AllFarmsTab farmCount={farmCount} />}
+        {activeTab === CREATE_TAB && isFarmOperator && <FarmManagePanel />}
+        {activeTab === MY_POSITIONS_TAB && <MyPositionsTab />}
       </div>
     </AppShell>
   );
@@ -86,8 +107,8 @@ function AllFarmsTab({ farmCount }: { farmCount: number }) {
             <Sprout className="w-5 h-5" style={{ color: "rgba(255,255,255,0.7)" }} strokeWidth={1.5} />
           </div>
           <p className="font-grotesk uppercase text-[14px] tracking-wider" style={{ color: "#FFFFFF" }}>No Farms Yet</p>
-          <p className="font-mono text-[11px] mt-2 max-w-[300px]" style={{ color: "rgba(255,255,255,0.55)" }}>
-            Farms are created by the admin from the Admin dashboard. Check back soon!
+          <p className="font-mono text-[11px] mt-2 max-w-[320px]" style={{ color: "rgba(255,255,255,0.55)" }}>
+            Whitelisted creators can launch farms from Create &amp; Manage. Get your wallet approved by a protocol admin first.
           </p>
         </div>
       </div>
@@ -601,11 +622,14 @@ function PositionCardInner({ tokenId, farmId, amount, boost, locked, lockExpiry,
             <p className="font-grotesk text-[14px] font-medium tracking-tight" style={{ color: "#FFFFFF" }}>
               {stakedFormatted} {symbol}
             </p>
-            <p className="font-mono text-[10px]" style={{ color: "rgba(255,255,255,0.45)" }}>
-              Position #{tokenId.toString()} · Farm #{farmId?.toString()}
-              {boost > 1 && ` · ${boost}x boost`}
-              {locked && ` · ${lockDaysLeft}d locked`}
-            </p>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <p className="font-mono text-[10px]" style={{ color: "rgba(255,255,255,0.45)" }}>
+                Position #{tokenId.toString()} · Farm #{farmId?.toString()}
+                {boost > 1 && ` · ${boost}x boost`}
+                {locked && ` · ${lockDaysLeft}d locked`}
+              </p>
+              <NftExplorerLink contract={contracts.streamFarm} tokenId={tokenId} />
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">

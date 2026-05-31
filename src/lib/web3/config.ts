@@ -25,7 +25,7 @@ export const monad = defineChain({
     default: { http: ["https://rpc.monad.xyz"] },
   },
   blockExplorers: {
-    default: { name: "Monad Explorer", url: "https://monadexplorer.com" },
+    default: { name: "MonadScan", url: "https://monadscan.com" },
   },
 });
 

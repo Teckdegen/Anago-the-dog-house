@@ -68,8 +68,14 @@ contract StreamFarm is ERC721, Ownable, ReentrancyGuard {
     uint256 public constant BASIS_POINTS = 10000;
     uint256 public constant PRECISION = 1e36;
 
-    // Multi-admin support
+    // Protocol admins: whitelist operators, add admins, recover tokens, boost tiers
     mapping(address => bool) public admins;
+
+    // Whitelisted wallets allowed to create and manage their own farms
+    mapping(address => bool) public farmOperators;
+
+    /// @dev Farm IDs per creator — for listing a wallet's pools without scanning all farms.
+    mapping(address => uint256[]) private _farmsByCreator;
 
     // Boost tiers: lock duration => multiplier (1e18 scaled)
     uint256[] public boostDurations;   // e.g. [7 days, 30 days, 90 days]
@@ -87,6 +93,7 @@ contract StreamFarm is ERC721, Ownable, ReentrancyGuard {
     event FarmActiveToggled(uint256 indexed farmId, bool active);
     event AdminAdded(address indexed admin);
     event AdminRemoved(address indexed admin);
+    event FarmOperatorUpdated(address indexed operator, bool allowed);
 
     // ═══════════════════════════════════════════════════════════════════════
     //                          MODIFIERS
@@ -94,6 +101,21 @@ contract StreamFarm is ERC721, Ownable, ReentrancyGuard {
 
     modifier onlyAdmin() {
         require(admins[msg.sender] || msg.sender == owner(), "Not admin");
+        _;
+    }
+
+    modifier onlyFarmOperator() {
+        require(
+            farmOperators[msg.sender] || admins[msg.sender] || msg.sender == owner(),
+            "Not farm operator"
+        );
+        _;
+    }
+
+    /** Farm creator only — whitelisted operators cannot manage another user's pool. */
+    modifier onlyFarmCreator(uint256 farmId) {
+        require(farmId < farms.length, "Invalid farm");
+        require(msg.sender == farms[farmId].creator, "Not farm creator");
         _;
     }
 
@@ -132,12 +154,39 @@ contract StreamFarm is ERC721, Ownable, ReentrancyGuard {
         return admins[account] || account == owner();
     }
 
+    /**
+     * @notice Whitelist or revoke a wallet that may create and manage farms.
+     */
+    function setFarmOperator(address operator, bool allowed) external onlyAdmin {
+        require(operator != address(0), "Invalid address");
+        farmOperators[operator] = allowed;
+        emit FarmOperatorUpdated(operator, allowed);
+    }
+
+    function isFarmOperator(address account) external view returns (bool) {
+        return farmOperators[account] || admins[account] || account == owner();
+    }
+
+    function getFarmCreator(uint256 farmId) external view returns (address) {
+        require(farmId < farms.length, "Invalid farm");
+        return farms[farmId].creator;
+    }
+
+    function isFarmCreator(address account, uint256 farmId) external view returns (bool) {
+        require(farmId < farms.length, "Invalid farm");
+        return account == farms[farmId].creator;
+    }
+
+    function farmsOfCreator(address creator) external view returns (uint256[] memory) {
+        return _farmsByCreator[creator];
+    }
+
     // ═══════════════════════════════════════════════════════════════════════
-    //                      ADMIN: FARM MANAGEMENT
+    //                      FARM OPERATOR: CREATE & MANAGE
     // ═══════════════════════════════════════════════════════════════════════
 
     /**
-     * @notice Create a new farm. Only owner (admin).
+     * @notice Create a new farm. Whitelisted operators only.
      * @param stakeToken Token users will deposit
      * @param lockDuration Optional lock period in seconds (0 = no lock)
      * @param earlyWithdrawBps Penalty for early withdrawal in basis points (0 = no penalty)
@@ -146,7 +195,7 @@ contract StreamFarm is ERC721, Ownable, ReentrancyGuard {
         IERC20 stakeToken,
         uint256 lockDuration,
         uint256 earlyWithdrawBps
-    ) external onlyAdmin returns (uint256 farmId) {
+    ) external onlyFarmOperator returns (uint256 farmId) {
         require(address(stakeToken) != address(0), "Invalid stake token");
         require(earlyWithdrawBps <= 5000, "Max 50% penalty");
 
@@ -161,11 +210,12 @@ contract StreamFarm is ERC721, Ownable, ReentrancyGuard {
         }));
 
         farmId = farms.length - 1;
+        _farmsByCreator[msg.sender].push(farmId);
         emit FarmCreated(farmId, msg.sender, address(stakeToken));
     }
 
     /**
-     * @notice Add a reward stream to a farm. Only owner.
+     * @notice Add a reward stream to a farm. Only the wallet that created this farm.
      * @param farmId Target farm
      * @param rewardToken Token to distribute
      * @param totalBudget Total tokens to stream
@@ -178,8 +228,7 @@ contract StreamFarm is ERC721, Ownable, ReentrancyGuard {
         uint256 totalBudget,
         uint256 startTime,
         uint256 endTime
-    ) external onlyAdmin nonReentrant {
-        require(farmId < farms.length, "Invalid farm");
+    ) external onlyFarmCreator(farmId) nonReentrant {
         require(address(rewardToken) != address(0), "Invalid reward token");
         require(endTime > startTime, "End must be after start");
         require(totalBudget > 0, "Budget must be > 0");
@@ -206,9 +255,17 @@ contract StreamFarm is ERC721, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice Toggle farm active status
+     * @notice Toggle farm active status. Only the farm creator (not other operators).
      */
-    function setFarmActive(uint256 farmId, bool active) external onlyAdmin {
+    function setFarmActive(uint256 farmId, bool active) external onlyFarmCreator(farmId) {
+        farms[farmId].active = active;
+        emit FarmActiveToggled(farmId, active);
+    }
+
+    /**
+     * @notice Protocol admin emergency pause / unpause for any farm.
+     */
+    function setFarmActiveByAdmin(uint256 farmId, bool active) external onlyAdmin {
         require(farmId < farms.length, "Invalid farm");
         farms[farmId].active = active;
         emit FarmActiveToggled(farmId, active);

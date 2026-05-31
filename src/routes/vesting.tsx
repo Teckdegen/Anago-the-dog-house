@@ -16,6 +16,7 @@ import { formatAmount } from "@/lib/web3/format";
 import { prepareTransactionWithGas } from "@/lib/web3/gasUtils";
 import { bigintToUsd, useTokenPriceUsdLive } from "@/lib/web3/prices";
 import { formatUsdTable } from "@/lib/capricorn/poolMetrics";
+import { NftExplorerLink } from "@/components/NftExplorerLink";
 
 export const Route = createFileRoute("/vesting")({
   component: VestingPage,
@@ -179,6 +180,7 @@ function VestingRow({
       />
 
       <VestingRowUI
+        nftContract={vestingNFT}
         symbol={symbol}
         decimals={decimals}
         logoUrl={remote?.logoURI}
@@ -208,7 +210,7 @@ function VestingRow({
   );
 }
 
-function VestingRowUI({ symbol, decimals, logoUrl, vesting, totalAmount, claimed, claimable, vestedPct, claimedPct, inCliff, fullyVested, hasCliff, cliff, duration, endDate, cliffDate, timeLabel, justClaimed, doClaim, txPending, isLast }: any) {
+function VestingRowUI({ nftContract, symbol, decimals, logoUrl, vesting, totalAmount, claimed, claimable, vestedPct, claimedPct, inCliff, fullyVested, hasCliff, cliff, duration, endDate, cliffDate, timeLabel, justClaimed, doClaim, txPending, isLast }: any) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -225,6 +227,7 @@ function VestingRowUI({ symbol, decimals, logoUrl, vesting, totalAmount, claimed
             <div className="flex items-center gap-2">
               <p className="font-grotesk uppercase text-[12px] tracking-wider truncate" style={{ color: "#FFFFFF" }}>{symbol}</p>
               <span className="font-mono text-[9px]" style={{ color: "rgba(255,255,255,0.4)" }}>#{vesting.id.toString()}</span>
+              <NftExplorerLink contract={nftContract} tokenId={vesting.id} />
             </div>
             {/* Progress bar inline */}
             <div className="relative w-full h-1.5 rounded-full overflow-hidden mt-1.5" style={{ background: "rgba(139,92,246,0.12)" }}>

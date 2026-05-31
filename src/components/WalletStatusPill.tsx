@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ChevronDown, Copy, LogOut, Settings2 } from "lucide-react";
+import { ChevronDown, Copy, LogOut, Settings2, Shield } from "lucide-react";
 import { useAccount, useDisconnect } from "wagmi";
 import { useAppKit } from "@reown/appkit/react";
+import { explorerAddressUrl } from "@/lib/web3/explorer";
+import { useIsStreamFarmAdmin } from "@/lib/web3/useStreamFarmRoles";
+
+const ADMIN_APP_URL =
+  (import.meta.env.VITE_ADMIN_APP_URL as string | undefined)?.trim() || "";
 
 function shorten(a: string) {
   return `${a.slice(0, 6)}…${a.slice(-4)}`;
@@ -23,6 +28,7 @@ export function WalletStatusPill() {
   const { address, isConnected } = useAccount();
   const { open } = useAppKit();
   const { disconnect } = useDisconnect();
+  const { isAdmin } = useIsStreamFarmAdmin();
   const [copied, setCopied] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -121,9 +127,19 @@ export function WalletStatusPill() {
             label="View on Explorer"
             onClick={() => {
               closeMenu();
-              window.open(`https://monadexplorer.com/address/${address}`, "_blank", "noopener");
+              window.open(explorerAddressUrl(address), "_blank", "noopener");
             }}
           />
+          {isAdmin && ADMIN_APP_URL && (
+            <ProfileMenuItem
+              icon={<Shield className="w-4 h-4" />}
+              label="Protocol admin"
+              onClick={() => {
+                closeMenu();
+                window.open(ADMIN_APP_URL, "_blank", "noopener");
+              }}
+            />
+          )}
 
           <div className="my-1 h-px" style={{ background: "rgba(139,92,246,0.15)" }} />
 

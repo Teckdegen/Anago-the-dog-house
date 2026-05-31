@@ -3,6 +3,6 @@ export const MAINNET_DEPLOYMENTS = {
   chainId: 143,
   tokenLock: "0x12563124736400C9d6E2CBE8d8114545f4A8923f" as `0x${string}`,
   vestingNFT: "0x2167d1c0713bcDD77f6932c355EF7A7b983B0299" as `0x${string}`,
-  streamFarm: "0xC57201aD89B86Af48c0dB303350b364A8ED9582b" as `0x${string}`,
+  streamFarm: "0xC84D1e9C9Acc23254E7202a0a549e6c93D1bE6dB" as `0x${string}`,
   otcMarket: "0xE211Cd80d70b2C5FA5e82355E4B50924A907018A" as `0x${string}`,
 };

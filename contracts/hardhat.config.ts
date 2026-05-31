@@ -29,6 +29,7 @@ const config: HardhatUserConfig = {
     },
     monad: {
       url: MONAD_MAINNET_RPC,
+      chainId: 143,
       accounts: PRIVATE_KEY ? [PRIVATE_KEY] : [],
     },
   },

@@ -19,6 +19,7 @@ import {
 } from "@/lib/capricorn";
 import { NPM_ABI } from "@/lib/capricorn/abis";
 import { clmm } from "./clmmTheme";
+import { NftExplorerLink } from "@/components/NftExplorerLink";
 
 export function PositionCards({
   positions,
@@ -168,9 +169,12 @@ function PositionCard({ position: pos }: { position: LpPosition }) {
           <p className="font-grotesk text-[15px] font-medium truncate" style={{ color: clmm.text }}>
             {pos.token0Symbol}/{pos.token1Symbol}
           </p>
-          <p className="font-mono text-[9px]" style={{ color: clmm.textDim }}>
-            NFT #{pos.tokenId.toString()}
-          </p>
+          <div className="flex items-center gap-1.5">
+            <p className="font-mono text-[9px]" style={{ color: clmm.textDim }}>
+              NFT #{pos.tokenId.toString()}
+            </p>
+            <NftExplorerLink contract={positionManager} tokenId={pos.tokenId} />
+          </div>
         </div>
       </div>
 

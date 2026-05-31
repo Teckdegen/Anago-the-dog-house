@@ -11,6 +11,7 @@ import { shortAddr } from "@/lib/web3/format";
 import { prepareTransactionWithGas } from "@/lib/web3/gasUtils";
 import { LIVE_CHAIN_QUERY } from "@/lib/web3/nftImage";
 import { NftImage } from "@/components/NftImage";
+import { NftExplorerLink } from "@/components/NftExplorerLink";
 import { TokenPicker } from "@/components/TokenPicker";
 import { parseListingTuple } from "@/lib/web3/parseOtc";
 
@@ -344,6 +345,7 @@ function ListingCard({ listingId, showBuy, showUnlist, showInactive }: { listing
           <div className="flex items-center gap-2 mb-1">
             <span className="px-2 py-0.5 rounded font-mono text-[9px] uppercase" style={{ background: "rgba(139,92,246,0.15)", color: "#A78BFA", border: "1px solid rgba(139,92,246,0.3)" }}>{nftLabel}</span>
             <p className="font-grotesk text-[14px] font-medium" style={{ color: "#FFFFFF" }}>#{tokenId?.toString()}</p>
+            <NftExplorerLink contract={nftContract as `0x${string}`} tokenId={tokenId ?? 0n} showLabel />
           </div>
           <p className="font-mono text-[10px]" style={{ color: "rgba(255,255,255,0.5)" }}>
             Seller: {shortAddr(seller)} · Price: {priceFormatted} {paySym}
@@ -627,6 +629,7 @@ function UserPositionsList({ selected, onSelect }: { selected: any; onSelect: (s
                 <div className="min-w-0">
                   <span className="px-2 py-0.5 rounded font-mono text-[8px] uppercase" style={{ background: "rgba(139,92,246,0.15)", color: "#A78BFA" }}>{pos.label}</span>
                   <span className="font-mono text-[12px] ml-2" style={{ color: "#FFFFFF" }}>#{pos.tokenId}</span>
+                  <NftExplorerLink contract={pos.contract} tokenId={pos.tokenId} />
                 </div>
               </div>
               {isSelected && (

@@ -24,6 +24,7 @@ import { TokenIcon } from "@/components/TokenIcon";
 import { bigintToUsd, useTokenPriceUsdLive } from "@/lib/web3/prices";
 import { formatUsdTable } from "@/lib/capricorn/poolMetrics";
 import { useRemoteTokenMeta } from "@/lib/web3/useRemoteTokenMeta";
+import { NftExplorerLink } from "@/components/NftExplorerLink";
 
 export const Route = createFileRoute("/lock")({
   component: LockPage,
@@ -197,9 +198,12 @@ function LockRow({
         />
         <div className="min-w-0">
           <p className="font-grotesk uppercase text-[12px] tracking-wider truncate" style={{ color: "#FFFFFF" }}>{symbol}</p>
-          <p className="font-mono text-[9px] truncate" style={{ color: "rgba(255,255,255,0.5)" }}>
-            #{lockId.toString()} · {shortAddr(owner)}{isOwner ? " (you)" : ""}
-          </p>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <p className="font-mono text-[9px] truncate" style={{ color: "rgba(255,255,255,0.5)" }}>
+              #{lockId.toString()} · {shortAddr(owner)}{isOwner ? " (you)" : ""}
+            </p>
+            <NftExplorerLink contract={tokenLock} tokenId={lockId} />
+          </div>
         </div>
       </div>
       <div className="text-right font-grotesk text-[12px] tabular-nums" style={{ color: "rgba(255,255,255,0.9)" }}>

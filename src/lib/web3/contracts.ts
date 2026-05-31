@@ -1,17 +1,24 @@
 /**
  * Deployed contract addresses — Monad mainnet (chainId 143).
- * After `cd contracts && npm run deploy:mainnet`, update deployments.generated.ts or set VITE_* in .env.local.
+ * StreamFarm: `deployments.generated.ts` only (run `cd contracts && npm run deploy:stream-farm`).
+ * Other contracts may still be overridden via optional VITE_* in .env.local.
  */
 
 import { MAINNET_DEPLOYMENTS } from "./deployments.generated";
 
-const MAINNET = {
+/** Canonical mainnet addresses — edit via deploy scripts, not .env */
+export const MAINNET_CONTRACTS = {
   chainId: MAINNET_DEPLOYMENTS.chainId,
   tokenLock: MAINNET_DEPLOYMENTS.tokenLock,
   vestingNFT: MAINNET_DEPLOYMENTS.vestingNFT,
   streamFarm: MAINNET_DEPLOYMENTS.streamFarm,
   otcMarket: MAINNET_DEPLOYMENTS.otcMarket,
-};
+} as const;
+
+/** @deprecated use MAINNET_CONTRACTS */
+const MAINNET = MAINNET_CONTRACTS;
+
+export const STREAM_FARM_ADDRESS = MAINNET_CONTRACTS.streamFarm;
 
 function envAddress(name: string, fallback: `0x${string}`): `0x${string}` {
   const v = import.meta.env[name];
@@ -32,7 +39,7 @@ export const CONTRACTS: Record<number, ContractAddresses> = {
   [MAINNET.chainId]: {
     tokenLock: envAddress("VITE_TOKEN_LOCK", MAINNET.tokenLock),
     vestingNFT: envAddress("VITE_VESTING_NFT", MAINNET.vestingNFT),
-    streamFarm: envAddress("VITE_STREAM_FARM", MAINNET.streamFarm),
+    streamFarm: MAINNET.streamFarm,
     otcMarket: envAddress("VITE_OTC_MARKET", MAINNET.otcMarket),
   },
 };
@@ -423,7 +430,30 @@ export const STREAM_FARM_ABI = [
   { type: "function", name: "farmCount", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
   { type: "function", name: "owner", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
   { type: "function", name: "admins", stateMutability: "view", inputs: [{ name: "account", type: "address" }], outputs: [{ type: "bool" }] },
+  { type: "function", name: "farmOperators", stateMutability: "view", inputs: [{ name: "account", type: "address" }], outputs: [{ type: "bool" }] },
   { type: "function", name: "isAdmin", stateMutability: "view", inputs: [{ name: "account", type: "address" }], outputs: [{ type: "bool" }] },
+  { type: "function", name: "isFarmOperator", stateMutability: "view", inputs: [{ name: "account", type: "address" }], outputs: [{ type: "bool" }] },
+  {
+    type: "function",
+    name: "getFarmCreator",
+    stateMutability: "view",
+    inputs: [{ name: "farmId", type: "uint256" }],
+    outputs: [{ type: "address" }],
+  },
+  {
+    type: "function",
+    name: "isFarmCreator",
+    stateMutability: "view",
+    inputs: [{ name: "account", type: "address" }, { name: "farmId", type: "uint256" }],
+    outputs: [{ type: "bool" }],
+  },
+  {
+    type: "function",
+    name: "farmsOfCreator",
+    stateMutability: "view",
+    inputs: [{ name: "creator", type: "address" }],
+    outputs: [{ type: "uint256[]" }],
+  },
   {
     type: "function", name: "getFarm", stateMutability: "view",
     inputs: [{ name: "farmId", type: "uint256" }],
@@ -539,12 +569,27 @@ export const STREAM_FARM_ABI = [
     outputs: [],
   },
   { type: "function", name: "setFarmActive", stateMutability: "nonpayable", inputs: [{ name: "farmId", type: "uint256" }, { name: "active", type: "bool" }], outputs: [] },
+  {
+    type: "function",
+    name: "setFarmActiveByAdmin",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "farmId", type: "uint256" }, { name: "active", type: "bool" }],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "setFarmOperator",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "operator", type: "address" }, { name: "allowed", type: "bool" }],
+    outputs: [],
+  },
   { type: "function", name: "addAdmin", stateMutability: "nonpayable", inputs: [{ name: "admin", type: "address" }], outputs: [] },
   { type: "function", name: "removeAdmin", stateMutability: "nonpayable", inputs: [{ name: "admin", type: "address" }], outputs: [] },
   { type: "function", name: "setBoostTiers", stateMutability: "nonpayable", inputs: [{ name: "durations", type: "uint256[]" }, { name: "multipliers", type: "uint256[]" }], outputs: [] },
   { type: "function", name: "recoverTokens", stateMutability: "nonpayable", inputs: [{ name: "token", type: "address" }, { name: "amount", type: "uint256" }], outputs: [] },
   // ── Events ─────────────────────────────────────────────────────────────
   { type: "event", name: "FarmCreated", inputs: [{ name: "farmId", type: "uint256", indexed: true }, { name: "creator", type: "address", indexed: true }, { name: "stakeToken", type: "address", indexed: false }] },
+  { type: "event", name: "FarmOperatorUpdated", inputs: [{ name: "operator", type: "address", indexed: true }, { name: "allowed", type: "bool", indexed: false }] },
   { type: "event", name: "RewardStreamAdded", inputs: [{ name: "farmId", type: "uint256", indexed: true }, { name: "rewardIdx", type: "uint256", indexed: false }, { name: "token", type: "address", indexed: false }, { name: "rewardRate", type: "uint256", indexed: false }, { name: "startTime", type: "uint256", indexed: false }, { name: "endTime", type: "uint256", indexed: false }] },
   { type: "event", name: "Deposited", inputs: [{ name: "tokenId", type: "uint256", indexed: true }, { name: "farmId", type: "uint256", indexed: true }, { name: "user", type: "address", indexed: true }, { name: "amount", type: "uint256", indexed: false }, { name: "shares", type: "uint256", indexed: false }] },
   { type: "event", name: "Withdrawn", inputs: [{ name: "tokenId", type: "uint256", indexed: true }, { name: "farmId", type: "uint256", indexed: true }, { name: "user", type: "address", indexed: true }, { name: "amount", type: "uint256", indexed: false }, { name: "penalty", type: "uint256", indexed: false }] },
