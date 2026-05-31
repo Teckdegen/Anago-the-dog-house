@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Settings2 } from "lucide-react";
+import { Plus, Settings2, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   useAccount,
   useChainId,
@@ -69,6 +69,22 @@ function useRewardBudget(token: TokenInfo | null, budget: string) {
   };
 }
 
+const farmFieldLabel = "block font-grotesk text-[13px] sm:text-[14px] font-semibold uppercase tracking-wide mb-1";
+const farmFieldHint = "block font-mono text-[10px] mb-2";
+const farmInput =
+  "w-full rounded-xl px-4 py-3 font-mono text-[14px] font-medium outline-none transition focus:ring-2 focus:ring-violet-500/40";
+
+function FarmFieldLabel({ title, hint }: { title: string; hint?: string }) {
+  return (
+    <div className="mb-2">
+      <span className={farmFieldLabel} style={{ color: "#FFFFFF" }}>{title}</span>
+      {hint && (
+        <span className={farmFieldHint} style={{ color: "rgba(255,255,255,0.5)" }}>{hint}</span>
+      )}
+    </div>
+  );
+}
+
 function RewardStreamFields({
   token,
   onTokenSelect,
@@ -99,71 +115,98 @@ function RewardStreamFields({
     onBudgetChange(formatUnits(maxAllowed, decimals));
   };
 
+  const inputStyle = {
+    background: "rgba(0,0,0,0.45)",
+    border: "1px solid rgba(139,92,246,0.45)",
+    color: "#FFFFFF",
+  };
+
   return (
-    <div className="space-y-3">
+    <div className={compact ? "space-y-4" : "space-y-6"}>
       <div>
-        <p className="font-mono text-[9px] uppercase tracking-wider mb-2" style={{ color: "rgba(255,255,255,0.45)" }}>
-          Reward token
-        </p>
+        <FarmFieldLabel
+          title="Reward token"
+          hint="Token deposited into the reward stream for farmers to earn."
+        />
         <TokenPicker selected={token} onSelect={onTokenSelect} excludeNative compact={compact} />
       </div>
-      <div className="grid sm:grid-cols-3 gap-2">
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <span className="font-mono text-[9px] uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.45)" }}>
-              Total budget
-            </span>
-            {token && balance > 0n && (
-              <button
-                type="button"
-                onClick={setMaxBudget}
-                className="font-mono text-[9px] uppercase tracking-wider transition hover:opacity-80"
-                style={{ color: "rgba(255,255,255,0.55)" }}
-              >
-                Max (leave 1 wei)
-              </button>
-            )}
+
+      <div>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <FarmFieldLabel
+              title="Total reward budget"
+              hint="Full amount you are funding upfront. Leave at least 1 wei in your wallet."
+            />
           </div>
-          <input
-            placeholder="0.0"
-            value={budget}
-            onChange={(e) => onBudgetChange(e.target.value.replace(/[^0-9.]/g, ""))}
-            className="w-full rounded-xl px-3 py-2 font-mono text-[11px] outline-none"
-            style={{ background: "rgba(0,0,0,0.3)", border: "1px solid rgba(139,92,246,0.3)", color: "#fff" }}
-          />
+          {token && balance > 0n && (
+            <button
+              type="button"
+              onClick={setMaxBudget}
+              className="shrink-0 mt-0.5 font-grotesk text-[10px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-lg transition hover:opacity-80"
+              style={{ color: "#C4B5FD", background: "rgba(139,92,246,0.2)", border: "1px solid rgba(139,92,246,0.4)" }}
+            >
+              Use max
+            </button>
+          )}
         </div>
         <input
-          placeholder="Days"
-          value={days}
-          onChange={(e) => onDaysChange(e.target.value)}
-          className="rounded-xl px-3 py-2 font-mono text-[11px] outline-none self-end"
-          style={{ background: "rgba(0,0,0,0.3)", border: "1px solid rgba(139,92,246,0.3)", color: "#fff" }}
-        />
-        <input
-          placeholder="Start delay (h)"
-          value={delayHours}
-          onChange={(e) => onDelayHoursChange(e.target.value)}
-          className="rounded-xl px-3 py-2 font-mono text-[11px] outline-none self-end"
-          style={{ background: "rgba(0,0,0,0.3)", border: "1px solid rgba(139,92,246,0.3)", color: "#fff" }}
+          placeholder="0.0"
+          value={budget}
+          onChange={(e) => onBudgetChange(e.target.value.replace(/[^0-9.]/g, ""))}
+          className={farmInput}
+          style={inputStyle}
         />
       </div>
+
+      <div className="grid sm:grid-cols-2 gap-4">
+        <div>
+          <FarmFieldLabel
+            title="Emission duration (days)"
+            hint="How many days rewards drip out to stakers."
+          />
+          <input
+            inputMode="numeric"
+            placeholder="30"
+            value={days}
+            onChange={(e) => onDaysChange(e.target.value.replace(/[^0-9]/g, ""))}
+            className={farmInput}
+            style={inputStyle}
+          />
+        </div>
+        <div>
+          <FarmFieldLabel
+            title="Start delay (hours)"
+            hint="Wait time before the reward stream begins."
+          />
+          <input
+            inputMode="numeric"
+            placeholder="0"
+            value={delayHours}
+            onChange={(e) => onDelayHoursChange(e.target.value.replace(/[^0-9]/g, ""))}
+            className={farmInput}
+            style={inputStyle}
+          />
+        </div>
+      </div>
+
       {token && balance === 0n && (
-        <p className="font-mono text-[10px]" style={{ color: "rgba(255,180,100,0.9)" }}>
+        <p className="font-mono text-[11px]" style={{ color: "rgba(255,180,100,0.9)" }}>
           No {token.symbol} balance in wallet.
         </p>
       )}
       {isWholeBalance && (
-        <p className="font-mono text-[10px]" style={{ color: "rgba(255,100,100,0.9)" }}>
+        <p className="font-mono text-[11px]" style={{ color: "rgba(255,100,100,0.9)" }}>
           Cannot use your entire balance — leave at least 1 wei for gas and rounding.
         </p>
       )}
       {exceedsBalance && !isWholeBalance && (
-        <p className="font-mono text-[10px]" style={{ color: "rgba(255,100,100,0.9)" }}>
+        <p className="font-mono text-[11px]" style={{ color: "rgba(255,100,100,0.9)" }}>
           Budget exceeds wallet balance.
         </p>
       )}
       {parsedBudget > 0n && validBudget && token && (
-        <p className="font-mono text-[10px]" style={{ color: "rgba(255,255,255,0.45)" }}>
+        <p className="font-mono text-[11px]" style={{ color: "rgba(255,255,255,0.55)" }}>
           Available: {Number(formatUnits(balance, decimals)).toLocaleString()} {token.symbol}
         </p>
       )}
@@ -204,6 +247,7 @@ function CreateFarmForm() {
   const [days, setDays] = useState("30");
   const [delayHours, setDelayHours] = useState("0");
   const [open, setOpen] = useState(false);
+  const [phase, setPhase] = useState<1 | 2>(1);
   const [successOpen, setSuccessOpen] = useState(false);
   const [successRows, setSuccessRows] = useState<{ label: string; value: string }[]>([]);
 
@@ -229,6 +273,7 @@ function CreateFarmForm() {
     setBudget("");
     setDays("30");
     setDelayHours("0");
+    setPhase(1);
     pendingFarmIdRef.current = null;
     createHandledRef.current = null;
     autoApproveRef.current = false;
@@ -369,6 +414,19 @@ function CreateFarmForm() {
   })();
 
   const canSubmit = !!token && !!rewardToken && rewardBudget.validBudget && !busy;
+  const canAdvancePhase1 = !!token;
+  const inputStyle = {
+    background: "rgba(0,0,0,0.45)",
+    border: "1px solid rgba(139,92,246,0.45)",
+    color: "#FFFFFF",
+  };
+
+  const toggleOpen = () => {
+    setOpen((prev) => {
+      if (prev) setPhase(1);
+      return !prev;
+    });
+  };
 
   return (
     <>
@@ -380,94 +438,184 @@ function CreateFarmForm() {
         subtext="Your farm is live and the initial reward stream has been funded."
         rows={successRows}
       />
-    <div className="rounded-xl p-5" style={{ border: "1px solid rgba(139,92,246,0.35)", background: "rgba(139,92,246,0.05)" }}>
+    <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(139,92,246,0.45)", background: "rgba(0,0,0,0.35)" }}>
       <button
         type="button"
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between gap-3"
+        onClick={toggleOpen}
+        className="w-full flex items-center justify-between gap-3 p-5"
+        style={{ background: "rgba(139,92,246,0.08)" }}
       >
         <div className="flex items-center gap-2">
           <Plus className="w-4 h-4" style={{ color: "#A78BFA" }} />
-          <span className="font-grotesk text-[14px] uppercase tracking-wider" style={{ color: "#FFFFFF" }}>
+          <span className="font-grotesk text-[15px] font-semibold uppercase tracking-wider" style={{ color: "#FFFFFF" }}>
             Create new farm
           </span>
         </div>
-        <span className="font-mono text-[10px]" style={{ color: "rgba(255,255,255,0.45)" }}>{open ? "Hide" : "Show"}</span>
+        <span className="font-grotesk text-[11px] font-medium uppercase" style={{ color: "rgba(255,255,255,0.55)" }}>{open ? "Hide" : "Show"}</span>
       </button>
 
       {open && (
-        <div className="mt-5 pt-5 space-y-5" style={{ borderTop: "1px solid rgba(139,92,246,0.15)" }}>
+        <div className="p-5 sm:p-6 space-y-6" style={{ borderTop: "1px solid rgba(139,92,246,0.25)" }}>
+          {/* Progress */}
           <div>
-            <p className="font-mono text-[9px] uppercase tracking-wider mb-2" style={{ color: "rgba(255,255,255,0.45)" }}>
-              Stake token
-            </p>
-            <TokenPicker selected={token} onSelect={setToken} excludeNative />
-          </div>
-          <div className="grid sm:grid-cols-2 gap-3">
-            <label className="block">
-              <span className="font-mono text-[9px] uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.45)" }}>
-                Lock duration (days, 0 = none)
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-grotesk text-[11px] font-semibold uppercase tracking-wider" style={{ color: "#C4B5FD" }}>
+                Step {phase} of 2
               </span>
-              <input
-                value={lockDays}
-                onChange={(e) => setLockDays(e.target.value)}
-                className="mt-1.5 w-full rounded-xl px-3 py-2.5 font-mono text-[12px] outline-none"
-                style={{ background: "rgba(0,0,0,0.3)", border: "1px solid rgba(139,92,246,0.3)", color: "#fff" }}
-              />
-            </label>
-            <label className="block">
-              <span className="font-mono text-[9px] uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.45)" }}>
-                Early exit penalty (%)
+              <span className="font-mono text-[10px]" style={{ color: "rgba(255,255,255,0.45)" }}>
+                {phase === 1 ? "Farm setup" : "Fund rewards"}
               </span>
-              <input
-                value={penalty}
-                onChange={(e) => setPenalty(e.target.value)}
-                className="mt-1.5 w-full rounded-xl px-3 py-2.5 font-mono text-[12px] outline-none"
-                style={{ background: "rgba(0,0,0,0.3)", border: "1px solid rgba(139,92,246,0.3)", color: "#fff" }}
+            </div>
+            <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(139,92,246,0.15)" }}>
+              <div
+                className="h-full rounded-full transition-all duration-300"
+                style={{ width: phase === 1 ? "50%" : "100%", background: "linear-gradient(90deg, #7C3AED, #A78BFA)" }}
               />
-            </label>
+            </div>
           </div>
 
-          <div className="rounded-xl p-4" style={{ background: "rgba(139,92,246,0.06)", border: "1px solid rgba(139,92,246,0.2)" }}>
-            <p className="font-grotesk text-[11px] uppercase tracking-wider mb-3" style={{ color: "#A78BFA" }}>
-              Initial reward stream
-            </p>
-            <RewardStreamFields
-              token={rewardToken}
-              onTokenSelect={setRewardToken}
-              budget={budget}
-              onBudgetChange={setBudget}
-              days={days}
-              onDaysChange={setDays}
-              delayHours={delayHours}
-              onDelayHoursChange={setDelayHours}
-              budgetMeta={rewardBudget}
-            />
-          </div>
+          {phase === 1 ? (
+            <div className="space-y-6 animate-in fade-in duration-200">
+              <div>
+                <h3 className="font-grotesk text-[20px] sm:text-[24px] font-semibold leading-tight mb-1" style={{ color: "#FFFFFF" }}>
+                  Which token will users stake?
+                </h3>
+                <p className="font-mono text-[11px]" style={{ color: "rgba(255,255,255,0.5)" }}>
+                  This is the token farmers deposit to earn rewards.
+                </p>
+              </div>
 
-          {stepLabel && (
-            <p className="font-mono text-[10px]" style={{ color: "rgba(255,255,255,0.7)" }}>{stepLabel}</p>
-          )}
+              <div>
+                <FarmFieldLabel title="Stake token" />
+                <TokenPicker selected={token} onSelect={setToken} excludeNative />
+              </div>
 
-          <button
-            type="button"
-            onClick={handleCreate}
-            disabled={!canSubmit}
-            className="w-full rounded-xl py-3 font-grotesk text-[11px] uppercase tracking-wider disabled:opacity-40"
-            style={{ background: "rgba(139,92,246,0.25)", color: "#fff", border: "1px solid rgba(139,92,246,0.55)" }}
-          >
-            {busy ? "Processing…" : "Create farm & fund rewards"}
-          </button>
+              <div className="grid sm:grid-cols-2 gap-5">
+                <div>
+                  <FarmFieldLabel
+                    title="Lock period (days)"
+                    hint="How long deposits stay locked. Use 0 for no lock."
+                  />
+                  <input
+                    inputMode="numeric"
+                    value={lockDays}
+                    onChange={(e) => setLockDays(e.target.value.replace(/[^0-9]/g, ""))}
+                    className={farmInput}
+                    style={inputStyle}
+                  />
+                </div>
+                <div>
+                  <FarmFieldLabel
+                    title="Early exit penalty (%)"
+                    hint="Fee charged if users withdraw before lock ends."
+                  />
+                  <input
+                    inputMode="decimal"
+                    value={penalty}
+                    onChange={(e) => setPenalty(e.target.value.replace(/[^0-9.]/g, ""))}
+                    className={farmInput}
+                    style={inputStyle}
+                  />
+                </div>
+              </div>
 
-          {createTx.error && (
-            <p className="font-mono text-[10px] break-words" style={{ color: "rgba(255,100,100,0.9)" }}>
-              {(createTx.error as Error).message?.slice(0, 160)}
-            </p>
-          )}
-          {(approveTx.error || addTx.error) && (
-            <p className="font-mono text-[10px] break-words" style={{ color: "rgba(255,100,100,0.9)" }}>
-              {((approveTx.error || addTx.error) as Error).message?.slice(0, 160)}
-            </p>
+              <button
+                type="button"
+                onClick={() => setPhase(2)}
+                disabled={!canAdvancePhase1}
+                className="w-full flex items-center justify-center gap-2 rounded-xl py-3.5 font-grotesk text-[12px] font-semibold uppercase tracking-wider disabled:opacity-40 transition hover:opacity-90"
+                style={{ background: "rgba(139,92,246,0.35)", color: "#FFFFFF", border: "1px solid rgba(139,92,246,0.65)" }}
+              >
+                Continue to rewards
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-6 animate-in fade-in duration-200">
+              <div>
+                <h3 className="font-grotesk text-[20px] sm:text-[24px] font-semibold leading-tight mb-1" style={{ color: "#FFFFFF" }}>
+                  Fund the reward stream
+                </h3>
+                <p className="font-mono text-[11px]" style={{ color: "rgba(255,255,255,0.5)" }}>
+                  Choose the reward token, budget, and how long emissions run.
+                </p>
+              </div>
+
+              {token && (
+                <div
+                  className="rounded-xl px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-1"
+                  style={{ background: "rgba(139,92,246,0.12)", border: "1px solid rgba(139,92,246,0.35)" }}
+                >
+                  <span className="font-grotesk text-[11px] font-semibold uppercase" style={{ color: "#C4B5FD" }}>Farm preview</span>
+                  <span className="font-mono text-[11px]" style={{ color: "#FFFFFF" }}>
+                    Stake: <strong>{token.symbol}</strong>
+                  </span>
+                  <span className="font-mono text-[11px]" style={{ color: "rgba(255,255,255,0.7)" }}>
+                    Lock: {lockDays || "0"} days
+                  </span>
+                  <span className="font-mono text-[11px]" style={{ color: "rgba(255,255,255,0.7)" }}>
+                    Penalty: {penalty || "0"}%
+                  </span>
+                </div>
+              )}
+
+              <div
+                className="rounded-xl p-5 sm:p-6"
+                style={{ background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.3)" }}
+              >
+                <p className="font-grotesk text-[13px] font-semibold uppercase tracking-wide mb-5" style={{ color: "#A78BFA" }}>
+                  Initial reward stream
+                </p>
+                <RewardStreamFields
+                  token={rewardToken}
+                  onTokenSelect={setRewardToken}
+                  budget={budget}
+                  onBudgetChange={setBudget}
+                  days={days}
+                  onDaysChange={setDays}
+                  delayHours={delayHours}
+                  onDelayHoursChange={setDelayHours}
+                  budgetMeta={rewardBudget}
+                />
+              </div>
+
+              {stepLabel && (
+                <p className="font-grotesk text-[12px] font-medium" style={{ color: "rgba(255,255,255,0.85)" }}>{stepLabel}</p>
+              )}
+
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  type="button"
+                  onClick={() => setPhase(1)}
+                  disabled={busy}
+                  className="sm:w-auto flex items-center justify-center gap-2 rounded-xl py-3 px-5 font-grotesk text-[12px] font-semibold uppercase tracking-wider disabled:opacity-40 transition hover:opacity-90"
+                  style={{ background: "rgba(0,0,0,0.4)", color: "#FFFFFF", border: "1px solid rgba(139,92,246,0.35)" }}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  Back
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCreate}
+                  disabled={!canSubmit}
+                  className="flex-1 rounded-xl py-3.5 font-grotesk text-[12px] font-semibold uppercase tracking-wider disabled:opacity-40 transition hover:opacity-90"
+                  style={{ background: "rgba(139,92,246,0.4)", color: "#FFFFFF", border: "1px solid rgba(139,92,246,0.7)" }}
+                >
+                  {busy ? "Processing…" : "Create farm & fund rewards"}
+                </button>
+              </div>
+
+              {createTx.error && (
+                <p className="font-mono text-[11px] break-words" style={{ color: "rgba(255,100,100,0.9)" }}>
+                  {(createTx.error as Error).message?.slice(0, 160)}
+                </p>
+              )}
+              {(approveTx.error || addTx.error) && (
+                <p className="font-mono text-[11px] break-words" style={{ color: "rgba(255,100,100,0.9)" }}>
+                  {((approveTx.error || addTx.error) as Error).message?.slice(0, 160)}
+                </p>
+              )}
+            </div>
           )}
         </div>
       )}
