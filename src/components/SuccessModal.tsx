@@ -1,5 +1,6 @@
 import { CheckCircle2, X } from "lucide-react";
 import { useEffect } from "react";
+import { createPortal } from "react-dom";
 
 type Row = { label: string; value: string };
 
@@ -17,14 +18,19 @@ export function SuccessModal({ open, onClose, title, heading, subtext, rows }: P
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
   }, [open, onClose]);
 
   if (!open) return null;
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+      className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4"
       style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)" }}
       onClick={onClose}
     >
@@ -105,6 +111,7 @@ export function SuccessModal({ open, onClose, title, heading, subtext, rows }: P
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

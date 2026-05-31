@@ -6,6 +6,7 @@ import { maxUint256, formatUnits, parseUnits } from "viem";
 import { AppShell } from "@/components/AppShell";
 import { useToast } from "@/components/Toast";
 import { SuccessModal } from "@/components/SuccessModal";
+import { useTransactionSuccess } from "@/lib/web3/useTransactionSuccess";
 import { OTC_MARKET_ABI, ERC721_ABI, ERC20_ABI, CONTRACTS, TOKEN_LOCK_ABI, VESTING_NFT_ABI, STREAM_FARM_ABI } from "@/lib/web3/contracts";
 import { shortAddr } from "@/lib/web3/format";
 import { prepareTransactionWithGas } from "@/lib/web3/gasUtils";
@@ -23,6 +24,11 @@ export const Route = createFileRoute("/otc")({
 
 const TABS = ["Browse", "My Listings", "Sell"] as const;
 type Tab = (typeof TABS)[number];
+type TxSuccessPayload = {
+  heading: string;
+  subtext: string;
+  rows: { label: string; value: string }[];
+};
 /** On-chain: paymentToken == address(0) means native MON */
 const NATIVE_PAYMENT = "0x0000000000000000000000000000000000000000" as const;
 const isNativePaymentToken = (addr: string) => addr.toLowerCase() === NATIVE_PAYMENT;
@@ -76,6 +82,7 @@ function OTCPage() {
 
 function BrowseTab({ totalListings }: { totalListings: number }) {
   const contracts = useContracts();
+  const [txSuccess, setTxSuccess] = useState<TxSuccessPayload | null>(null);
 
   const activeQ = useReadContract({ address: contracts.otcMarket, abi: OTC_MARKET_ABI, functionName: "getActiveListings", args: [0n, BigInt(50)], query: { refetchInterval: 10_000 } });
   const activeIds = (activeQ.data as bigint[]) ?? [];
@@ -91,9 +98,21 @@ function BrowseTab({ totalListings }: { totalListings: number }) {
   }
 
   return (
-    <div className="space-y-3">
-      {activeIds.map((id) => <ListingCard key={id.toString()} listingId={id} showBuy />)}
-    </div>
+    <>
+      <SuccessModal
+        open={!!txSuccess}
+        onClose={() => setTxSuccess(null)}
+        title="OTC Market"
+        heading={txSuccess?.heading ?? ""}
+        subtext={txSuccess?.subtext ?? ""}
+        rows={txSuccess?.rows}
+      />
+      <div className="space-y-3">
+        {activeIds.map((id) => (
+          <ListingCard key={id.toString()} listingId={id} showBuy onSuccess={setTxSuccess} />
+        ))}
+      </div>
+    </>
   );
 }
 
@@ -104,6 +123,7 @@ function BrowseTab({ totalListings }: { totalListings: number }) {
 function MyListingsTab() {
   const { address } = useAccount();
   const contracts = useContracts();
+  const [txSuccess, setTxSuccess] = useState<TxSuccessPayload | null>(null);
 
   const myQ = useReadContract({ address: contracts.otcMarket, abi: OTC_MARKET_ABI, functionName: "getSellerListings", args: address ? [address] : undefined, query: { enabled: !!address, refetchInterval: 10_000 } });
   const myIds = (myQ.data as bigint[]) ?? [];
@@ -141,14 +161,26 @@ function MyListingsTab() {
   }
 
   return (
-    <div className="space-y-3">
-      <PendingPaymentsPanel />
-      {activeMyIds.map((id) => <ListingCard key={id.toString()} listingId={id} showUnlist />)}
-    </div>
+    <>
+      <SuccessModal
+        open={!!txSuccess}
+        onClose={() => setTxSuccess(null)}
+        title="OTC Market"
+        heading={txSuccess?.heading ?? ""}
+        subtext={txSuccess?.subtext ?? ""}
+        rows={txSuccess?.rows}
+      />
+      <div className="space-y-3">
+        <PendingPaymentsPanel onSuccess={setTxSuccess} />
+        {activeMyIds.map((id) => (
+          <ListingCard key={id.toString()} listingId={id} showUnlist onSuccess={setTxSuccess} />
+        ))}
+      </div>
+    </>
   );
 }
 
-function PendingPaymentsPanel() {
+function PendingPaymentsPanel({ onSuccess }: { onSuccess?: (payload: TxSuccessPayload) => void }) {
   const { address } = useAccount();
   const publicClient = usePublicClient();
   const contracts = useContracts();
@@ -166,9 +198,13 @@ function PendingPaymentsPanel() {
   const withdrawTx = useWriteContract();
   const withdrawRcpt = useWaitForTransactionReceipt({ hash: withdrawTx.data });
 
-  useEffect(() => {
-    if (withdrawRcpt.isSuccess) toast("success", "Withdrawn", "Sale proceeds sent to your wallet.");
-  }, [withdrawRcpt.isSuccess, toast]);
+  useTransactionSuccess(withdrawTx, withdrawRcpt, () => {
+    onSuccess?.({
+      heading: "Proceeds Withdrawn",
+      subtext: "Sale proceeds have been sent to your wallet.",
+      rows: [{ label: "Amount", value: `${Number(formatUnits(pendingMon, 18)).toLocaleString()} MON` }],
+    });
+  });
 
   if (!address || pendingMon === 0n) return null;
 
@@ -211,13 +247,23 @@ function PendingPaymentsPanel() {
 //                              LISTING CARD
 // ═══════════════════════════════════════════════════════════════════════════
 
-function ListingCard({ listingId, showBuy, showUnlist, showInactive }: { listingId: bigint; showBuy?: boolean; showUnlist?: boolean; showInactive?: boolean }) {
+function ListingCard({
+  listingId,
+  showBuy,
+  showUnlist,
+  showInactive,
+  onSuccess,
+}: {
+  listingId: bigint;
+  showBuy?: boolean;
+  showUnlist?: boolean;
+  showInactive?: boolean;
+  onSuccess?: (payload: TxSuccessPayload) => void;
+}) {
   const { address } = useAccount();
   const publicClient = usePublicClient();
   const contracts = useContracts();
   const { toast } = useToast();
-  const [successOpen, setSuccessOpen] = useState(false);
-  const [successMsg, setSuccessMsg] = useState({ heading: "", subtext: "" });
   const autoBuyRef = useRef(false);
   const pendingBuyHashRef = useRef<`0x${string}` | undefined>(undefined);
 
@@ -288,15 +334,33 @@ function ListingCard({ listingId, showBuy, showUnlist, showInactive }: { listing
     autoBuyRef.current = false;
   }, [listingId]);
 
+  const listingPrice = listing?.price ?? 0n;
+
+  const formatPriceLabel = (priceValue: bigint, token: string) => {
+    const native = isNativePaymentToken(token);
+    const dec = native ? 18 : ((payDecQ.data as number) ?? 18);
+    const sym = native ? "MON" : ((paySymQ.data as string) || "...");
+    return `${Number(formatUnits(priceValue, dec)).toLocaleString()} ${sym}`;
+  };
+
+  const notifySuccess = (heading: string, subtext: string, rows: TxSuccessPayload["rows"]) => {
+    onSuccess?.({ heading, subtext, rows });
+  };
+
   useEffect(() => {
     if (!buyRcpt.isSuccess || !buyTx.data || buyRcpt.data?.transactionHash !== buyTx.data) return;
     if (pendingBuyHashRef.current === buyTx.data) return;
     pendingBuyHashRef.current = buyTx.data;
 
     const verify = async () => {
+      const priceLabel = listing ? formatPriceLabel(listing.price, listing.paymentToken) : "—";
+      const rows = [
+        { label: "Listing", value: `#${listingId.toString()}` },
+        { label: "Price", value: priceLabel },
+      ];
+
       if (!publicClient || !address || !listing) {
-        setSuccessMsg({ heading: "Position Purchased", subtext: "The NFT position has been transferred to your wallet." });
-        setSuccessOpen(true);
+        notifySuccess("Position Purchased", "The NFT position has been transferred to your wallet.", rows);
         return;
       }
       try {
@@ -310,15 +374,14 @@ function ListingCard({ listingId, showBuy, showUnlist, showInactive }: { listing
           toast("error", "Purchase Incomplete", "Payment may have gone through but the NFT was not transferred. Contact support with your tx hash.");
           return;
         }
-        setSuccessMsg({ heading: "Position Purchased", subtext: "The NFT position has been transferred to your wallet." });
-        setSuccessOpen(true);
+        notifySuccess("Position Purchased", "The NFT position has been transferred to your wallet.", rows);
       } catch {
-        setSuccessMsg({ heading: "Position Purchased", subtext: "The NFT position has been transferred to your wallet." });
-        setSuccessOpen(true);
+        notifySuccess("Position Purchased", "The NFT position has been transferred to your wallet.", rows);
       }
     };
 
     verify();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [buyRcpt.isSuccess, buyRcpt.data?.transactionHash, buyTx.data, publicClient, address, listing?.nftContract, listing?.tokenId, toast]);
 
   useEffect(() => {
@@ -327,11 +390,13 @@ function ListingCard({ listingId, showBuy, showUnlist, showInactive }: { listing
     }
   }, [buyTx.error, toast]);
 
-  useEffect(() => {
-    if (unlistRcpt.isSuccess) { setSuccessMsg({ heading: "Listing Cancelled", subtext: "Your position has been returned to your wallet." }); setSuccessOpen(true); }
-  }, [unlistRcpt.isSuccess]);
-
-  const listingPrice = listing?.price ?? 0n;
+  useTransactionSuccess(unlistTx, unlistRcpt, () => {
+    const priceLabel = listing ? formatPriceLabel(listing.price, listing.paymentToken) : "—";
+    notifySuccess("Listing Cancelled", "Your position has been returned to your wallet.", [
+      { label: "Listing", value: `#${listingId.toString()}` },
+      { label: "Price", value: priceLabel },
+    ]);
+  });
 
   useEffect(() => {
     if (!approveRcpt.isSuccess || !autoBuyRef.current || !publicClient) return;
@@ -419,8 +484,6 @@ function ListingCard({ listingId, showBuy, showUnlist, showInactive }: { listing
   };
 
   return (
-    <>
-    <SuccessModal open={successOpen} onClose={() => { setSuccessOpen(false); buyTx.reset(); pendingBuyHashRef.current = undefined; }} title="OTC Market" heading={successMsg.heading} subtext={successMsg.subtext} rows={[{ label: "Listing", value: `#${listingId.toString()}` }, { label: "Price", value: `${priceFormatted} ${paySym}` }]} />
     <div className="rounded-xl p-5 flex items-center justify-between gap-4" style={{ border: "1px solid rgba(139,92,246,0.3)", background: "rgba(139,92,246,0.04)" }}>
       <div
         className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer"
@@ -495,7 +558,6 @@ function ListingCard({ listingId, showBuy, showUnlist, showInactive }: { listing
         {isSeller && showBuy && <span className="font-mono text-[9px]" style={{ color: "rgba(255,255,255,0.4)" }}>Your listing</span>}
       </div>
     </div>
-    </>
   );
 }
 
@@ -582,7 +644,8 @@ function SellTab() {
   }, [approveRcpt.isSuccess]);
 
   const [listSuccess, setListSuccess] = useState(false);
-  useEffect(() => { if (listRcpt.isSuccess) setListSuccess(true); }, [listRcpt.isSuccess]);
+
+  useTransactionSuccess(listTx, listRcpt, () => setListSuccess(true));
 
   if (!address) {
     return (
@@ -595,7 +658,7 @@ function SellTab() {
 
   return (
     <>
-    <SuccessModal open={listSuccess} onClose={() => setListSuccess(false)} title="OTC Market" heading="Position Listed" subtext="Your position is now for sale on the OTC market." rows={[{ label: "Type", value: selected?.label || "—" }, { label: "Token ID", value: `#${selected?.tokenId || "—"}` }]} />
+    <SuccessModal open={listSuccess} onClose={() => { setListSuccess(false); listTx.reset(); approveTx.reset(); }} title="OTC Market" heading="Position Listed" subtext="Your position is now for sale on the OTC market." rows={[{ label: "Type", value: selected?.label || "—" }, { label: "Token ID", value: `#${selected?.tokenId || "—"}` }]} />
     <div className="space-y-6">
       {/* Step 1: Pick a position */}
       <div className="rounded-xl p-5" style={{ border: "1px solid rgba(139,92,246,0.35)", background: "rgba(139,92,246,0.04)" }}>

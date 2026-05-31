@@ -3,6 +3,8 @@ import { useAccount, usePublicClient, useReadContract, useWriteContract, useWait
 import { formatUnits, parseUnits, maxUint256 } from "viem";
 import { clmm } from "@/components/clmm/clmmTheme";
 import { useToast } from "@/components/Toast";
+import { SuccessModal } from "@/components/SuccessModal";
+import { useTransactionSuccess } from "@/lib/web3/useTransactionSuccess";
 import { ERC20_ABI } from "@/lib/web3/tokens";
 import { prepareTransactionWithGas } from "@/lib/web3/gasUtils";
 import {
@@ -34,6 +36,8 @@ export function SwapPanel({
   const [quoting, setQuoting] = useState(false);
   const [zeroForOne, setZeroForOne] = useState(true);
   const autoSwapRef = useRef(false);
+  const [successOpen, setSuccessOpen] = useState(false);
+  const [successRows, setSuccessRows] = useState<{ label: string; value: string }[]>([]);
 
   const approveTx = useWriteContract();
   const swapTx = useWriteContract();
@@ -112,17 +116,33 @@ export function SwapPanel({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [approveRcpt.isSuccess]);
 
-  useEffect(() => {
-    if (swapRcpt.isSuccess) {
-      toast("success", "Swap complete", `${symbolIn} → ${symbolOut}`);
-      setAmountIn("");
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [swapRcpt.isSuccess]);
+  useTransactionSuccess(swapTx, swapRcpt, () => {
+    setSuccessRows([
+      { label: "From", value: `${amountIn || "0"} ${symbolIn}` },
+      { label: "To", value: quoteOut != null ? `${formatUnits(quoteOut, decimalsOut)} ${symbolOut}` : symbolOut },
+    ]);
+    setSuccessOpen(true);
+    setAmountIn("");
+  });
+
+  const handleSuccessClose = () => {
+    setSuccessOpen(false);
+    swapTx.reset();
+    approveTx.reset();
+  };
 
   const busy = approveTx.isPending || approveRcpt.isLoading || swapTx.isPending || swapRcpt.isLoading;
 
   return (
+    <>
+      <SuccessModal
+        open={successOpen}
+        onClose={handleSuccessClose}
+        title="CLMM Swap"
+        heading="Swap Complete"
+        subtext="Your tokens have been exchanged on Capricorn."
+        rows={successRows}
+      />
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <p className="font-grotesk text-[12px] uppercase" style={{ color: clmm.text }}>
@@ -185,5 +205,6 @@ export function SwapPanel({
         </>
       )}
     </div>
+    </>
   );
 }

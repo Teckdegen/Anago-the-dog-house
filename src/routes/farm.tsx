@@ -9,6 +9,8 @@ import { useOpenNftExplorer, stopPositionRowClick } from "@/components/NftExplor
 import { parseUnits, formatUnits } from "viem";
 import { AppShell } from "@/components/AppShell";
 import { useToast } from "@/components/Toast";
+import { SuccessModal } from "@/components/SuccessModal";
+import { useTransactionSuccess } from "@/lib/web3/useTransactionSuccess";
 import { STREAM_FARM_ABI, CONTRACTS, ERC20_ABI } from "@/lib/web3/contracts";
 import type { TokenInfo } from "@/lib/web3/tokens";
 import { TokenIcon } from "@/components/TokenIcon";
@@ -301,6 +303,7 @@ function RewardStreamRow({ token, rewardRate, startTime, endTime, totalBudget, t
 function DepositModal({ farmId, stakeToken, symbol, decimals, userBalance, onClose }: { farmId: number; stakeToken: `0x${string}`; symbol: string; decimals: number; userBalance: bigint; onClose: () => void }) {
   const [amount, setAmount] = useState("");
   const [lockTier, setLockTier] = useState(0);
+  const [successOpen, setSuccessOpen] = useState(false);
   const { toast } = useToast();
   const contracts = useContracts();
   const publicClient = usePublicClient();
@@ -371,12 +374,14 @@ function DepositModal({ farmId, stakeToken, symbol, decimals, userBalance, onClo
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [approveRcpt.isSuccess, publicClient]);
 
-  useEffect(() => {
-    if (depositRcpt.isSuccess) {
-      toast("success", "Deposited!", `${amount} ${symbol} deposited into farm. You received an NFT position.`);
-      onClose();
-    }
-  }, [depositRcpt.isSuccess]);
+  useTransactionSuccess(depositTx, depositRcpt, () => setSuccessOpen(true));
+
+  const handleSuccessClose = () => {
+    setSuccessOpen(false);
+    depositTx.reset();
+    approveTx.reset();
+    onClose();
+  };
 
   const boostLabel = (tier: number) => {
     if (tier === 0) return "No lock · 1x";
@@ -387,6 +392,20 @@ function DepositModal({ farmId, stakeToken, symbol, decimals, userBalance, onClo
   };
 
   return (
+    <>
+      <SuccessModal
+        open={successOpen}
+        onClose={handleSuccessClose}
+        title="Stream Farms"
+        heading="Deposit Complete"
+        subtext="Your stake is active and you received an NFT position."
+        rows={[
+          { label: "Farm", value: `#${farmId}` },
+          { label: "Amount", value: `${amount} ${symbol}` },
+          { label: "Lock boost", value: boostLabel(lockTier) },
+        ]}
+      />
+    {!successOpen && (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="w-full max-w-md rounded-2xl overflow-hidden" style={{ background: "#0D0B18", border: "1px solid rgba(139,92,246,0.35)" }}>
         <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: "1px solid rgba(139,92,246,0.2)" }}>
@@ -463,6 +482,8 @@ function DepositModal({ farmId, stakeToken, symbol, decimals, userBalance, onClo
         </div>
       </div>
     </div>
+    )}
+    </>
   );
 }
 
@@ -532,6 +553,13 @@ function PositionCard({ tokenId, onPositionChange }: { tokenId: bigint; onPositi
   const contracts = useContracts();
   const { toast } = useToast();
   const publicClient = usePublicClient();
+  const [successOpen, setSuccessOpen] = useState(false);
+  const [successConfig, setSuccessConfig] = useState<{
+    heading: string;
+    subtext: string;
+    rows: { label: string; value: string }[];
+    refreshOnClose?: boolean;
+  } | null>(null);
 
   const posQ = useReadContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "getPosition", args: [tokenId], query: { ...LIVE_CHAIN_QUERY, refetchInterval: 10_000 } });
   const pendingQ = useReadContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "pendingRewards", args: [tokenId], query: { ...LIVE_CHAIN_QUERY, refetchInterval: 10_000 } });
@@ -546,20 +574,47 @@ function PositionCard({ tokenId, onPositionChange }: { tokenId: bigint; onPositi
   const emergencyTx = useWriteContract();
   const emergencyRcpt = useWaitForTransactionReceipt({ hash: emergencyTx.data });
 
-  // IMPORTANT: All hooks MUST be above any early return
-  useEffect(() => {
-    if (claimRcpt.isSuccess) {
-      toast("success", "Rewards claimed!", "Your pending rewards have been sent to your wallet.");
-      onPositionChange?.();
-    }
-  }, [claimRcpt.isSuccess]);
+  const showSuccess = (config: NonNullable<typeof successConfig>) => {
+    setSuccessConfig(config);
+    setSuccessOpen(true);
+  };
 
-  useEffect(() => {
-    if (withdrawRcpt.isSuccess || emergencyRcpt.isSuccess) {
-      toast("success", "Withdrawn!", "Position closed and tokens returned.");
-      onPositionChange?.();
-    }
-  }, [withdrawRcpt.isSuccess, emergencyRcpt.isSuccess]);
+  const handleSuccessClose = () => {
+    setSuccessOpen(false);
+    if (successConfig?.refreshOnClose) onPositionChange?.();
+    setSuccessConfig(null);
+    claimTx.reset();
+    withdrawTx.reset();
+    emergencyTx.reset();
+  };
+
+  // IMPORTANT: All hooks MUST be above any early return
+  useTransactionSuccess(claimTx, claimRcpt, () =>
+    showSuccess({
+      heading: "Rewards Claimed",
+      subtext: "Your pending rewards have been sent to your wallet.",
+      rows: [{ label: "Position", value: `#${tokenId.toString()}` }],
+      refreshOnClose: true,
+    }),
+  );
+
+  useTransactionSuccess(withdrawTx, withdrawRcpt, () =>
+    showSuccess({
+      heading: "Withdrawn",
+      subtext: "Your position was closed and stake returned to your wallet.",
+      rows: [{ label: "Position", value: `#${tokenId.toString()}` }],
+      refreshOnClose: true,
+    }),
+  );
+
+  useTransactionSuccess(emergencyTx, emergencyRcpt, () =>
+    showSuccess({
+      heading: "Emergency Withdrawn",
+      subtext: "Your stake was returned. Unclaimed rewards were forfeited.",
+      rows: [{ label: "Position", value: `#${tokenId.toString()}` }],
+      refreshOnClose: true,
+    }),
+  );
 
   if (!posData) return <div className="rounded-xl p-5 animate-pulse h-28" style={{ border: "1px solid rgba(139,92,246,0.2)", background: "rgba(139,92,246,0.03)" }} />;
 
@@ -606,11 +661,23 @@ function PositionCard({ tokenId, onPositionChange }: { tokenId: bigint; onPositi
   const boost = Number(boostMultiplier) / 1e18;
 
   return (
+    <>
+      {successConfig && (
+        <SuccessModal
+          open={successOpen}
+          onClose={handleSuccessClose}
+          title="Stream Farms"
+          heading={successConfig.heading}
+          subtext={successConfig.subtext}
+          rows={successConfig.rows}
+        />
+      )}
     <PositionCardInner tokenId={tokenId} farmId={farmId} amount={amount} boost={boost} locked={locked} lockExpiry={lockExpiry} pendingData={pendingData}
       onClaim={handleClaim} onWithdraw={handleWithdraw} onEmergencyWithdraw={handleEmergencyWithdraw}
       claimPending={claimTx.isPending || claimRcpt.isLoading}
       withdrawPending={withdrawTx.isPending || withdrawRcpt.isLoading || emergencyTx.isPending || emergencyRcpt.isLoading}
       error={claimTx.error || withdrawTx.error || emergencyTx.error} />
+    </>
   );
 }
 

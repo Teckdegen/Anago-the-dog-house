@@ -14,6 +14,8 @@ import { LIVE_CHAIN_QUERY } from "@/lib/web3/nftImage";
 import { prepareTransactionWithGas } from "@/lib/web3/gasUtils";
 import { useToast } from "@/components/Toast";
 import { SuccessModal } from "@/components/SuccessModal";
+import { useTransactionSuccess } from "@/lib/web3/useTransactionSuccess";
+import { useTransactionSuccess } from "@/lib/web3/useTransactionSuccess";
 import { TokenPicker } from "@/components/TokenPicker";
 import { TokenIcon } from "@/components/TokenIcon";
 import { useRemoteTokenMeta } from "@/lib/web3/useRemoteTokenMeta";
@@ -683,8 +685,7 @@ function CreateFarmForm() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [approveRcpt.isSuccess]);
 
-  useEffect(() => {
-    if (!addRcpt.isSuccess) return;
+  useTransactionSuccess(addTx, addRcpt, () => {
     const farmId = pendingFarmIdRef.current;
     setSuccessRows([
       { label: "Stake token", value: token?.symbol ?? "—" },
@@ -697,8 +698,7 @@ function CreateFarmForm() {
     createTx.reset();
     approveTx.reset();
     addTx.reset();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [addRcpt.isSuccess]);
+  });
 
   const busy =
     createTx.isPending ||
@@ -1185,8 +1185,7 @@ function AddRewardStreamForm({ farmId }: { farmId: number }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [approveRcpt.isSuccess]);
 
-  useEffect(() => {
-    if (!addRcpt.isSuccess) return;
+  useTransactionSuccess(addTx, addRcpt, () => {
     setSuccessRows([
       { label: "Farm", value: `#${farmId}` },
       { label: "Token", value: token?.symbol ?? "—" },
@@ -1200,8 +1199,7 @@ function AddRewardStreamForm({ farmId }: { farmId: number }) {
     setToken(null);
     addTx.reset();
     approveTx.reset();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [addRcpt.isSuccess]);
+  });
 
   const busy = approveTx.isPending || approveRcpt.isLoading || addTx.isPending || addRcpt.isLoading;
 

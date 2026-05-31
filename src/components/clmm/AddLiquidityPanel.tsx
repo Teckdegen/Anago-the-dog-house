@@ -4,6 +4,8 @@ import { useAccount, usePublicClient, useReadContract, useWriteContract, useWait
 import { formatUnits, parseUnits, maxUint256 } from "viem";
 import { TokenIcon } from "@/components/TokenIcon";
 import { useToast } from "@/components/Toast";
+import { SuccessModal } from "@/components/SuccessModal";
+import { useTransactionSuccess } from "@/lib/web3/useTransactionSuccess";
 import { ERC20_ABI } from "@/lib/web3/tokens";
 import { prepareTransactionWithGas } from "@/lib/web3/gasUtils";
 import {
@@ -57,6 +59,8 @@ export function AddLiquidityPanel({
   const [amount0, setAmount0] = useState("");
   const [amount1, setAmount1] = useState("");
   const [editSide, setEditSide] = useState<EditSide>("0");
+  const [successOpen, setSuccessOpen] = useState(false);
+  const [successRows, setSuccessRows] = useState<{ label: string; value: string }[]>([]);
   const pendingMintRef = useRef<{ amount0: bigint; amount1: bigint } | null>(null);
   const approveStepRef = useRef<"0" | "1" | null>(null);
 
@@ -327,15 +331,22 @@ export function AddLiquidityPanel({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [approveRcpt.isSuccess]);
 
-  useEffect(() => {
-    if (mintRcpt.isSuccess) {
-      pendingMintRef.current = null;
-      toast("success", "Liquidity added", "Your position NFT was minted on Capricorn.");
-      setAmount0("");
-      setAmount1("");
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mintRcpt.isSuccess]);
+  useTransactionSuccess(mintTx, mintRcpt, () => {
+    pendingMintRef.current = null;
+    setSuccessRows([
+      { label: "Token A", value: `${amount0 || "0"} ${live.token0Symbol}` },
+      { label: "Token B", value: `${amount1 || "0"} ${live.token1Symbol}` },
+    ]);
+    setSuccessOpen(true);
+    setAmount0("");
+    setAmount1("");
+  });
+
+  const handleSuccessClose = () => {
+    setSuccessOpen(false);
+    mintTx.reset();
+    approveTx.reset();
+  };
 
   const busy = approveTx.isPending || approveRcpt.isLoading || mintTx.isPending || mintRcpt.isLoading;
   const canSubmit = priceInRange
@@ -367,6 +378,15 @@ export function AddLiquidityPanel({
   }
 
   return (
+    <>
+      <SuccessModal
+        open={successOpen}
+        onClose={handleSuccessClose}
+        title="CLMM Liquidity"
+        heading="Liquidity Added"
+        subtext="Your position NFT was minted on Capricorn."
+        rows={successRows}
+      />
     <div className="space-y-4">
       <TokenAmountCard
         symbol={live.token0Symbol}
@@ -443,6 +463,7 @@ export function AddLiquidityPanel({
         {actionLabel}
       </button>
     </div>
+    </>
   );
 }
 

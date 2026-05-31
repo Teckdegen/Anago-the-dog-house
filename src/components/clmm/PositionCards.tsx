@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Loader2 } from "lucide-react";
 import {
@@ -10,6 +10,8 @@ import {
 import { formatUnits } from "viem";
 import { TokenIcon } from "@/components/TokenIcon";
 import { useToast } from "@/components/Toast";
+import { SuccessModal } from "@/components/SuccessModal";
+import { useTransactionSuccess } from "@/lib/web3/useTransactionSuccess";
 import { prepareTransactionWithGas } from "@/lib/web3/gasUtils";
 import {
   type LpPosition,
@@ -86,6 +88,12 @@ function PositionCard({ position: pos }: { position: LpPosition }) {
   const publicClient = usePublicClient();
   const { toast } = useToast();
   const [busy, setBusy] = useState(false);
+  const [successOpen, setSuccessOpen] = useState(false);
+  const [successConfig, setSuccessConfig] = useState<{
+    heading: string;
+    subtext: string;
+    rows: { label: string; value: string }[];
+  } | null>(null);
   const positionManager = CAPRICORN_CL.positionManager as `0x${string}`;
 
   const collectTx = useWriteContract();
@@ -135,26 +143,52 @@ function PositionCard({ position: pos }: { position: LpPosition }) {
     }
   };
 
-  useEffect(() => {
-    if (collectRcpt.isSuccess) {
-      setBusy(false);
-      toast("success", "Fees claimed", `#${pos.tokenId.toString()}`);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [collectRcpt.isSuccess]);
+  useTransactionSuccess(collectTx, collectRcpt, () => {
+    setBusy(false);
+    setSuccessConfig({
+      heading: "Fees Claimed",
+      subtext: "Accrued fees have been sent to your wallet.",
+      rows: [
+        { label: "Position", value: `#${pos.tokenId.toString()}` },
+        { label: "Token 0", value: `${owed0Label} ${pos.token0Symbol}` },
+        { label: "Token 1", value: `${owed1Label} ${pos.token1Symbol}` },
+      ],
+    });
+    setSuccessOpen(true);
+  });
 
-  useEffect(() => {
-    if (decreaseRcpt.isSuccess) {
-      setBusy(false);
-      toast("success", "Liquidity removed", `#${pos.tokenId.toString()}`);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [decreaseRcpt.isSuccess]);
+  useTransactionSuccess(decreaseTx, decreaseRcpt, () => {
+    setBusy(false);
+    setSuccessConfig({
+      heading: "Liquidity Removed",
+      subtext: "Your liquidity has been withdrawn from the pool.",
+      rows: [{ label: "Position", value: `#${pos.tokenId.toString()}` }],
+    });
+    setSuccessOpen(true);
+  });
+
+  const handleSuccessClose = () => {
+    setSuccessOpen(false);
+    setSuccessConfig(null);
+    collectTx.reset();
+    decreaseTx.reset();
+  };
 
   const pending =
     busy || collectTx.isPending || collectRcpt.isLoading || decreaseTx.isPending || decreaseRcpt.isLoading;
 
   return (
+    <>
+      {successConfig && (
+        <SuccessModal
+          open={successOpen}
+          onClose={handleSuccessClose}
+          title="CLMM Positions"
+          heading={successConfig.heading}
+          subtext={successConfig.subtext}
+          rows={successConfig.rows}
+        />
+      )}
     <div
       className="rounded-xl p-5 flex flex-col h-full cursor-pointer transition hover:bg-[rgba(139,92,246,0.06)]"
       style={{ border: `1px solid ${clmm.border}`, background: clmm.purpleBg }}
@@ -237,6 +271,7 @@ function PositionCard({ position: pos }: { position: LpPosition }) {
         </Link>
       </div>
     </div>
+    </>
   );
 }
 
