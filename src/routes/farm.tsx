@@ -17,6 +17,8 @@ import { TokenIcon } from "@/components/TokenIcon";
 import { useRemoteTokenMeta } from "@/lib/web3/useRemoteTokenMeta";
 import { FarmManagePanel } from "@/components/FarmManagePanel";
 import { useIsFarmOperator, useIsStreamFarmAdmin } from "@/lib/web3/useStreamFarmRoles";
+import { bigintToUsd, useTokenPriceUsdLive } from "@/lib/web3/prices";
+import { formatUsdTable } from "@/lib/capricorn/poolMetrics";
 
 export const Route = createFileRoute("/farm")({
   component: FarmPage,
@@ -31,6 +33,24 @@ type Tab = typeof ALL_FARMS_TAB | typeof CREATE_TAB | typeof MY_POSITIONS_TAB;
 function useContracts() {
   const chainId = useChainId();
   return CONTRACTS[chainId] ?? CONTRACTS[143];
+}
+
+/** Wagmi/viem may return tuple outputs as an array or as named fields. */
+function parsePendingRewards(data: unknown): { token: string; amount: bigint }[] {
+  if (!data) return [];
+  let tokens: string[] = [];
+  let amounts: bigint[] = [];
+  if (Array.isArray(data)) {
+    tokens = (data[0] as string[]) ?? [];
+    amounts = (data[1] as bigint[]) ?? [];
+  } else if (typeof data === "object") {
+    const d = data as { tokens?: string[]; amounts?: bigint[]; 0?: string[]; 1?: bigint[] };
+    tokens = d.tokens ?? d[0] ?? [];
+    amounts = d.amounts ?? d[1] ?? [];
+  }
+  return tokens
+    .map((token, i) => ({ token, amount: amounts[i] ?? 0n }))
+    .filter((e) => e.token);
 }
 
 function FarmPage() {
@@ -60,6 +80,15 @@ function FarmPage() {
   const farmCountQ = useReadContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "farmCount", query: { ...LIVE_CHAIN_QUERY, refetchInterval: 10_000 } });
   const farmCount = Number(farmCountQ.data ?? 0);
 
+  const myPositionsQ = useReadContract({
+    address: contracts.streamFarm,
+    abi: STREAM_FARM_ABI,
+    functionName: "positionsOf",
+    args: address ? [address] : undefined,
+    query: { ...LIVE_CHAIN_QUERY, enabled: !!address, refetchInterval: 10_000 },
+  });
+  const myPositionCount = ((myPositionsQ.data as bigint[] | undefined) ?? []).length;
+
   return (
     <AppShell>
       <div className="max-w-[1280px] mx-auto px-5 sm:px-8 lg:px-14 pt-8 pb-20">
@@ -76,9 +105,17 @@ function FarmPage() {
           <div className="flex items-center gap-0.5 p-1 rounded-full" style={{ background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.25)" }}>
             {visibleTabs.map((t) => (
               <button key={t} onClick={() => setActiveTab(t)}
-                className="px-4 py-1.5 rounded-full font-grotesk text-[11px] uppercase tracking-wider transition whitespace-nowrap"
+                className="px-4 py-1.5 rounded-full font-grotesk text-[11px] uppercase tracking-wider transition whitespace-nowrap flex items-center gap-1.5"
                 style={activeTab === t ? { background: "rgba(139,92,246,0.35)", color: "#FFFFFF", border: "1px solid rgba(139,92,246,0.6)" } : { color: "rgba(255,255,255,0.5)" }}>
                 {t}
+                {t === MY_POSITIONS_TAB && myPositionCount > 0 && (
+                  <span
+                    className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full font-mono text-[9px]"
+                    style={{ background: "rgba(167,139,250,0.35)", color: "#E9D5FF", border: "1px solid rgba(167,139,250,0.5)" }}
+                  >
+                    {myPositionCount}
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -91,13 +128,39 @@ function FarmPage() {
           )}
         </div>
 
-        {activeTab === ALL_FARMS_TAB && <AllFarmsTab farmCount={farmCount} />}
+        {activeTab === ALL_FARMS_TAB && (
+          <>
+            {myPositionCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setActiveTab(MY_POSITIONS_TAB)}
+                className="w-full mb-4 rounded-xl px-4 py-3.5 text-left transition hover:opacity-90"
+                style={{ background: "rgba(139,92,246,0.15)", border: "1px solid rgba(167,139,250,0.45)" }}
+              >
+                <p className="font-grotesk text-[12px] uppercase tracking-wider" style={{ color: "#E9D5FF" }}>
+                  You have {myPositionCount} active position{myPositionCount !== 1 ? "s" : ""}
+                </p>
+                <p className="font-mono text-[10px] mt-1" style={{ color: "rgba(255,255,255,0.55)" }}>
+                  View staked amounts, claimable rewards, and claim →
+                </p>
+              </button>
+            )}
+            <AllFarmsTab farmCount={farmCount} />
+          </>
+        )}
         {activeTab === CREATE_TAB && (canManage ? <FarmManagePanel /> : manageLoading ? (
           <div className="flex justify-center py-16">
             <div className="w-6 h-6 rounded-full border-2 animate-spin" style={{ borderColor: "rgba(139,92,246,0.2)", borderTopColor: "#8B5CF6" }} />
           </div>
         ) : null)}
-        {activeTab === MY_POSITIONS_TAB && <MyPositionsTab />}
+        {activeTab === MY_POSITIONS_TAB && (
+          <div>
+            <p className="font-mono text-[11px] mb-4 max-w-xl" style={{ color: "rgba(255,255,255,0.55)" }}>
+              Your staked positions, claimable rewards, and estimated USD value — updated every few seconds.
+            </p>
+            <MyPositionsTab />
+          </div>
+        )}
       </div>
     </AppShell>
   );
@@ -535,7 +598,12 @@ function MyPositionsTab() {
 
   return (
     <div className="space-y-4">
-      <p className="font-mono text-[11px]" style={{ color: "rgba(255,255,255,0.6)" }}>{positions.length} position{positions.length !== 1 ? "s" : ""}</p>
+      <div className="rounded-xl px-4 py-3.5" style={{ background: "rgba(139,92,246,0.1)", border: "1px solid rgba(139,92,246,0.3)" }}>
+        <p className="font-grotesk text-[13px] uppercase tracking-wider" style={{ color: "#FFFFFF" }}>My Positions</p>
+        <p className="font-mono text-[10px] mt-1" style={{ color: "rgba(255,255,255,0.55)" }}>
+          {positions.length} active position{positions.length !== 1 ? "s" : ""} · Staked amounts, claimable rewards, and claim actions below
+        </p>
+      </div>
       <div className="grid gap-4">
         {positions.map((id) => (
           <PositionCard
@@ -682,7 +750,7 @@ function PositionCard({ tokenId, onPositionChange }: { tokenId: bigint; onPositi
 }
 
 function PositionCardInner({ tokenId, farmId, amount, boost, locked, lockExpiry, pendingData, onClaim, onWithdraw, onEmergencyWithdraw, claimPending, withdrawPending, error }: any) {
-  const [expanded, setExpanded] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const contracts = useContracts();
   const farmQ = useReadContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "getFarm", args: [farmId], query: { ...LIVE_CHAIN_QUERY, refetchInterval: 10_000 } });
   const farmData = farmQ.data as any;
@@ -694,99 +762,145 @@ function PositionCardInner({ tokenId, farmId, amount, boost, locked, lockExpiry,
   const remote = getRemoteMeta(stakeToken);
   const symbol = remote?.symbol ?? ((symbolQ.data as string) || "...");
   const decimals = remote?.decimals ?? ((decimalsQ.data as number) ?? 18);
+  const { priceUsd: stakePriceUsd, loading: stakePriceLoading } = useTokenPriceUsdLive(stakeToken ?? "");
 
-  const pendingTokens: string[] = pendingData?.[0] ?? [];
-  const pendingAmounts: bigint[] = pendingData?.[1] ?? [];
-  const hasPending = pendingAmounts.some((a: bigint) => a > 0n);
+  const rewardEntries = useMemo(() => parsePendingRewards(pendingData), [pendingData]);
+  const hasPending = rewardEntries.some((e) => e.amount > 0n);
 
   const now = Math.floor(Date.now() / 1000);
   const lockDaysLeft = locked ? Math.ceil((Number(lockExpiry) - now) / 86400) : 0;
-  const stakedFormatted = Number(formatUnits(amount ?? 0n, decimals)).toLocaleString();
+  const stakedFormatted = Number(formatUnits(amount ?? 0n, decimals)).toLocaleString(undefined, { maximumFractionDigits: 6 });
+  const stakedUsd = bigintToUsd(amount ?? 0n, decimals, stakePriceUsd);
   const openExplorer = useOpenNftExplorer(contracts.streamFarm, tokenId);
+  const boostLabel = boost > 1 ? `${boost.toFixed(2).replace(/\.?0+$/, "")}x` : "1x";
 
   return (
     <div
-      className="rounded-xl p-5 cursor-pointer transition hover:bg-[rgba(139,92,246,0.08)]"
-      style={{ border: "1px solid rgba(139,92,246,0.35)", background: "rgba(139,92,246,0.05)" }}
-      onClick={openExplorer}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          openExplorer();
-        }
-      }}
-      role="link"
-      tabIndex={0}
-      title="View on MonadScan"
+      className="rounded-xl p-5 sm:p-6 transition"
+      style={{ border: "1px solid rgba(139,92,246,0.45)", background: "rgba(139,92,246,0.06)" }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex items-start justify-between gap-4 mb-5">
         <div className="flex items-center gap-3 min-w-0">
           {stakeToken ? (
-            <TokenIcon address={stakeToken} symbol={symbol} size={40} logoUrl={remote?.logoURI} />
+            <TokenIcon address={stakeToken} symbol={symbol} size={44} logoUrl={remote?.logoURI} />
           ) : (
-            <NftImage contract={contracts.streamFarm} tokenId={tokenId} size={40} fallbackLetter={symbol} />
+            <NftImage contract={contracts.streamFarm} tokenId={tokenId} size={44} fallbackLetter={symbol} />
           )}
           <div className="min-w-0">
-            <p className="font-grotesk text-[14px] font-medium tracking-tight" style={{ color: "#FFFFFF" }}>
-              {stakedFormatted} {symbol}
+            <p className="font-grotesk text-[16px] sm:text-[18px] font-semibold tracking-tight truncate" style={{ color: "#FFFFFF" }}>
+              {symbol} Farm
             </p>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <p className="font-mono text-[10px]" style={{ color: "rgba(255,255,255,0.45)" }}>
-                Position #{tokenId.toString()} · Farm #{farmId?.toString()}
-                {boost > 1 && ` · ${boost}x boost`}
-                {locked && ` · ${lockDaysLeft}d locked`}
-              </p>
-            </div>
+            <p className="font-mono text-[10px] mt-0.5" style={{ color: "rgba(255,255,255,0.5)" }}>
+              Position #{tokenId.toString()} · Farm #{farmId?.toString()}
+            </p>
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0" onClick={stopPositionRowClick}>
-          {hasPending && (
-            <button onClick={onClaim} disabled={claimPending}
-              className="px-3 py-1.5 rounded-xl font-grotesk text-[10px] uppercase tracking-wider transition hover:opacity-90 disabled:opacity-40"
-              style={{ background: "rgba(139,92,246,0.2)", color: "#FFFFFF", border: "1px solid rgba(139,92,246,0.5)" }}>
-              {claimPending ? "..." : "Claim"}
-            </button>
-          )}
-          <button onClick={onWithdraw} disabled={withdrawPending}
-            className="px-3 py-1.5 rounded-xl font-grotesk text-[10px] uppercase tracking-wider transition hover:opacity-90 disabled:opacity-40"
-            style={{ background: "rgba(139,92,246,0.1)", color: "#A78BFA", border: "1px solid rgba(139,92,246,0.3)" }}>
-            {withdrawPending ? "..." : "Withdraw"}
-          </button>
-          <button onClick={() => setExpanded(!expanded)}
-            className="w-7 h-7 rounded-full flex items-center justify-center transition hover:bg-[rgba(139,92,246,0.15)]"
-            style={{ color: "rgba(255,255,255,0.5)" }}>
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ transform: expanded ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
-              <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </button>
-        </div>
+        <span
+          className="shrink-0 px-2.5 py-1 rounded-full font-mono text-[9px] uppercase tracking-wider"
+          style={{
+            background: hasPending ? "rgba(139,92,246,0.25)" : "rgba(255,255,255,0.06)",
+            color: hasPending ? "#C4B5FD" : "rgba(255,255,255,0.45)",
+            border: `1px solid ${hasPending ? "rgba(139,92,246,0.5)" : "rgba(255,255,255,0.15)"}`,
+          }}
+        >
+          {hasPending ? "Rewards ready" : "Active"}
+        </span>
       </div>
 
-      {/* Expanded details */}
-      {expanded && (
-        <div className="mt-4 pt-3" style={{ borderTop: "1px solid rgba(139,92,246,0.12)" }}>
-          <div className="flex items-center gap-6 font-mono text-[11px] mb-3" style={{ color: "rgba(255,255,255,0.6)" }}>
-            <span>Staked <span style={{ color: "#FFFFFF" }}>{stakedFormatted} {symbol}</span></span>
-            <span>Boost <span style={{ color: "#FFFFFF" }}>{boost}x</span></span>
-            {locked && <span>Lock <span style={{ color: "#FFFFFF" }}>{lockDaysLeft}d left</span></span>}
+      {/* Stats grid — always visible */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+        <PositionStatBox
+          label="Total staked"
+          value={`${stakedFormatted} ${symbol}`}
+          sub={stakePriceLoading ? "…" : stakedUsd > 0 ? formatUsdTable(stakedUsd) : "—"}
+          accent
+        />
+        <FarmClaimableStat entries={rewardEntries} />
+        <PositionStatBox
+          label="Lock status"
+          value={locked ? `${lockDaysLeft}d left` : "Unlocked"}
+          sub={locked ? "Stake locked" : "Withdraw anytime"}
+          accent={locked}
+        />
+        <PositionStatBox label="Boost" value={boostLabel} sub={boost > 1 ? "Lock boost active" : "No boost"} />
+      </div>
+
+      {/* Rewards breakdown — always visible */}
+      <div
+        className="rounded-xl px-4 py-3.5 mb-5"
+        style={{ background: "rgba(0,0,0,0.35)", border: "1px solid rgba(139,92,246,0.25)" }}
+      >
+        <p className="font-mono text-[9px] uppercase tracking-wider mb-3" style={{ color: "rgba(255,255,255,0.45)" }}>
+          Rewards breakdown
+        </p>
+        {rewardEntries.length === 0 ? (
+          <p className="font-mono text-[11px]" style={{ color: "rgba(255,255,255,0.45)" }}>
+            No reward streams on this farm yet.
+          </p>
+        ) : (
+          <div className="space-y-2.5">
+            {rewardEntries.map((e, i) => (
+              <PendingRewardLine key={`${e.token}-${i}`} token={e.token} amount={e.amount} highlight={e.amount > 0n} />
+            ))}
           </div>
-          {pendingAmounts.length > 0 && (
-            <div>
-              <p className="font-mono text-[9px] uppercase tracking-wider mb-1.5" style={{ color: "rgba(255,255,255,0.4)" }}>Pending Rewards</p>
-              <div className="space-y-1">
-                {pendingAmounts.map((amt: bigint, i: number) => amt > 0n ? <PendingRewardLine key={i} token={pendingTokens[i]} amount={amt} /> : null)}
-                {!hasPending && <p className="font-mono text-[11px]" style={{ color: "rgba(255,255,255,0.4)" }}>None yet</p>}
-              </div>
-            </div>
-          )}
-          <p className="font-mono text-[9px] mt-3 mb-2" style={{ color: "rgba(255,255,255,0.45)" }}>
-            If normal withdraw fails (too many reward streams), use emergency withdraw — returns stake only, skips unclaimed rewards.
+        )}
+      </div>
+
+      {/* Actions */}
+      <div className="flex flex-col sm:flex-row gap-2.5" onClick={stopPositionRowClick}>
+        <button
+          type="button"
+          onClick={onClaim}
+          disabled={!hasPending || claimPending}
+          className="flex-1 rounded-xl py-3.5 font-grotesk text-[12px] font-semibold uppercase tracking-wider transition disabled:opacity-45 active:scale-[0.99]"
+          style={{
+            background: hasPending ? "rgba(139,92,246,0.45)" : "rgba(139,92,246,0.12)",
+            color: "#FFFFFF",
+            border: `1px solid ${hasPending ? "rgba(167,139,250,0.7)" : "rgba(139,92,246,0.25)"}`,
+          }}
+        >
+          {claimPending ? "Claiming…" : hasPending ? "Claim rewards" : "Nothing to claim"}
+        </button>
+        <button
+          type="button"
+          onClick={onWithdraw}
+          disabled={withdrawPending || locked}
+          className="sm:w-36 rounded-xl py-3.5 font-grotesk text-[12px] uppercase tracking-wider transition disabled:opacity-45 active:scale-[0.99]"
+          style={{ background: "rgba(139,92,246,0.1)", color: "#A78BFA", border: "1px solid rgba(139,92,246,0.35)" }}
+          title={locked ? `Locked for ${lockDaysLeft} more days` : undefined}
+        >
+          {withdrawPending ? "Withdrawing…" : locked ? "Locked" : "Withdraw"}
+        </button>
+        <button
+          type="button"
+          onClick={openExplorer}
+          className="sm:w-36 rounded-xl py-3.5 font-grotesk text-[11px] uppercase tracking-wider transition hover:opacity-90"
+          style={{ background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.65)", border: "1px solid rgba(255,255,255,0.12)" }}
+        >
+          View NFT
+        </button>
+      </div>
+
+      <button
+        type="button"
+        onClick={() => setShowAdvanced((v) => !v)}
+        className="mt-3 font-mono text-[9px] uppercase tracking-wider transition hover:opacity-80"
+        style={{ color: "rgba(255,255,255,0.4)" }}
+      >
+        {showAdvanced ? "Hide" : "Show"} advanced options
+      </button>
+
+      {showAdvanced && (
+        <div className="mt-3 pt-3" style={{ borderTop: "1px solid rgba(139,92,246,0.15)" }}>
+          <p className="font-mono text-[10px] leading-relaxed mb-3" style={{ color: "rgba(255,255,255,0.5)" }}>
+            Emergency withdraw returns your stake only and forfeits unclaimed rewards. Use if normal withdraw fails (e.g. too many reward streams).
           </p>
           <button
+            type="button"
             onClick={onEmergencyWithdraw}
             disabled={withdrawPending}
-            className="px-3 py-1.5 rounded-xl font-grotesk text-[10px] uppercase tracking-wider transition hover:opacity-90 disabled:opacity-40"
+            className="px-4 py-2 rounded-xl font-grotesk text-[10px] uppercase tracking-wider transition disabled:opacity-40"
             style={{ background: "rgba(255,120,80,0.12)", color: "#FCA5A5", border: "1px solid rgba(255,120,80,0.35)" }}
           >
             Emergency withdraw
@@ -794,15 +908,153 @@ function PositionCardInner({ tokenId, farmId, amount, boost, locked, lockExpiry,
         </div>
       )}
 
-      {error && <p className="font-mono text-[10px] mt-3 break-words" style={{ color: "rgba(255,100,100,0.9)" }}>{(error as any)?.shortMessage ?? error?.message}</p>}
+      {error && (
+        <p className="font-mono text-[10px] mt-3 break-words" style={{ color: "rgba(255,100,100,0.9)" }}>
+          {(error as any)?.shortMessage ?? error?.message}
+        </p>
+      )}
     </div>
   );
 }
 
-function PendingRewardLine({ token, amount }: { token: string; amount: bigint }) {
+function PositionStatBox({
+  label,
+  value,
+  sub,
+  accent,
+  highlight,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  accent?: boolean;
+  highlight?: boolean;
+}) {
+  return (
+    <div
+      className="rounded-xl px-3 py-2.5 min-w-0"
+      style={{
+        background: "rgba(0,0,0,0.35)",
+        border: highlight ? "1px solid rgba(167,139,250,0.65)" : "1px solid rgba(139,92,246,0.2)",
+      }}
+    >
+      <p className="font-mono text-[8px] uppercase tracking-wider truncate" style={{ color: "rgba(255,255,255,0.4)" }}>
+        {label}
+      </p>
+      <p
+        className="font-mono text-[11px] sm:text-[12px] mt-1 font-medium truncate"
+        style={{ color: accent ? "#C4B5FD" : "#FFFFFF" }}
+      >
+        {value}
+      </p>
+      {sub && (
+        <p className="font-mono text-[9px] mt-0.5 truncate" style={{ color: "rgba(255,255,255,0.45)" }}>
+          {sub}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function FarmClaimableStat({ entries }: { entries: { token: string; amount: bigint }[] }) {
+  const { totalUsd, loading, summary } = useRewardEntriesUsd(entries);
+  const hasClaimable = entries.some((e) => e.amount > 0n);
+  return (
+    <PositionStatBox
+      label="Claimable now"
+      value={summary}
+      sub={loading ? "Fetching prices…" : totalUsd > 0 ? formatUsdTable(totalUsd) : entries.length > 0 ? "Earned (no USD price)" : "—"}
+      accent={hasClaimable}
+      highlight={hasClaimable}
+    />
+  );
+}
+
+function useRewardEntriesUsd(entries: { token: string; amount: bigint }[]) {
+  const metaQ = useReadContracts({
+    allowFailure: true,
+    contracts: entries.flatMap((e) => [
+      { address: e.token as `0x${string}`, abi: ERC20_ABI, functionName: "symbol" as const },
+      { address: e.token as `0x${string}`, abi: ERC20_ABI, functionName: "decimals" as const },
+    ]),
+    query: { enabled: entries.length > 0, refetchInterval: 10_000 },
+  });
+
+  const [totalUsd, setTotalUsd] = useState(0);
+  const [loading, setLoading] = useState(entries.length > 0);
+
+  useEffect(() => {
+    if (entries.length === 0) {
+      setTotalUsd(0);
+      setLoading(false);
+      return;
+    }
+    if (!metaQ.data) return;
+
+    let cancelled = false;
+    setLoading(true);
+
+    (async () => {
+      const { getTokenPriceUsd } = await import("@/lib/web3/dexscreener");
+      let sum = 0;
+
+      for (let i = 0; i < entries.length; i++) {
+        const { token, amount } = entries[i];
+        const dec = (metaQ.data?.[i * 2 + 1]?.result as number | undefined) ?? 18;
+        const price = await getTokenPriceUsd(token).catch(() => null);
+        sum += bigintToUsd(amount, dec, price ?? 0);
+      }
+
+      if (!cancelled) {
+        setTotalUsd(sum);
+        setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [entries, metaQ.data]);
+
+  const summary = (() => {
+    if (entries.length === 0) return "0";
+    if (!metaQ.data) return "…";
+    const parts: string[] = [];
+    for (let i = 0; i < entries.length; i++) {
+      if (entries[i].amount === 0n) continue;
+      const sym = (metaQ.data[i * 2]?.result as string | undefined) ?? "…";
+      const dec = (metaQ.data[i * 2 + 1]?.result as number | undefined) ?? 18;
+      const formatted = Number(formatUnits(entries[i].amount, dec)).toLocaleString(undefined, { maximumFractionDigits: 4 });
+      parts.push(`${formatted} ${sym}`);
+    }
+    return parts.length > 0 ? parts.join(" + ") : "0";
+  })();
+
+  return { totalUsd, loading, summary };
+}
+
+function PendingRewardLine({ token, amount, highlight }: { token: string; amount: bigint; highlight?: boolean }) {
   const symbolQ = useReadContract({ address: token as `0x${string}`, abi: ERC20_ABI, functionName: "symbol", query: { enabled: !!token } });
   const decimalsQ = useReadContract({ address: token as `0x${string}`, abi: ERC20_ABI, functionName: "decimals", query: { enabled: !!token } });
+  const { priceUsd, loading } = useTokenPriceUsdLive(token);
   const sym = (symbolQ.data as string) || "...";
   const dec = (decimalsQ.data as number) ?? 18;
-  return <p className="font-mono text-[11px]" style={{ color: "#FFFFFF" }}>{Number(formatUnits(amount, dec)).toLocaleString(undefined, { maximumFractionDigits: 6 })} {sym}</p>;
+  const formatted = Number(formatUnits(amount, dec)).toLocaleString(undefined, { maximumFractionDigits: 6 });
+  const usd = bigintToUsd(amount, dec, priceUsd);
+
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="font-mono text-[10px] uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.45)" }}>
+        {sym}
+      </span>
+      <div className="text-right min-w-0">
+        <p className="font-mono text-[11px] font-medium truncate" style={{ color: highlight ? "#C4B5FD" : "rgba(255,255,255,0.55)" }}>
+          {formatted} {sym}
+        </p>
+        <p className="font-mono text-[9px] mt-0.5" style={{ color: "rgba(255,255,255,0.4)" }}>
+          {loading ? "…" : usd > 0 ? formatUsdTable(usd) : amount > 0n ? "—" : "$0.00"}
+        </p>
+      </div>
+    </div>
+  );
 }
