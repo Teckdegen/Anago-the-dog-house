@@ -215,7 +215,59 @@ function VestingRow({
   );
 }
 
-function VestingRowUI({ nftContract, symbol, decimals, logoUrl, vesting, totalAmount, claimed, claimable, vestedPct, claimedPct, inCliff, fullyVested, hasCliff, cliff, duration, endDate, cliffDate, timeLabel, justClaimed, doClaim, txPending, isLast }: any) {
+function VestingRowUI({
+  nftContract,
+  symbol,
+  decimals,
+  logoUrl,
+  vesting,
+  totalAmount,
+  claimed,
+  claimable,
+  totalUsd,
+  claimableUsd,
+  priceLoading,
+  vestedPct,
+  claimedPct,
+  inCliff,
+  fullyVested,
+  hasCliff,
+  cliff,
+  duration,
+  endDate,
+  cliffDate,
+  timeLabel,
+  justClaimed,
+  doClaim,
+  txPending,
+  isLast,
+}: {
+  nftContract: `0x${string}`;
+  symbol: string;
+  decimals: number;
+  logoUrl?: string | null;
+  vesting: VestingView;
+  totalAmount: bigint;
+  claimed: bigint;
+  claimable: bigint;
+  totalUsd: number;
+  claimableUsd: number;
+  priceLoading: boolean;
+  vestedPct: number;
+  claimedPct: number;
+  inCliff: boolean;
+  fullyVested: boolean;
+  hasCliff: boolean;
+  cliff: number;
+  duration: number;
+  endDate: string;
+  cliffDate: string | null;
+  timeLabel: string;
+  justClaimed: boolean;
+  doClaim: () => void;
+  txPending: boolean;
+  isLast: boolean;
+}) {
   const [expanded, setExpanded] = useState(false);
   const openExplorer = useOpenNftExplorer(nftContract, vesting.id);
 
@@ -279,9 +331,15 @@ function VestingRowUI({ nftContract, symbol, decimals, logoUrl, vesting, totalAm
 
           {/* More button */}
           <button
-            onClick={() => setExpanded(!expanded)}
+            type="button"
+            onClick={(e) => {
+              stopPositionRowClick(e);
+              setExpanded((v) => !v);
+            }}
             className="w-6 h-6 rounded-full flex items-center justify-center transition hover:bg-[rgba(139,92,246,0.15)]"
             style={{ color: "rgba(255,255,255,0.5)" }}
+            aria-expanded={expanded}
+            aria-label={expanded ? "Hide vesting details" : "Show vesting details"}
           >
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ transform: expanded ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
               <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -292,7 +350,11 @@ function VestingRowUI({ nftContract, symbol, decimals, logoUrl, vesting, totalAm
 
       {/* Expanded details */}
       {expanded && (
-        <div className="mt-3 pt-3" style={{ borderTop: "1px solid rgba(139,92,246,0.1)" }}>
+        <div
+          className="mt-3 pt-3"
+          style={{ borderTop: "1px solid rgba(139,92,246,0.1)" }}
+          onClick={stopPositionRowClick}
+        >
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-2">
             <div>
               <p className="font-mono text-[8px] uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.4)" }}>Total</p>
