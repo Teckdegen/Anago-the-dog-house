@@ -22,21 +22,25 @@ import {
 import { NPM_ABI } from "@/lib/capricorn/abis";
 import { clmm } from "./clmmTheme";
 import { useOpenNftExplorer, stopPositionRowClick } from "@/components/NftExplorerLink";
+import { SharePositionButton } from "@/components/SharePositionButton";
 
 export function PositionCards({
   positions,
   loading,
   emptyLabel,
   layout = "stack",
+  requireWallet = true,
 }: {
   positions: LpPosition[];
   loading?: boolean;
   emptyLabel?: string;
   layout?: "stack" | "grid";
+  /** When false, show on-chain position data without a connected wallet (shared links). */
+  requireWallet?: boolean;
 }) {
   const { address } = useAccount();
 
-  if (!address) {
+  if (requireWallet && !address) {
     return (
       <p className="font-mono text-[12px] py-12 text-center" style={{ color: clmm.textMuted }}>
         Connect wallet to view positions
@@ -217,6 +221,9 @@ function PositionCard({ position: pos }: { position: LpPosition }) {
           <p className="font-mono text-[9px]" style={{ color: clmm.textDim }}>
             NFT #{pos.tokenId.toString()}
           </p>
+        </div>
+        <div onClick={stopPositionRowClick}>
+          <SharePositionButton kind="clmm" tokenId={pos.tokenId} />
         </div>
       </div>
 

@@ -19,8 +19,13 @@ import { FarmManagePanel } from "@/components/FarmManagePanel";
 import { useIsFarmOperator, useIsStreamFarmAdmin } from "@/lib/web3/useStreamFarmRoles";
 import { bigintToUsd, useTokenPriceUsdLive } from "@/lib/web3/prices";
 import { formatUsdTable } from "@/lib/capricorn/poolMetrics";
+import { SharePositionButton } from "@/components/SharePositionButton";
+import { SharedPositionBanner } from "@/components/SharedPositionBanner";
+import { parsePositionSearchParam, validatePositionSearch } from "@/lib/positionShare";
+import { useSharedFarmPositionExists } from "@/lib/web3/useSharedPositions";
 
 export const Route = createFileRoute("/farm")({
+  validateSearch: validatePositionSearch,
   component: FarmPage,
   head: () => ({ meta: [{ title: "Stream Farms — The Dog House" }, { name: "description", content: "Streaming reward farms on Monad." }] }),
 });
@@ -54,6 +59,14 @@ function parsePendingRewards(data: unknown): { token: string; amount: bigint }[]
 }
 
 function FarmPage() {
+  const { position: positionParam, tab: tabParam } = Route.useSearch();
+  const sharedFarmId = parsePositionSearchParam(positionParam);
+  const {
+    exists: sharedFarmExists,
+    loading: sharedFarmLoading,
+    notFound: sharedFarmNotFound,
+  } = useSharedFarmPositionExists(sharedFarmId);
+
   const [activeTab, setActiveTab] = useState<Tab>(ALL_FARMS_TAB);
   const [search, setSearch] = useState("");
   const { address } = useAccount();
@@ -76,6 +89,12 @@ function FarmPage() {
       setActiveTab(ALL_FARMS_TAB);
     }
   }, [manageLoading, canManage, activeTab]);
+
+  useEffect(() => {
+    if (sharedFarmId !== undefined || tabParam === "positions") {
+      setActiveTab(MY_POSITIONS_TAB);
+    }
+  }, [sharedFarmId, tabParam]);
 
   const farmCountQ = useReadContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "farmCount", query: { ...LIVE_CHAIN_QUERY, refetchInterval: 10_000 } });
   const farmCount = Number(farmCountQ.data ?? 0);
@@ -100,6 +119,22 @@ function FarmPage() {
             </p>
           </div>
         </div>
+
+        {sharedFarmId !== undefined && (
+          <SharedPositionBanner
+            kind="farm"
+            tokenId={sharedFarmId}
+            loading={sharedFarmLoading}
+            notFound={sharedFarmNotFound}
+          >
+            {sharedFarmExists && (
+              <PositionCard
+                tokenId={sharedFarmId}
+                onPositionChange={() => myPositionsQ.refetch()}
+              />
+            )}
+          </SharedPositionBanner>
+        )}
 
         <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
           <div className="flex items-center gap-0.5 p-1 rounded-full" style={{ background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.25)" }}>
@@ -796,16 +831,19 @@ function PositionCardInner({ tokenId, farmId, amount, boost, locked, lockExpiry,
             </p>
           </div>
         </div>
-        <span
-          className="shrink-0 px-2.5 py-1 rounded-full font-mono text-[9px] uppercase tracking-wider"
-          style={{
-            background: hasPending ? "rgba(139,92,246,0.25)" : "rgba(255,255,255,0.06)",
-            color: hasPending ? "#C4B5FD" : "rgba(255,255,255,0.45)",
-            border: `1px solid ${hasPending ? "rgba(139,92,246,0.5)" : "rgba(255,255,255,0.15)"}`,
-          }}
-        >
-          {hasPending ? "Rewards ready" : "Active"}
-        </span>
+        <div className="flex items-center gap-2 shrink-0">
+          <SharePositionButton kind="farm" tokenId={tokenId} />
+          <span
+            className="px-2.5 py-1 rounded-full font-mono text-[9px] uppercase tracking-wider"
+            style={{
+              background: hasPending ? "rgba(139,92,246,0.25)" : "rgba(255,255,255,0.06)",
+              color: hasPending ? "#C4B5FD" : "rgba(255,255,255,0.45)",
+              border: `1px solid ${hasPending ? "rgba(139,92,246,0.5)" : "rgba(255,255,255,0.15)"}`,
+            }}
+          >
+            {hasPending ? "Rewards ready" : "Active"}
+          </span>
+        </div>
       </div>
 
       {/* Stats grid — always visible */}

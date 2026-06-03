@@ -25,8 +25,13 @@ import { bigintToUsd, useTokenPriceUsdLive } from "@/lib/web3/prices";
 import { formatUsdTable } from "@/lib/capricorn/poolMetrics";
 import { useRemoteTokenMeta } from "@/lib/web3/useRemoteTokenMeta";
 import { useOpenNftExplorer, stopPositionRowClick } from "@/components/NftExplorerLink";
+import { SharePositionButton } from "@/components/SharePositionButton";
+import { SharedPositionBanner } from "@/components/SharedPositionBanner";
+import { parsePositionSearchParam, validatePositionSearch } from "@/lib/positionShare";
+import { useSharedLock } from "@/lib/web3/useSharedPositions";
 
 export const Route = createFileRoute("/lock")({
+  validateSearch: validatePositionSearch,
   component: LockPage,
   head: () => ({
     meta: [
@@ -227,6 +232,7 @@ function LockRow({
         {timeUntil(unlockAt)}
       </div>
       <div className="col-span-2 sm:col-span-1 flex sm:justify-end items-center gap-2">
+        <SharePositionButton kind="lock" tokenId={lockId} />
         {localWithdrawn ? (
           <span className="font-mono text-[9px] uppercase" style={{ color: "#A78BFA" }}>Claimed ✓</span>
         ) : canClaim ? (
@@ -444,6 +450,10 @@ function UserLeaderboard({
 }
 
 function LockPage() {
+  const { position: positionParam } = Route.useSearch();
+  const sharedLockId = parsePositionSearchParam(positionParam);
+  const { lock: sharedLock, loading: sharedLoading, notFound: sharedNotFound } = useSharedLock(sharedLockId);
+
   const [activeTab, setActiveTab] = useState<Tab>("All Locks");
   const [search, setSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
@@ -512,6 +522,32 @@ function LockPage() {
           </div>
           {showSearch && <NewActionCTA label="New Lock" onClick={() => setShowCreate(true)} />}
         </div>
+
+        {sharedLockId !== undefined && (
+          <SharedPositionBanner
+            kind="lock"
+            tokenId={sharedLockId}
+            loading={sharedLoading}
+            notFound={sharedNotFound}
+          >
+            {sharedLock && (
+              <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(139,92,246,0.35)" }}>
+                <LockRow
+                  lockId={sharedLock.id}
+                  token={sharedLock.token}
+                  owner={sharedLock.owner}
+                  amount={sharedLock.amount}
+                  unlockAt={sharedLock.unlockAt}
+                  withdrawn={sharedLock.withdrawn}
+                  isLast
+                  mine={
+                    !!address && address.toLowerCase() === sharedLock.owner.toLowerCase()
+                  }
+                />
+              </div>
+            )}
+          </SharedPositionBanner>
+        )}
 
         <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
           <div

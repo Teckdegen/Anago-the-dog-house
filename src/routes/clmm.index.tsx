@@ -10,9 +10,12 @@ import { PoolsExploreTable } from "@/components/clmm/PoolsExploreTable";
 import { clmm } from "@/components/clmm/clmmTheme";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useClmmPoolsPage } from "@/hooks/useClmmPoolsPage";
-import { isCapricornSupportedChain, fetchUserPositions, type LpPosition } from "@/lib/capricorn";
+import { isCapricornSupportedChain, fetchUserPositions, fetchLpPosition, type LpPosition } from "@/lib/capricorn";
+import { SharedPositionBanner } from "@/components/SharedPositionBanner";
+import { parsePositionSearchParam, validatePositionSearch } from "@/lib/positionShare";
 
 export const Route = createFileRoute("/clmm/")({
+  validateSearch: validatePositionSearch,
   component: CLMMExplorePage,
   head: () => ({
     meta: [
@@ -29,6 +32,9 @@ const PAGE_SIZE = 20;
 const POSITION_POLL_MS = 25_000;
 
 function CLMMExplorePage() {
+  const { position: positionParam } = Route.useSearch();
+  const sharedClmmId = parsePositionSearchParam(positionParam);
+
   const chainId = useChainId();
   const supported = isCapricornSupportedChain(chainId);
   const { address } = useAccount();
@@ -36,6 +42,8 @@ function CLMMExplorePage() {
   const [view, setView] = useState<ClmmView>("explore");
   const [positions, setPositions] = useState<LpPosition[]>([]);
   const [loadingPos, setLoadingPos] = useState(false);
+  const [sharedPosition, setSharedPosition] = useState<LpPosition | null>(null);
+  const [sharedLoading, setSharedLoading] = useState(false);
 
   const [page, setPage] = useState(1);
   const [poolSearch, setPoolSearch] = useState("");
@@ -94,6 +102,30 @@ function CLMMExplorePage() {
     return () => clearInterval(id);
   }, [view, address, supported, loadPositions]);
 
+  useEffect(() => {
+    if (sharedClmmId !== undefined) setView("positions");
+  }, [sharedClmmId]);
+
+  useEffect(() => {
+    if (!publicClient || !supported || sharedClmmId === undefined) {
+      setSharedPosition(null);
+      setSharedLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setSharedLoading(true);
+    fetchLpPosition(publicClient, sharedClmmId)
+      .then((pos) => {
+        if (!cancelled) setSharedPosition(pos);
+      })
+      .finally(() => {
+        if (!cancelled) setSharedLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [publicClient, supported, sharedClmmId]);
+
   return (
     <AppShell>
       <div className="w-full px-5 sm:px-8 lg:px-14 pt-8 pb-20 min-h-screen" style={{ background: clmm.bg }}>
@@ -105,6 +137,19 @@ function CLMMExplorePage() {
             Capricorn CLMM on Monad · {total > 0 ? `${total.toLocaleString()} pools` : "loading pools…"}
           </p>
         </header>
+
+        {sharedClmmId !== undefined && (
+          <SharedPositionBanner
+            kind="clmm"
+            tokenId={sharedClmmId}
+            loading={sharedLoading}
+            notFound={!sharedLoading && !sharedPosition}
+          >
+            {sharedPosition && (
+              <PositionCards positions={[sharedPosition]} layout="stack" requireWallet={false} />
+            )}
+          </SharedPositionBanner>
+        )}
 
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div className="flex gap-6">

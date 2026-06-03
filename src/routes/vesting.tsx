@@ -17,8 +17,13 @@ import { prepareTransactionWithGas } from "@/lib/web3/gasUtils";
 import { bigintToUsd, useTokenPriceUsdLive } from "@/lib/web3/prices";
 import { formatUsdTable } from "@/lib/capricorn/poolMetrics";
 import { useOpenNftExplorer, stopPositionRowClick } from "@/components/NftExplorerLink";
+import { SharePositionButton } from "@/components/SharePositionButton";
+import { SharedPositionBanner } from "@/components/SharedPositionBanner";
+import { parsePositionSearchParam, validatePositionSearch } from "@/lib/positionShare";
+import { useSharedVesting } from "@/lib/web3/useSharedPositions";
 
 export const Route = createFileRoute("/vesting")({
+  validateSearch: validatePositionSearch,
   component: VestingPage,
   head: () => ({
     meta: [
@@ -252,6 +257,7 @@ function VestingRowUI({ nftContract, symbol, decimals, logoUrl, vesting, totalAm
 
         {/* Status + action */}
         <div className="flex items-center gap-2 shrink-0" onClick={stopPositionRowClick}>
+          <SharePositionButton kind="vesting" tokenId={vesting.id} />
           {vesting.revoked ? (
             <span className="font-mono text-[9px] uppercase" style={{ color: "rgba(255,100,100,0.7)" }}>Revoked</span>
           ) : justClaimed ? (
@@ -327,6 +333,11 @@ function VestingRowUI({ nftContract, symbol, decimals, logoUrl, vesting, totalAm
 
 // ── Page ──────────────────────────────────────────────────────────────────
 function VestingPage() {
+  const { position: positionParam } = Route.useSearch();
+  const sharedVestingId = parsePositionSearchParam(positionParam);
+  const { vesting: sharedVesting, loading: sharedLoading, notFound: sharedNotFound } =
+    useSharedVesting(sharedVestingId);
+
   const [activeTab, setActiveTab] = useState<Tab>("My Schedules");
   const [search, setSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
@@ -377,6 +388,25 @@ function VestingPage() {
           </div>
           <NewActionCTA label="New Schedule" onClick={() => setShowCreate(true)} />
         </div>
+
+        {sharedVestingId !== undefined && (
+          <SharedPositionBanner
+            kind="vesting"
+            tokenId={sharedVestingId}
+            loading={sharedLoading}
+            notFound={sharedNotFound}
+          >
+            {sharedVesting && (
+              <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(139,92,246,0.35)" }}>
+                <VestingRow
+                  vesting={sharedVesting}
+                  isLast
+                  onClaimed={() => {}}
+                />
+              </div>
+            )}
+          </SharedPositionBanner>
+        )}
 
         <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
           <div
