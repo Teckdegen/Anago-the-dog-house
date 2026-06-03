@@ -17,6 +17,7 @@ import { TokenIcon } from "@/components/TokenIcon";
 import { useRemoteTokenMeta } from "@/lib/web3/useRemoteTokenMeta";
 import { FarmManagePanel } from "@/components/FarmManagePanel";
 import { useIsFarmOperator, useIsStreamFarmAdmin } from "@/lib/web3/useStreamFarmRoles";
+import { parseFarmTuple } from "@/lib/web3/parseFarm";
 import { bigintToUsd, useTokenPriceUsdLive } from "@/lib/web3/prices";
 import { formatUsdTable } from "@/lib/capricorn/poolMetrics";
 import { SharePositionButton } from "@/components/SharePositionButton";
@@ -238,11 +239,11 @@ function FarmCard({ farmId }: { farmId: number }) {
   const contracts = useContracts();
 
   const farmQ = useReadContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "getFarm", args: [BigInt(farmId)], query: { ...LIVE_CHAIN_QUERY, refetchInterval: 10_000 } });
-  const data = farmQ.data as any;
-  if (!data) return <div className="rounded-xl p-5 animate-pulse h-36" style={{ border: "1px solid rgba(139,92,246,0.2)", background: "rgba(139,92,246,0.03)" }} />;
+  const farm = parseFarmTuple(farmQ.data);
+  if (!farm) return <div className="rounded-xl p-5 animate-pulse h-36" style={{ border: "1px solid rgba(139,92,246,0.2)", background: "rgba(139,92,246,0.03)" }} />;
 
-  const [stakeToken, , totalStaked, active, lockDuration, earlyWithdrawBps, rewardStreamCount] = data;
-  const rewardCount = Number(rewardStreamCount ?? 0);
+  const { stakeToken, totalStaked, active, lockDuration, earlyWithdrawBps, rewardStreamCount } = farm;
+  const rewardCount = Number(rewardStreamCount);
   const lockDays = Number(lockDuration ?? 0) / 86400;
   const penaltyPct = Number(earlyWithdrawBps ?? 0) / 100;
 
@@ -400,17 +401,21 @@ function RewardStreamRow({ token, rewardRate, startTime, endTime, totalBudget, t
 
 function DepositModal({ farmId, stakeToken, symbol, decimals, userBalance, onClose }: { farmId: number; stakeToken: `0x${string}`; symbol: string; decimals: number; userBalance: bigint; onClose: () => void }) {
   const [amount, setAmount] = useState("");
-  const [lockTier, setLockTier] = useState(0);
   const [successOpen, setSuccessOpen] = useState(false);
   const { toast } = useToast();
   const contracts = useContracts();
   const publicClient = usePublicClient();
   const autoDepositRef = useRef(false);
 
-  const boostQ = useReadContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "getBoostTiers" });
-  const boostData = boostQ.data as any;
-  const durations: bigint[] = boostData?.[0] ?? [];
-  const multipliers: bigint[] = boostData?.[1] ?? [];
+  const farmQ = useReadContract({
+    address: contracts.streamFarm,
+    abi: STREAM_FARM_ABI,
+    functionName: "getFarm",
+    args: [BigInt(farmId)],
+    query: { ...LIVE_CHAIN_QUERY },
+  });
+  const farm = parseFarmTuple(farmQ.data);
+  const farmLockDays = farm ? Number(farm.lockDuration) / 86400 : 0;
 
   // Approve
   const approveTx = useWriteContract();
@@ -434,7 +439,7 @@ function DepositModal({ farmId, stakeToken, symbol, decimals, userBalance, onClo
       address: contracts.streamFarm,
       abi: STREAM_FARM_ABI,
       functionName: "deposit",
-      args: [BigInt(farmId), parsedAmount, BigInt(lockTier)],
+      args: [BigInt(farmId), parsedAmount, 0n],
       ...gas,
     });
   };
@@ -481,14 +486,6 @@ function DepositModal({ farmId, stakeToken, symbol, decimals, userBalance, onClo
     onClose();
   };
 
-  const boostLabel = (tier: number) => {
-    if (tier === 0) return "No lock · 1x";
-    const idx = tier - 1;
-    const days = Number(durations[idx] ?? 0n) / 86400;
-    const mult = Number(multipliers[idx] ?? 1000000000000000000n) / 1e18;
-    return `${days}d lock · ${mult}x`;
-  };
-
   return (
     <>
       <SuccessModal
@@ -500,7 +497,9 @@ function DepositModal({ farmId, stakeToken, symbol, decimals, userBalance, onClo
         rows={[
           { label: "Farm", value: `#${farmId}` },
           { label: "Amount", value: `${amount} ${symbol}` },
-          { label: "Lock boost", value: boostLabel(lockTier) },
+          ...(farmLockDays > 0
+            ? [{ label: "Farm lock", value: `${farmLockDays} day${farmLockDays === 1 ? "" : "s"} (set by creator)` }]
+            : []),
         ]}
       />
     {!successOpen && (
@@ -509,7 +508,10 @@ function DepositModal({ farmId, stakeToken, symbol, decimals, userBalance, onClo
         <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: "1px solid rgba(139,92,246,0.2)" }}>
           <div>
             <p className="font-grotesk uppercase text-[15px] tracking-wider" style={{ color: "#FFFFFF" }}>Deposit {symbol}</p>
-            <p className="font-mono text-[9px] mt-0.5" style={{ color: "rgba(255,255,255,0.5)" }}>Farm #{farmId} · Earn streaming rewards</p>
+            <p className="font-mono text-[9px] mt-0.5" style={{ color: "rgba(255,255,255,0.5)" }}>
+              Farm #{farmId} · Earn streaming rewards
+              {farmLockDays > 0 && ` · ${farmLockDays}d lock`}
+            </p>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center transition hover:bg-[rgba(139,92,246,0.15)]" style={{ color: "rgba(255,255,255,0.6)" }}>
             <X className="w-4 h-4" strokeWidth={2} />
@@ -529,19 +531,11 @@ function DepositModal({ farmId, stakeToken, symbol, decimals, userBalance, onClo
               style={{ color: "#FFFFFF", border: "1px solid rgba(139,92,246,0.3)", background: "rgba(139,92,246,0.06)" }} />
           </div>
 
-          {/* Boost tier selector */}
-          <div>
-            <label className="font-mono text-[9px] uppercase tracking-wider mb-2 block" style={{ color: "rgba(255,255,255,0.55)" }}>Lock Boost (optional)</label>
-            <div className="grid grid-cols-2 gap-2">
-              {[0, ...durations.map((_, i) => i + 1)].map((tier) => (
-                <button key={tier} onClick={() => setLockTier(tier)}
-                  className="px-3 py-2 rounded-lg font-mono text-[10px] transition text-left"
-                  style={{ background: lockTier === tier ? "rgba(139,92,246,0.2)" : "rgba(139,92,246,0.05)", border: `1px solid ${lockTier === tier ? "rgba(139,92,246,0.5)" : "rgba(139,92,246,0.2)"}`, color: lockTier === tier ? "#FFFFFF" : "rgba(255,255,255,0.6)" }}>
-                  {boostLabel(tier)}
-                </button>
-              ))}
-            </div>
-          </div>
+          {farmLockDays > 0 && (
+            <p className="font-mono text-[10px] leading-relaxed" style={{ color: "rgba(255,255,255,0.5)" }}>
+              This farm has a {farmLockDays}-day lock set by the creator. Enter your amount and deposit — no extra options needed.
+            </p>
+          )}
 
           {(approveTx.isPending || approveRcpt.isLoading) && (
             <p className="font-mono text-[10px]" style={{ color: "rgba(255,255,255,0.7)" }}>Step 1 of 2 — Approving {symbol}…</p>
@@ -788,8 +782,7 @@ function PositionCardInner({ tokenId, farmId, amount, boost, locked, lockExpiry,
   const [showAdvanced, setShowAdvanced] = useState(false);
   const contracts = useContracts();
   const farmQ = useReadContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "getFarm", args: [farmId], query: { ...LIVE_CHAIN_QUERY, refetchInterval: 10_000 } });
-  const farmData = farmQ.data as any;
-  const stakeToken = farmData?.[0];
+  const stakeToken = parseFarmTuple(farmQ.data)?.stakeToken;
 
   const symbolQ = useReadContract({ address: stakeToken ?? "0x0000000000000000000000000000000000000000", abi: ERC20_ABI, functionName: "symbol", query: { enabled: !!stakeToken } });
   const decimalsQ = useReadContract({ address: stakeToken ?? "0x0000000000000000000000000000000000000000", abi: ERC20_ABI, functionName: "decimals", query: { enabled: !!stakeToken } });

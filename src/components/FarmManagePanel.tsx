@@ -15,12 +15,12 @@ import { prepareTransactionWithGas } from "@/lib/web3/gasUtils";
 import { useToast } from "@/components/Toast";
 import { SuccessModal } from "@/components/SuccessModal";
 import { useTransactionSuccess } from "@/lib/web3/useTransactionSuccess";
-import { useTransactionSuccess } from "@/lib/web3/useTransactionSuccess";
 import { TokenPicker } from "@/components/TokenPicker";
 import { TokenIcon } from "@/components/TokenIcon";
 import { useRemoteTokenMeta } from "@/lib/web3/useRemoteTokenMeta";
 import type { TokenInfo } from "@/lib/web3/tokens";
 import { useIsFarmOperator, useIsStreamFarmAdmin, useIsStreamFarmOwner } from "@/lib/web3/useStreamFarmRoles";
+import { computeRewardStreamWindow, parseFarmTuple } from "@/lib/web3/parseFarm";
 
 const isEthAddress = (s: string) => /^0x[a-fA-F0-9]{40}$/.test(s);
 
@@ -182,7 +182,7 @@ function RewardStreamFields({
         <div>
           <FarmFieldLabel
             title="Start delay (hours)"
-            hint="Wait time before the reward stream begins."
+            hint="Wait before emissions start. 0 = ~2 min from now (chain time buffer)."
           />
           <input
             inputMode="numeric"
@@ -586,17 +586,23 @@ function CreateFarmForm() {
 
   const runAddReward = async (farmId: bigint) => {
     if (!rewardToken || !publicClient || !rewardBudget.validBudget) return;
-    const now = Math.floor(Date.now() / 1000);
-    const start = BigInt(now + (parseInt(delayHours, 10) || 0) * 3600);
-    const end = start + BigInt((parseInt(days, 10) || 30) * 86400);
-    const gas = await prepareTransactionWithGas(publicClient);
-    addTx.writeContract({
-      address: contracts.streamFarm,
-      abi: STREAM_FARM_ABI,
-      functionName: "addRewardStream",
-      args: [farmId, rewardToken.address, rewardBudget.parsedBudget, start, end],
-      ...gas,
-    });
+    try {
+      const { start, end } = await computeRewardStreamWindow(
+        publicClient,
+        parseInt(delayHours, 10) || 0,
+        parseInt(days, 10) || 30,
+      );
+      const gas = await prepareTransactionWithGas(publicClient);
+      addTx.writeContract({
+        address: contracts.streamFarm,
+        abi: STREAM_FARM_ABI,
+        functionName: "addRewardStream",
+        args: [farmId, rewardToken.address, rewardBudget.parsedBudget, start, end],
+        ...gas,
+      });
+    } catch (e) {
+      toast("error", "Reward failed", (e as Error).message?.slice(0, 120) ?? "Failed to add stream");
+    }
   };
 
   const runApprove = async () => {
@@ -1006,13 +1012,11 @@ function ManageFarmCard({ farmId }: { farmId: number }) {
     args: [BigInt(farmId)],
     query: { ...LIVE_CHAIN_QUERY, refetchInterval: 10_000 },
   });
-  const data = farmQ.data as
-    | [string, bigint, bigint, boolean, bigint, bigint, bigint]
-    | undefined;
-
-  const stakeToken = data?.[0];
+  const data = farmQ.data;
+  const farm = parseFarmTuple(data);
+  const stakeToken = farm?.stakeToken;
   const stakeAddr = (stakeToken ?? "0x0000000000000000000000000000000000000000") as `0x${string}`;
-  const canShow = !!data && isCreator;
+  const canShow = !!farm && isCreator;
   const metaAddrs = useMemo(
     () => (canShow && stakeToken ? [stakeAddr] : []),
     [canShow, stakeToken, stakeAddr],
@@ -1033,10 +1037,10 @@ function ManageFarmCard({ farmId }: { farmId: number }) {
   const getRemoteMeta = useRemoteTokenMeta(metaAddrs);
   const remote = canShow && stakeToken ? getRemoteMeta(stakeAddr) : undefined;
 
-  if (!canShow) return null;
+  if (!canShow || !farm) return null;
 
-  const [, , totalStaked, active, , , rewardStreamCount] = data;
-  const rewardCount = Number(rewardStreamCount ?? 0);
+  const { totalStaked, active, rewardStreamCount } = farm;
+  const rewardCount = Number(rewardStreamCount);
   const symbol = remote?.symbol ?? ((symbolQ.data as string) || "Token");
   const decimals = remote?.decimals ?? ((decimalsQ.data as number) ?? 18);
   const stakedLabel = Number(formatUnits(totalStaked ?? 0n, decimals)).toLocaleString();
@@ -1069,7 +1073,15 @@ function ManageFarmCard({ farmId }: { farmId: number }) {
       >
         {showRewards ? "Hide" : "Add reward stream"}
       </button>
-      {showRewards && <AddRewardStreamForm farmId={farmId} />}
+      {showRewards && (
+        <AddRewardStreamForm
+          farmId={farmId}
+          onStreamAdded={() => {
+            void farmQ.refetch();
+            setShowRewards(false);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -1109,7 +1121,13 @@ function FarmActiveToggle({ farmId, active }: { farmId: number; active: boolean 
   );
 }
 
-function AddRewardStreamForm({ farmId }: { farmId: number }) {
+function AddRewardStreamForm({
+  farmId,
+  onStreamAdded,
+}: {
+  farmId: number;
+  onStreamAdded?: () => void;
+}) {
   const { address } = useAccount();
   const { toast } = useToast();
   const contracts = useContracts();
@@ -1143,10 +1161,12 @@ function AddRewardStreamForm({ farmId }: { farmId: number }) {
 
   const runAdd = async () => {
     if (!token || !publicClient || !validBudget) return;
-    const now = Math.floor(Date.now() / 1000);
-    const start = BigInt(now + (parseInt(delayHours, 10) || 0) * 3600);
-    const end = start + BigInt((parseInt(days, 10) || 30) * 86400);
     try {
+      const { start, end } = await computeRewardStreamWindow(
+        publicClient,
+        parseInt(delayHours, 10) || 0,
+        parseInt(days, 10) || 30,
+      );
       const gas = await prepareTransactionWithGas(publicClient);
       addTx.writeContract({
         address: contracts.streamFarm,
@@ -1199,7 +1219,14 @@ function AddRewardStreamForm({ farmId }: { farmId: number }) {
     setToken(null);
     addTx.reset();
     approveTx.reset();
+    onStreamAdded?.();
   });
+
+  const txError =
+    (addTx.error as { shortMessage?: string; message?: string } | undefined)?.shortMessage ??
+    addTx.error?.message ??
+    (approveTx.error as { shortMessage?: string; message?: string } | undefined)?.shortMessage ??
+    approveTx.error?.message;
 
   const busy = approveTx.isPending || approveRcpt.isLoading || addTx.isPending || addRcpt.isLoading;
 
@@ -1246,6 +1273,11 @@ function AddRewardStreamForm({ farmId }: { farmId: number }) {
         >
           {addTx.isPending || addRcpt.isLoading ? "Adding…" : "Add reward stream"}
         </button>
+      )}
+      {txError && (
+        <p className="font-mono text-[10px] break-words" style={{ color: "rgba(255,100,100,0.9)" }}>
+          {txError}
+        </p>
       )}
     </div>
     </>
