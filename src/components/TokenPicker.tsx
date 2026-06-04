@@ -1,9 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useAccount, useReadContracts } from "wagmi";
 import { formatAmount } from "@/lib/web3/format";
 import { getBlockVisionApiKey } from "@/lib/web3/blockvision";
 import { ERC20_ABI, type TokenInfo } from "@/lib/web3/tokens";
-import { Check, Search, Loader2, Coins } from "lucide-react";
+import { Check, Search, Loader2, Coins, ChevronDown } from "lucide-react";
 import { useAllTokenBalances } from "@/lib/web3/hooks";
 import { TokenIcon } from "./TokenIcon";
 
@@ -33,6 +33,18 @@ export function TokenPicker({ selected, onSelect, excludeNative, compact }: Prop
   const { address: wallet } = useAccount();
   const [input, setInput] = useState("");
   const [showManual, setShowManual] = useState(false);
+  const [expanded, setExpanded] = useState(!selected);
+
+  useEffect(() => {
+    if (!selected) setExpanded(true);
+  }, [selected]);
+
+  const pickToken = (token: TokenInfo & { balance: bigint }) => {
+    onSelect(token);
+    setInput("");
+    setShowManual(false);
+    setExpanded(false);
+  };
 
   const { balances, isLoading: loadingBalances, error, addToken } = useAllTokenBalances();
   const hasBvKey = import.meta.env.DEV || !!getBlockVisionApiKey() || import.meta.env.PROD;
@@ -91,6 +103,50 @@ export function TokenPicker({ selected, onSelect, excludeNative, compact }: Prop
       : null;
 
   const maxH = compact ? "max-h-[220px]" : "max-h-[280px]";
+
+  const selectedBalance = selected
+    ? balances.find((t) => t.address.toLowerCase() === selected.address.toLowerCase())?.balanceFormatted
+    : null;
+
+  if (selected && !expanded) {
+    return (
+      <button
+        type="button"
+        onClick={() => setExpanded(true)}
+        className="w-full text-left rounded-xl p-3 transition hover:bg-[rgba(139,92,246,0.08)] active:scale-[0.99]"
+        style={{
+          background: "rgba(139,92,246,0.12)",
+          border: "1px solid rgba(139,92,246,0.45)",
+        }}
+      >
+        <div className="flex items-center gap-2.5">
+          <TokenIcon address={selected.address} symbol={selected.symbol} size={36} />
+          <div className="min-w-0 flex-1">
+            <p className="font-grotesk text-[13px] uppercase tracking-wider" style={{ color: "#FFFFFF" }}>
+              {selected.symbol}
+            </p>
+            <p className="font-mono text-[9px] truncate" style={{ color: "rgba(255,255,255,0.5)" }}>
+              {selected.name}
+            </p>
+          </div>
+          <div className="text-right shrink-0 flex items-center gap-2">
+            {selectedBalance && (
+              <p className="font-mono text-[11px] tabular-nums" style={{ color: "rgba(255,255,255,0.85)" }}>
+                {selectedBalance}
+              </p>
+            )}
+            <span
+              className="font-mono text-[9px] uppercase tracking-wider px-2 py-1 rounded-lg"
+              style={{ color: "#C4B5FD", background: "rgba(139,92,246,0.2)" }}
+            >
+              Change
+            </span>
+            <ChevronDown className="w-4 h-4 shrink-0" style={{ color: "rgba(255,255,255,0.45)" }} strokeWidth={2} />
+          </div>
+        </div>
+      </button>
+    );
+  }
 
   return (
     <div className="space-y-3">
@@ -174,7 +230,7 @@ export function TokenPicker({ selected, onSelect, excludeNative, compact }: Prop
               <button
                 key={token.address}
                 type="button"
-                onClick={() => onSelect(token)}
+                onClick={() => pickToken(token)}
                 className="w-full text-left p-3 relative transition hover:bg-[rgba(139,92,246,0.08)]"
                 style={{
                   background: isSel ? "rgba(139,92,246,0.12)" : "transparent",
@@ -273,7 +329,7 @@ export function TokenPicker({ selected, onSelect, excludeNative, compact }: Prop
               type="button"
               onClick={() => {
                 addToken(manualResolved);
-                onSelect(manualResolved);
+                pickToken(manualResolved);
               }}
               className="w-full text-left rounded-xl p-3 transition active:scale-[0.99]"
               style={{
