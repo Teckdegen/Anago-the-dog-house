@@ -250,7 +250,7 @@ function FarmCard({ farmId }: { farmId: number }) {
   const penaltyPct = Number(earlyWithdrawBps ?? 0) / 100;
 
   return (
-    <div className="rounded-xl p-5" style={{ border: "1px solid rgba(139,92,246,0.35)", background: "rgba(139,92,246,0.05)" }}>
+    <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.1)", background: "#0d0d0f" }}>
       <FarmCardInner farmId={farmId} stakeToken={stakeToken} totalStaked={totalStaked} active={active} lockDays={lockDays} penaltyPct={penaltyPct} rewardCount={rewardCount} showDeposit={showDeposit} setShowDeposit={setShowDeposit} />
     </div>
   );
@@ -275,54 +275,63 @@ function FarmCardInner({ farmId, stakeToken, totalStaked, active, lockDays, pena
 
   return (
     <>
-      {/* Header row */}
-      <div className="flex items-center justify-between gap-4 mb-4">
-        <div className="flex items-center gap-3 min-w-0">
-          <TokenIcon address={stakeToken} symbol={symbol} size={36} logoUrl={remote?.logoURI} />
-          <div className="min-w-0">
-            <p className="font-grotesk text-[15px] font-medium tracking-tight" style={{ color: "#FFFFFF" }}>{symbol} Farm</p>
-            <p className="font-mono text-[10px]" style={{ color: "rgba(255,255,255,0.45)" }}>
-              {stakedFormatted} {symbol} staked · {rewardCount} stream{rewardCount !== 1 ? "s" : ""}
-              {lockDays > 0 && ` · ${lockDays}d lock`}
-              {penaltyPct > 0 && ` · ${penaltyPct}% exit fee`}
-            </p>
+      <TokenDexProfileSection
+        profile={dexProfile}
+        loading={dexProfileLoading}
+        symbol={symbol}
+        name={remote?.name}
+        logoUrl={remote?.logoURI}
+        tokenAddress={stakeToken}
+        actions={
+          <>
+            {address && active && (
+              <button
+                onClick={() => setShowDeposit(true)}
+                className="px-3.5 py-1.5 rounded-lg font-grotesk text-[10px] uppercase tracking-wider transition hover:opacity-90 active:scale-[0.98]"
+                style={{ background: "rgba(139,92,246,0.35)", color: "#FFFFFF", border: "1px solid rgba(139,92,246,0.55)" }}
+              >
+                Deposit
+              </button>
+            )}
+            {rewardCount > 0 && (
+              <button
+                onClick={() => setExpanded(!expanded)}
+                className="w-8 h-8 rounded-lg flex items-center justify-center transition hover:bg-white/[0.06]"
+                style={{ color: "rgba(255,255,255,0.5)", border: "1px solid rgba(255,255,255,0.1)" }}
+                title={expanded ? "Hide streams" : "Show streams"}
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ transform: expanded ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
+                  <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+            )}
+          </>
+        }
+      />
+
+      <div
+        className="px-4 pb-4 pt-3"
+        style={{ borderTop: "1px solid rgba(255,255,255,0.06)", background: "rgba(255,255,255,0.02)" }}
+      >
+        <p className="font-mono text-[10px] mb-3 text-center sm:text-left" style={{ color: "rgba(255,255,255,0.45)" }}>
+          {stakedFormatted} {symbol} staked · {rewardCount} stream{rewardCount !== 1 ? "s" : ""}
+          {lockDays > 0 && ` · ${lockDays}d lock`}
+          {penaltyPct > 0 && ` · ${penaltyPct}% exit fee`}
+        </p>
+
+        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-6 gap-y-1 font-mono text-[11px]" style={{ color: "rgba(255,255,255,0.7)" }}>
+          <span>TVL <span style={{ color: "#FFFFFF" }}>{stakedFormatted}</span></span>
+          <span>Balance <span style={{ color: "#FFFFFF" }}>{balanceFormatted}</span></span>
+          {!active && <span style={{ color: "rgba(255,100,100,0.8)" }}>Paused</span>}
+        </div>
+
+        {/* Expanded: reward streams */}
+        {expanded && rewardCount > 0 && (
+          <div className="mt-4 pt-3" style={{ borderTop: "1px solid rgba(139,92,246,0.12)" }}>
+            <RewardStreams farmId={farmId} count={rewardCount} />
           </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {address && active && (
-            <button onClick={() => setShowDeposit(true)}
-              className="px-4 py-2 rounded-xl font-grotesk text-[10px] uppercase tracking-wider transition hover:opacity-90 active:scale-[0.98]"
-              style={{ background: "rgba(139,92,246,0.2)", color: "#FFFFFF", border: "1px solid rgba(139,92,246,0.5)" }}>
-              Deposit
-            </button>
-          )}
-          {rewardCount > 0 && (
-            <button onClick={() => setExpanded(!expanded)}
-              className="w-7 h-7 rounded-full flex items-center justify-center transition hover:bg-[rgba(139,92,246,0.15)]"
-              style={{ color: "rgba(255,255,255,0.5)" }}>
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ transform: expanded ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
-                <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
-          )}
-        </div>
+        )}
       </div>
-
-      <TokenDexProfileSection profile={dexProfile} loading={dexProfileLoading} />
-
-      {/* Stats row */}
-      <div className="flex items-center gap-6 font-mono text-[11px]" style={{ color: "rgba(255,255,255,0.7)" }}>
-        <span>TVL <span style={{ color: "#FFFFFF" }}>{stakedFormatted}</span></span>
-        <span>Balance <span style={{ color: "#FFFFFF" }}>{balanceFormatted}</span></span>
-        {!active && <span style={{ color: "rgba(255,100,100,0.8)" }}>Paused</span>}
-      </div>
-
-      {/* Expanded: reward streams */}
-      {expanded && rewardCount > 0 && (
-        <div className="mt-4 pt-3" style={{ borderTop: "1px solid rgba(139,92,246,0.12)" }}>
-          <RewardStreams farmId={farmId} count={rewardCount} />
-        </div>
-      )}
 
       {showDeposit && (
         <DepositModal farmId={farmId} stakeToken={stakeToken} symbol={symbol} decimals={decimals} userBalance={userBalance} onClose={() => setShowDeposit(false)} />
@@ -810,42 +819,54 @@ function PositionCardInner({ tokenId, farmId, amount, boost, locked, lockExpiry,
 
   return (
     <div
-      className="rounded-xl p-5 sm:p-6 transition"
-      style={{ border: "1px solid rgba(139,92,246,0.45)", background: "rgba(139,92,246,0.06)" }}
+      className="rounded-xl overflow-hidden transition"
+      style={{ border: "1px solid rgba(255,255,255,0.1)", background: "#0d0d0f" }}
     >
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4 mb-5">
-        <div className="flex items-center gap-3 min-w-0">
-          {stakeToken ? (
-            <TokenIcon address={stakeToken} symbol={symbol} size={44} logoUrl={remote?.logoURI} />
-          ) : (
-            <NftImage contract={contracts.streamFarm} tokenId={tokenId} size={44} fallbackLetter={symbol} />
-          )}
-          <div className="min-w-0">
-            <p className="font-grotesk text-[16px] sm:text-[18px] font-semibold tracking-tight truncate" style={{ color: "#FFFFFF" }}>
-              {symbol} Farm
-            </p>
+      {stakeToken ? (
+        <TokenDexProfileSection
+          profile={dexProfile}
+          loading={dexProfileLoading}
+          symbol={symbol}
+          name={remote?.name}
+          logoUrl={remote?.logoURI}
+          tokenAddress={stakeToken}
+          actions={
+            <div className="flex items-center gap-2 shrink-0">
+              <SharePositionButton kind="farm" tokenId={tokenId} />
+              <span
+                className="px-2.5 py-1 rounded-full font-mono text-[9px] uppercase tracking-wider"
+                style={{
+                  background: hasPending ? "rgba(139,92,246,0.25)" : "rgba(255,255,255,0.06)",
+                  color: hasPending ? "#C4B5FD" : "rgba(255,255,255,0.45)",
+                  border: `1px solid ${hasPending ? "rgba(139,92,246,0.5)" : "rgba(255,255,255,0.15)"}`,
+                }}
+              >
+                {hasPending ? "Rewards ready" : "Active"}
+              </span>
+            </div>
+          }
+        />
+      ) : (
+        <div className="px-4 pt-4 pb-3 flex items-center gap-3">
+          <NftImage contract={contracts.streamFarm} tokenId={tokenId} size={44} fallbackLetter={symbol} />
+          <div>
+            <p className="font-grotesk text-[16px] font-semibold" style={{ color: "#FFFFFF" }}>{symbol} Farm</p>
             <p className="font-mono text-[10px] mt-0.5" style={{ color: "rgba(255,255,255,0.5)" }}>
               Position #{tokenId.toString()} · Farm #{farmId?.toString()}
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <SharePositionButton kind="farm" tokenId={tokenId} />
-          <span
-            className="px-2.5 py-1 rounded-full font-mono text-[9px] uppercase tracking-wider"
-            style={{
-              background: hasPending ? "rgba(139,92,246,0.25)" : "rgba(255,255,255,0.06)",
-              color: hasPending ? "#C4B5FD" : "rgba(255,255,255,0.45)",
-              border: `1px solid ${hasPending ? "rgba(139,92,246,0.5)" : "rgba(255,255,255,0.15)"}`,
-            }}
-          >
-            {hasPending ? "Rewards ready" : "Active"}
-          </span>
-        </div>
-      </div>
+      )}
 
-      {stakeToken && <TokenDexProfileSection profile={dexProfile} loading={dexProfileLoading} />}
+      <div
+        className="px-4 sm:px-5 pb-5 pt-3"
+        style={{ borderTop: "1px solid rgba(255,255,255,0.06)", background: "rgba(255,255,255,0.02)" }}
+      >
+        {!stakeToken && (
+          <p className="font-mono text-[10px] mb-4 text-center sm:text-left" style={{ color: "rgba(255,255,255,0.5)" }}>
+            Position #{tokenId.toString()} · Farm #{farmId?.toString()}
+          </p>
+        )}
 
       {/* Stats grid — always visible */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
@@ -952,6 +973,7 @@ function PositionCardInner({ tokenId, farmId, amount, boost, locked, lockExpiry,
           {(error as any)?.shortMessage ?? error?.message}
         </p>
       )}
+      </div>
     </div>
   );
 }

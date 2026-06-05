@@ -20,12 +20,23 @@ export type DexTokenProfile = {
   address: string;
   name: string | null;
   symbol: string | null;
+  quoteSymbol: string | null;
+  dexLabel: string | null;
   description: string | null;
   headerImage: string | null;
   icon: string | null;
   dexscreenerUrl: string | null;
   links: DexTokenLink[];
 };
+
+function formatDexLabel(dexId?: string): string | null {
+  if (!dexId?.trim()) return null;
+  if (dexId === "nad-fun") return "Nad.fun";
+  return dexId
+    .split(/[-_]/)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
 
 type ProfileIndexEntry = {
   description: string | null;
@@ -143,6 +154,7 @@ async function loadProfileIndex(): Promise<Map<string, ProfileIndexEntry>> {
 
 type PairRow = {
   chainId?: string;
+  dexId?: string;
   url?: string;
   baseToken?: { address?: string; name?: string; symbol?: string };
   quoteToken?: { address?: string; name?: string; symbol?: string };
@@ -191,6 +203,8 @@ export async function fetchDexTokenProfile(address: string): Promise<DexTokenPro
     const pairLinks: DexTokenLink[] = [];
     let name: string | null = null;
     let symbol: string | null = null;
+    let quoteSymbol: string | null = null;
+    let dexLabel: string | null = null;
     let headerImage: string | null = indexHit?.header ?? null;
     let icon: string | null = indexHit?.icon ?? null;
     let dexscreenerUrl: string | null = indexHit?.dexscreenerUrl ?? null;
@@ -201,8 +215,11 @@ export async function fetchDexTokenProfile(address: string): Promise<DexTokenPro
       if (picked) {
         const { pair, isBase } = picked;
         const token = isBase ? pair.baseToken : pair.quoteToken;
+        const quote = isBase ? pair.quoteToken : pair.baseToken;
         name = token?.name?.trim() || null;
         symbol = token?.symbol?.trim() || null;
+        quoteSymbol = quote?.symbol?.trim() || "MON";
+        dexLabel = formatDexLabel(pair.dexId);
         dexscreenerUrl = dexscreenerUrl ?? pair.url?.trim() ?? `https://dexscreener.com/${CHAIN_ID}/${key}`;
         headerImage = headerImage ?? pair.info?.header?.trim() ?? null;
         icon = icon ?? pair.info?.imageUrl?.trim() ?? null;
@@ -224,6 +241,8 @@ export async function fetchDexTokenProfile(address: string): Promise<DexTokenPro
           address: key,
           name,
           symbol,
+          quoteSymbol,
+          dexLabel,
           description: description?.trim() || null,
           headerImage,
           icon,
