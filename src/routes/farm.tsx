@@ -257,7 +257,6 @@ function FarmCard({ farmId }: { farmId: number }) {
 }
 
 function FarmCardInner({ farmId, stakeToken, totalStaked, active, lockDays, penaltyPct, rewardCount, showDeposit, setShowDeposit }: any) {
-  const [expanded, setExpanded] = useState(false);
   const { address } = useAccount();
   const contracts = useContracts();
   const symbolQ = useReadContract({ address: stakeToken, abi: ERC20_ABI, functionName: "symbol", query: { enabled: !!stakeToken } });
@@ -293,18 +292,6 @@ function FarmCardInner({ farmId, stakeToken, totalStaked, active, lockDays, pena
                 Deposit
               </button>
             )}
-            {rewardCount > 0 && (
-              <button
-                onClick={() => setExpanded(!expanded)}
-                className="w-8 h-8 rounded-lg flex items-center justify-center transition hover:bg-white/[0.06]"
-                style={{ color: "rgba(255,255,255,0.5)", border: "1px solid rgba(255,255,255,0.1)" }}
-                title={expanded ? "Hide streams" : "Show streams"}
-              >
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ transform: expanded ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
-                  <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </button>
-            )}
           </>
         }
       />
@@ -325,12 +312,6 @@ function FarmCardInner({ farmId, stakeToken, totalStaked, active, lockDays, pena
           {!active && <span style={{ color: "rgba(255,100,100,0.8)" }}>Paused</span>}
         </div>
 
-        {/* Expanded: reward streams */}
-        {expanded && rewardCount > 0 && (
-          <div className="mt-4 pt-3" style={{ borderTop: "1px solid rgba(139,92,246,0.12)" }}>
-            <RewardStreams farmId={farmId} count={rewardCount} />
-          </div>
-        )}
       </div>
 
       {showDeposit && (
@@ -794,9 +775,12 @@ function PositionCard({ tokenId, onPositionChange }: { tokenId: bigint; onPositi
 
 function PositionCardInner({ tokenId, farmId, amount, boost, locked, lockExpiry, pendingData, onClaim, onWithdraw, onEmergencyWithdraw, claimPending, withdrawPending, error }: any) {
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [streamsExpanded, setStreamsExpanded] = useState(false);
   const contracts = useContracts();
   const farmQ = useReadContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "getFarm", args: [farmId], query: { ...LIVE_CHAIN_QUERY, refetchInterval: 10_000 } });
-  const stakeToken = parseFarmTuple(farmQ.data)?.stakeToken;
+  const farm = parseFarmTuple(farmQ.data);
+  const stakeToken = farm?.stakeToken;
+  const rewardCount = farm ? Number(farm.rewardStreamCount) : 0;
 
   const symbolQ = useReadContract({ address: stakeToken ?? "0x0000000000000000000000000000000000000000", abi: ERC20_ABI, functionName: "symbol", query: { enabled: !!stakeToken } });
   const decimalsQ = useReadContract({ address: stakeToken ?? "0x0000000000000000000000000000000000000000", abi: ERC20_ABI, functionName: "decimals", query: { enabled: !!stakeToken } });
@@ -833,6 +817,19 @@ function PositionCardInner({ tokenId, farmId, amount, boost, locked, lockExpiry,
           actions={
             <div className="flex items-center gap-2 shrink-0">
               <SharePositionButton kind="farm" tokenId={tokenId} />
+              {rewardCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setStreamsExpanded(!streamsExpanded)}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center transition hover:bg-white/[0.06]"
+                  style={{ color: "rgba(255,255,255,0.5)", border: "1px solid rgba(255,255,255,0.1)" }}
+                  title={streamsExpanded ? "Hide streams" : "Show streams"}
+                >
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ transform: streamsExpanded ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
+                    <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+              )}
               <span
                 className="px-2.5 py-1 rounded-full font-mono text-[9px] uppercase tracking-wider"
                 style={{
@@ -906,6 +903,12 @@ function PositionCardInner({ tokenId, farmId, amount, boost, locked, lockExpiry,
           </div>
         )}
       </div>
+
+      {streamsExpanded && rewardCount > 0 && (
+        <div className="mb-5 pt-3" style={{ borderTop: "1px solid rgba(139,92,246,0.12)" }}>
+          <RewardStreams farmId={Number(farmId)} count={rewardCount} />
+        </div>
+      )}
 
       {/* Actions */}
       <div className="flex flex-col sm:flex-row gap-2.5" onClick={stopPositionRowClick}>
