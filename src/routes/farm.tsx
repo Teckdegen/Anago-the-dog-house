@@ -15,6 +15,8 @@ import { STREAM_FARM_ABI, CONTRACTS, ERC20_ABI } from "@/lib/web3/contracts";
 import type { TokenInfo } from "@/lib/web3/tokens";
 import { TokenIcon } from "@/components/TokenIcon";
 import { useRemoteTokenMeta } from "@/lib/web3/useRemoteTokenMeta";
+import { useDexTokenProfile } from "@/lib/web3/useDexTokenProfile";
+import { TokenDexProfileSection } from "@/components/TokenDexProfileSection";
 import { FarmManagePanel } from "@/components/FarmManagePanel";
 import { useIsFarmOperator, useIsStreamFarmAdmin } from "@/lib/web3/useStreamFarmRoles";
 import { parseFarmTuple } from "@/lib/web3/parseFarm";
@@ -264,6 +266,7 @@ function FarmCardInner({ farmId, stakeToken, totalStaked, active, lockDays, pena
 
   const getRemoteMeta = useRemoteTokenMeta([stakeToken]);
   const remote = getRemoteMeta(stakeToken);
+  const { profile: dexProfile, loading: dexProfileLoading } = useDexTokenProfile(stakeToken);
   const symbol = remote?.symbol ?? ((symbolQ.data as string) || "...");
   const decimals = remote?.decimals ?? ((decimalsQ.data as number) ?? 18);
   const userBalance = (balanceQ.data as bigint) ?? 0n;
@@ -304,6 +307,8 @@ function FarmCardInner({ farmId, stakeToken, totalStaked, active, lockDays, pena
           )}
         </div>
       </div>
+
+      <TokenDexProfileSection profile={dexProfile} loading={dexProfileLoading} />
 
       {/* Stats row */}
       <div className="flex items-center gap-6 font-mono text-[11px]" style={{ color: "rgba(255,255,255,0.7)" }}>
@@ -788,6 +793,7 @@ function PositionCardInner({ tokenId, farmId, amount, boost, locked, lockExpiry,
   const decimalsQ = useReadContract({ address: stakeToken ?? "0x0000000000000000000000000000000000000000", abi: ERC20_ABI, functionName: "decimals", query: { enabled: !!stakeToken } });
   const getRemoteMeta = useRemoteTokenMeta(stakeToken ? [stakeToken] : []);
   const remote = getRemoteMeta(stakeToken);
+  const { profile: dexProfile, loading: dexProfileLoading } = useDexTokenProfile(stakeToken);
   const symbol = remote?.symbol ?? ((symbolQ.data as string) || "...");
   const decimals = remote?.decimals ?? ((decimalsQ.data as number) ?? 18);
   const { priceUsd: stakePriceUsd, loading: stakePriceLoading } = useTokenPriceUsdLive(stakeToken ?? "");
@@ -838,6 +844,8 @@ function PositionCardInner({ tokenId, farmId, amount, boost, locked, lockExpiry,
           </span>
         </div>
       </div>
+
+      {stakeToken && <TokenDexProfileSection profile={dexProfile} loading={dexProfileLoading} />}
 
       {/* Stats grid — always visible */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
