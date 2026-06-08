@@ -11,6 +11,7 @@ export function TokenIcon({
   size = 28,
   logoUrl: logoUrlProp,
   fallbackLogoUrl,
+  shape = "circle",
 }: {
   address: string;
   symbol?: string;
@@ -18,7 +19,9 @@ export function TokenIcon({
   logoUrl?: string | null;
   /** Shown when this token has no logo (e.g. partner token image in a CL pair). */
   fallbackLogoUrl?: string | null;
+  shape?: "circle" | "rounded";
 }) {
+  const radiusClass = shape === "rounded" ? "rounded-xl" : "rounded-full";
   const publicClient = usePublicClient();
   const [logoUrl, setLogoUrl] = useState<string | null>(logoUrlProp ?? fallbackLogoUrl ?? null);
   const [failedPrimary, setFailedPrimary] = useState(false);
@@ -58,8 +61,8 @@ export function TokenIcon({
         alt={symbol || "token"}
         width={size}
         height={size}
-        className="rounded-full shrink-0 object-cover"
-        style={{ width: size, height: size, border: "1px solid rgba(139,92,246,0.25)" }}
+        className={`${radiusClass} shrink-0 object-cover`}
+        style={{ width: size, height: size, border: "1px solid rgba(255,255,255,0.12)" }}
         onError={() => {
           if (!failedPrimary && fallbackLogoUrl && displayUrl !== fallbackLogoUrl) {
             setFailedPrimary(true);
@@ -74,7 +77,7 @@ export function TokenIcon({
 
   return (
     <div
-      className="rounded-full flex items-center justify-center font-grotesk shrink-0"
+      className={`${radiusClass} flex items-center justify-center font-grotesk shrink-0`}
       style={{
         width: size,
         height: size,

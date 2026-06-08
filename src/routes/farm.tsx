@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect, useRef, useMemo } from "react";
-import { Search, Sprout, Plus, X, Clock, Wallet } from "lucide-react";
+import { useState, useEffect, useRef, useMemo, type ReactNode } from "react";
+import { Search, Sprout, X, Wallet, TrendingUp, DollarSign, Users, Calendar, Lock, Gift, ExternalLink, Globe, Send, UserRound } from "lucide-react";
 import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt, useChainId, usePublicClient } from "wagmi";
 import { prepareTransactionWithGas } from "@/lib/web3/gasUtils";
 import { LIVE_CHAIN_QUERY } from "@/lib/web3/nftImage";
@@ -17,6 +17,7 @@ import { TokenIcon } from "@/components/TokenIcon";
 import { useRemoteTokenMeta } from "@/lib/web3/useRemoteTokenMeta";
 import { useDexTokenProfile } from "@/lib/web3/useDexTokenProfile";
 import { TokenDexProfileSection } from "@/components/TokenDexProfileSection";
+import type { DexTokenLink } from "@/lib/web3/dexscreenerProfile";
 import { FarmManagePanel } from "@/components/FarmManagePanel";
 import { useIsFarmOperator, useIsStreamFarmAdmin } from "@/lib/web3/useStreamFarmRoles";
 import { parseFarmTuple } from "@/lib/web3/parseFarm";
@@ -225,7 +226,7 @@ function AllFarmsTab({ farmCount }: { farmCount: number }) {
     );
   }
   return (
-    <div className="grid gap-4">
+    <div className="max-w-xl mx-auto space-y-5">
       {Array.from({ length: farmCount }, (_, i) => <FarmCard key={i} farmId={i} />)}
     </div>
   );
@@ -235,101 +236,266 @@ function AllFarmsTab({ farmCount }: { farmCount: number }) {
 //                              FARM CARD
 // ═══════════════════════════════════════════════════════════════════════════
 
-function FarmCard({ farmId }: { farmId: number }) {
-  const [showDeposit, setShowDeposit] = useState(false);
-  const { address } = useAccount();
-  const contracts = useContracts();
+const FARM_GOLD = "#F5C842";
+const FARM_CARD_BG = "rgba(255,255,255,0.04)";
+const FARM_CARD_BORDER = "rgba(255,255,255,0.08)";
 
-  const farmQ = useReadContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "getFarm", args: [BigInt(farmId)], query: { ...LIVE_CHAIN_QUERY, refetchInterval: 10_000 } });
-  const farm = parseFarmTuple(farmQ.data);
-  if (!farm) return <div className="rounded-xl p-5 animate-pulse h-36" style={{ border: "1px solid rgba(139,92,246,0.2)", background: "rgba(139,92,246,0.03)" }} />;
+type RewardStreamTuple = readonly [
+  `0x${string}`, bigint, bigint, bigint, bigint, bigint, bigint, bigint,
+];
 
-  const { stakeToken, totalStaked, active, lockDuration, earlyWithdrawBps, rewardStreamCount } = farm;
-  const rewardCount = Number(rewardStreamCount);
-  const lockDays = Number(lockDuration ?? 0) / 86400;
-  const penaltyPct = Number(earlyWithdrawBps ?? 0) / 100;
+type FarmStreamStats = {
+  apyPercent: number | null;
+  rewardsRemaining: bigint;
+  avgStreamDays: number;
+  activeStreamCount: number;
+};
 
+function computeFarmStreamStats(
+  streams: readonly ({ status: string; result?: unknown } | undefined)[] | undefined,
+  count: number,
+  totalStaked: bigint,
+  stakeDecimals: number,
+  stakePriceUsd: number | null,
+): FarmStreamStats {
+  const now = Math.floor(Date.now() / 1000);
+  let rewardsRemaining = 0n;
+  let annualRewardTokens = 0;
+  let streamDaysSum = 0;
+  let streamDaysCount = 0;
+  let activeStreamCount = 0;
+
+  for (let i = 0; i < count; i++) {
+    const d = streams?.[i];
+    if (d?.status !== "success" || !d.result) continue;
+    const [, rewardRate, startTime, endTime, totalBudget, , totalClaimed] = d.result as RewardStreamTuple;
+    const start = Number(startTime);
+    const end = Number(endTime);
+    const remaining = totalBudget > totalClaimed ? totalBudget - totalClaimed : 0n;
+    rewardsRemaining += remaining;
+
+    if (end > start) {
+      streamDaysSum += (end - start) / 86400;
+      streamDaysCount += 1;
+    }
+
+    if (now >= start && now < end && rewardRate > 0n) {
+      activeStreamCount += 1;
+      const ratePerSec = Number(rewardRate) / 1e18;
+      annualRewardTokens += ratePerSec * 31_536_000;
+    }
+  }
+
+  const stakedTokens = Number(formatUnits(totalStaked, stakeDecimals));
+  let apyPercent: number | null = null;
+  if (stakedTokens > 0 && annualRewardTokens > 0) {
+    if (stakePriceUsd != null && stakePriceUsd > 0) {
+      const annualUsd = annualRewardTokens * stakePriceUsd;
+      const tvlUsd = stakedTokens * stakePriceUsd;
+      apyPercent = tvlUsd > 0 ? (annualUsd / tvlUsd) * 100 : null;
+    } else {
+      apyPercent = (annualRewardTokens / stakedTokens) * 100;
+    }
+  }
+
+  return {
+    apyPercent,
+    rewardsRemaining,
+    avgStreamDays: streamDaysCount > 0 ? streamDaysSum / streamDaysCount : 0,
+    activeStreamCount,
+  };
+}
+
+function formatFarmApy(pct: number | null): string {
+  if (pct == null || !Number.isFinite(pct)) return "—";
+  return `${pct.toFixed(2)}%`;
+}
+
+function formatVestingGrid(lockDays: number, streamCount: number, avgStreamDays: number): string {
+  if (lockDays > 0) return `${Math.round(lockDays)}d lock`;
+  if (streamCount > 0 && avgStreamDays > 0) return `${streamCount} × ${Math.round(avgStreamDays)}d`;
+  return "—";
+}
+
+function formatVestingDetail(lockDays: number, streamCount: number, avgStreamDays: number): string {
+  if (lockDays > 0) return `${Math.round(lockDays)} day stake lock`;
+  if (streamCount > 0 && avgStreamDays > 0) return `${streamCount} cycles × ${Math.round(avgStreamDays)} days`;
+  return "Streaming rewards";
+}
+
+function FarmSocialLinkIcon({ kind }: { kind: DexTokenLink["kind"] }) {
+  switch (kind) {
+    case "twitter":
+      return <UserRound className="w-3.5 h-3.5" strokeWidth={1.75} />;
+    case "telegram":
+      return <Send className="w-3.5 h-3.5" strokeWidth={1.75} />;
+    case "website":
+      return <Globe className="w-3.5 h-3.5" strokeWidth={1.75} />;
+    default:
+      return <ExternalLink className="w-3.5 h-3.5" strokeWidth={1.75} />;
+  }
+}
+
+function farmSocialLabel(kind: DexTokenLink["kind"], label: string): string {
+  if (kind === "twitter") return "Twitter";
+  if (kind === "telegram") return "Telegram";
+  if (kind === "website") return "Website";
+  return label;
+}
+
+function FarmDetailGridStat({
+  icon,
+  label,
+  value,
+  gold,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  gold?: boolean;
+}) {
   return (
-    <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.1)", background: "#0d0d0f" }}>
-      <FarmCardInner farmId={farmId} stakeToken={stakeToken} totalStaked={totalStaked} active={active} lockDays={lockDays} penaltyPct={penaltyPct} rewardCount={rewardCount} showDeposit={showDeposit} setShowDeposit={setShowDeposit} />
+    <div
+      className="rounded-xl px-3.5 py-3"
+      style={{ background: FARM_CARD_BG, border: `1px solid ${FARM_CARD_BORDER}` }}
+    >
+      <div className="flex items-center gap-1.5 mb-2">
+        <span style={{ color: "rgba(255,255,255,0.4)" }}>{icon}</span>
+        <p className="font-mono text-[11px]" style={{ color: "rgba(255,255,255,0.45)" }}>
+          {label}
+        </p>
+      </div>
+      <p
+        className="font-grotesk text-[20px] sm:text-[22px] font-semibold leading-none"
+        style={{ color: gold ? FARM_GOLD : "#FFFFFF" }}
+      >
+        {value}
+      </p>
     </div>
   );
 }
 
-function FarmStatChip({ label, value, sub, accent, warn }: { label: string; value: string; sub?: string; accent?: boolean; warn?: boolean }) {
+function FarmDetailRow({
+  icon,
+  label,
+  value,
+  symbol,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  symbol?: string;
+}) {
   return (
     <div
-      className="rounded-lg px-2.5 py-1.5 shrink-0"
-      style={{
-        background: warn ? "rgba(255,100,100,0.1)" : "rgba(0,0,0,0.35)",
-        border: `1px solid ${warn ? "rgba(255,100,100,0.35)" : accent ? "rgba(167,139,250,0.45)" : "rgba(255,255,255,0.1)"}`,
-      }}
+      className="rounded-xl px-4 py-3.5"
+      style={{ background: FARM_CARD_BG, border: `1px solid ${FARM_CARD_BORDER}` }}
     >
-      <p className="font-mono text-[8px] uppercase tracking-wider whitespace-nowrap" style={{ color: "rgba(255,255,255,0.42)" }}>
-        {label}
-      </p>
-      <p
-        className="font-mono text-[11px] sm:text-[12px] font-medium mt-0.5 whitespace-nowrap"
-        style={{ color: warn ? "rgba(255,160,160,0.95)" : accent ? "#C4B5FD" : "#FFFFFF" }}
-      >
+      <div className="flex items-center gap-1.5 mb-1.5">
+        <span style={{ color: "rgba(255,255,255,0.4)" }}>{icon}</span>
+        <p className="font-mono text-[11px]" style={{ color: "rgba(255,255,255,0.45)" }}>
+          {label}
+        </p>
+      </div>
+      <p className="font-grotesk text-[22px] sm:text-[24px] font-semibold leading-tight" style={{ color: "#FFFFFF" }}>
         {value}
       </p>
-      {sub && (
-        <p className="font-mono text-[9px] mt-0.5 whitespace-nowrap" style={{ color: "rgba(255,255,255,0.4)" }}>
-          {sub}
+      {symbol && (
+        <p className="font-mono text-[12px] mt-0.5" style={{ color: "rgba(255,255,255,0.4)" }}>
+          {symbol}
         </p>
       )}
     </div>
   );
 }
 
-function FarmHeaderStats({
-  symbol,
-  stakedFormatted,
-  balanceFormatted,
-  rewardCount,
-  lockDays,
-  penaltyPct,
-  active,
-  showBalance,
-}: {
-  symbol: string;
-  stakedFormatted: string;
-  balanceFormatted: string;
-  rewardCount: number;
-  lockDays: number;
-  penaltyPct: number;
-  active: boolean;
-  showBalance: boolean;
-}) {
+function FarmCard({ farmId }: { farmId: number }) {
+  const [showDeposit, setShowDeposit] = useState(false);
+  const contracts = useContracts();
+
+  const farmQ = useReadContract({ address: contracts.streamFarm, abi: STREAM_FARM_ABI, functionName: "getFarm", args: [BigInt(farmId)], query: { ...LIVE_CHAIN_QUERY, refetchInterval: 10_000 } });
+  const farm = parseFarmTuple(farmQ.data);
+  if (!farm) {
+    return (
+      <div className="rounded-2xl p-5 animate-pulse space-y-4" style={{ border: `1px solid ${FARM_CARD_BORDER}`, background: "#0a0a0c" }}>
+        <div className="flex gap-3">
+          <div className="w-12 h-12 rounded-xl shrink-0" style={{ background: "rgba(245,200,66,0.12)" }} />
+          <div className="flex-1 space-y-2 pt-1">
+            <div className="h-5 w-40 rounded" style={{ background: "rgba(245,200,66,0.12)" }} />
+            <div className="h-3 w-16 rounded" style={{ background: "rgba(255,255,255,0.06)" }} />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-20 rounded-xl" style={{ background: FARM_CARD_BG }} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const { stakeToken, totalShares, totalStaked, active, lockDuration, earlyWithdrawBps, rewardStreamCount } = farm;
+  const rewardCount = Number(rewardStreamCount);
+  const lockDays = Number(lockDuration ?? 0) / 86400;
+  const penaltyPct = Number(earlyWithdrawBps ?? 0) / 100;
+
   return (
-    <div className="flex flex-nowrap overflow-x-auto items-stretch gap-1.5 sm:flex-wrap sm:overflow-visible sm:justify-end sm:gap-2 min-w-0 w-full sm:w-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-      <FarmStatChip label="TVL" value={stakedFormatted} sub={symbol} accent />
-      {showBalance && (
-        <FarmStatChip label="Your balance" value={balanceFormatted} sub={symbol} />
-      )}
-      <FarmStatChip
-        label="Reward streams"
-        value={`${rewardCount}`}
-        sub={rewardCount === 1 ? "active stream" : "active streams"}
+    <div className="rounded-2xl overflow-hidden" style={{ border: `1px solid ${FARM_CARD_BORDER}`, background: "#0a0a0c" }}>
+      <FarmCardInner
+        farmId={farmId}
+        stakeToken={stakeToken}
+        totalShares={totalShares}
+        totalStaked={totalStaked}
+        active={active}
+        lockDays={lockDays}
+        penaltyPct={penaltyPct}
+        rewardCount={rewardCount}
+        showDeposit={showDeposit}
+        setShowDeposit={setShowDeposit}
       />
-      {lockDays > 0 && (
-        <FarmStatChip label="Lock" value={`${lockDays} days`} sub="Stake locked" />
-      )}
-      {penaltyPct > 0 && (
-        <FarmStatChip label="Exit fee" value={`${penaltyPct}%`} sub="Early withdraw" />
-      )}
-      {!active && <FarmStatChip label="Status" value="Paused" warn />}
     </div>
   );
 }
 
-function FarmCardInner({ farmId, stakeToken, totalStaked, active, lockDays, penaltyPct, rewardCount, showDeposit, setShowDeposit }: any) {
+function FarmCardInner({
+  farmId,
+  stakeToken,
+  totalShares,
+  totalStaked,
+  active,
+  lockDays,
+  penaltyPct,
+  rewardCount,
+  showDeposit,
+  setShowDeposit,
+}: {
+  farmId: number;
+  stakeToken: `0x${string}`;
+  totalShares: bigint;
+  totalStaked: bigint;
+  active: boolean;
+  lockDays: number;
+  penaltyPct: number;
+  rewardCount: number;
+  showDeposit: boolean;
+  setShowDeposit: (v: boolean) => void;
+}) {
   const { address } = useAccount();
   const contracts = useContracts();
   const symbolQ = useReadContract({ address: stakeToken, abi: ERC20_ABI, functionName: "symbol", query: { enabled: !!stakeToken } });
   const decimalsQ = useReadContract({ address: stakeToken, abi: ERC20_ABI, functionName: "decimals", query: { enabled: !!stakeToken } });
   const balanceQ = useReadContract({ address: stakeToken, abi: ERC20_ABI, functionName: "balanceOf", args: address ? [address] : undefined, query: { enabled: !!address && !!stakeToken, refetchInterval: 10_000 } });
+
+  const streamsQ = useReadContracts({
+    allowFailure: true,
+    contracts: Array.from({ length: rewardCount }, (_, i) => ({
+      address: contracts.streamFarm,
+      abi: STREAM_FARM_ABI,
+      functionName: "getRewardStream" as const,
+      args: [BigInt(farmId), BigInt(i)] as const,
+    })),
+    query: { ...LIVE_CHAIN_QUERY, enabled: rewardCount > 0, refetchInterval: 10_000 },
+  });
 
   const getRemoteMeta = useRemoteTokenMeta([stakeToken]);
   const remote = getRemoteMeta(stakeToken);
@@ -337,56 +503,153 @@ function FarmCardInner({ farmId, stakeToken, totalStaked, active, lockDays, pena
   const symbol = remote?.symbol ?? ((symbolQ.data as string) || "...");
   const decimals = remote?.decimals ?? ((decimalsQ.data as number) ?? 18);
   const userBalance = (balanceQ.data as bigint) ?? 0n;
-  const stakedFormatted = Number(formatUnits(totalStaked ?? 0n, decimals)).toLocaleString();
-  const balanceFormatted = Number(formatUnits(userBalance, decimals)).toLocaleString();
+  const { priceUsd: stakePriceUsd } = useTokenPriceUsdLive(stakeToken);
+
+  const displayName = dexProfile?.name?.trim() || remote?.name?.trim() || `${symbol} Farm`;
+  const icon = remote?.logoURI || dexProfile?.icon;
+
+  const stakedAmount = Number(formatUnits(totalStaked ?? 0n, decimals));
+  const stakedFormatted = stakedAmount.toLocaleString(undefined, { maximumFractionDigits: 5 });
+  const tvlUsd = bigintToUsd(totalStaked ?? 0n, decimals, stakePriceUsd);
+
+  const streamStats = useMemo(
+    () => computeFarmStreamStats(streamsQ.data, rewardCount, totalStaked ?? 0n, decimals, stakePriceUsd),
+    [streamsQ.data, rewardCount, totalStaked, decimals, stakePriceUsd],
+  );
+
+  const rewardsFormatted = Number(formatUnits(streamStats.rewardsRemaining, decimals)).toLocaleString(undefined, {
+    maximumFractionDigits: 5,
+  });
+
+  const socialLinks = useMemo(() => {
+    if (!dexProfile?.links.length) return [];
+    const order: DexTokenLink["kind"][] = ["website", "twitter", "telegram", "discord", "other"];
+    return [...dexProfile.links].sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind)).slice(0, 4);
+  }, [dexProfile?.links]);
+
+  const stakerCount = totalShares > 0n ? Number(totalShares).toLocaleString() : "—";
+  const vestingGrid = formatVestingGrid(lockDays, rewardCount, streamStats.avgStreamDays);
+  const vestingDetail = formatVestingDetail(lockDays, rewardCount, streamStats.avgStreamDays);
+
+  if (dexProfileLoading && !dexProfile) {
+    return (
+      <div className="p-5 animate-pulse space-y-4">
+        <div className="flex gap-3">
+          <div className="w-12 h-12 rounded-xl shrink-0" style={{ background: "rgba(245,200,66,0.12)" }} />
+          <div className="flex-1 space-y-2 pt-1">
+            <div className="h-5 w-40 rounded" style={{ background: "rgba(245,200,66,0.12)" }} />
+            <div className="h-3 w-16 rounded" style={{ background: "rgba(255,255,255,0.06)" }} />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
-      <TokenDexProfileSection
-        profile={dexProfile}
-        loading={dexProfileLoading}
-        symbol={symbol}
-        name={remote?.name}
-        logoUrl={remote?.logoURI}
-        tokenAddress={stakeToken}
-        actions={
-          <>
-            <FarmHeaderStats
-              symbol={symbol}
-              stakedFormatted={stakedFormatted}
-              balanceFormatted={balanceFormatted}
-              rewardCount={rewardCount}
-              lockDays={lockDays}
-              penaltyPct={penaltyPct}
-              active={active}
-              showBalance={!!address}
-            />
-            {address && active && (
-              <button
-                onClick={() => setShowDeposit(true)}
-                className="px-4 py-2.5 rounded-lg font-grotesk text-[12px] uppercase tracking-wider transition hover:opacity-90 active:scale-[0.98] shrink-0 self-center"
-                style={{ background: "rgba(139,92,246,0.35)", color: "#FFFFFF", border: "1px solid rgba(139,92,246,0.55)" }}
+      <div className="p-4 sm:p-5 space-y-4">
+        {/* Header — logo, name, badge, description */}
+        <div>
+          <div className="flex items-start gap-3">
+            <div className="shrink-0">
+              <TokenIcon address={stakeToken} symbol={symbol} size={52} logoUrl={icon} shape="rounded" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-grotesk text-[20px] sm:text-[22px] font-bold leading-tight truncate" style={{ color: FARM_GOLD }}>
+                    {displayName}
+                  </p>
+                  <p className="font-mono text-[13px] mt-0.5" style={{ color: "rgba(255,255,255,0.4)" }}>
+                    {symbol}
+                  </p>
+                </div>
+                <span
+                  className="shrink-0 px-2.5 py-1 rounded-md font-mono text-[10px] uppercase tracking-wider"
+                  style={{
+                    color: active ? "rgba(255,255,255,0.7)" : "rgba(255,160,160,0.9)",
+                    border: `1px solid ${active ? "rgba(255,255,255,0.2)" : "rgba(255,100,100,0.35)"}`,
+                    background: active ? "rgba(255,255,255,0.04)" : "rgba(255,100,100,0.1)",
+                  }}
+                >
+                  {active ? "Active" : "Paused"}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {dexProfile?.description?.trim() && (
+            <p className="mt-3 font-mono text-[13px] leading-relaxed" style={{ color: "rgba(255,255,255,0.55)" }}>
+              {dexProfile.description}
+            </p>
+          )}
+        </div>
+
+        {/* 2×2 stats grid */}
+        <div className="grid grid-cols-2 gap-3">
+          <FarmDetailGridStat icon={<TrendingUp className="w-3.5 h-3.5" />} label="APY" value={formatFarmApy(streamStats.apyPercent)} gold />
+          <FarmDetailGridStat icon={<DollarSign className="w-3.5 h-3.5" />} label="TVL" value={tvlUsd > 0 ? formatUsdTable(tvlUsd) : "—"} gold />
+          <FarmDetailGridStat icon={<Users className="w-3.5 h-3.5" />} label="Stakers" value={stakerCount} gold />
+          <FarmDetailGridStat icon={<Calendar className="w-3.5 h-3.5" />} label="Vesting" value={vestingGrid} />
+        </div>
+
+        {/* Detail rows */}
+        <div className="space-y-3">
+          <FarmDetailRow icon={<Lock className="w-3.5 h-3.5" />} label="Total Staked" value={stakedFormatted} symbol={symbol} />
+          <FarmDetailRow icon={<Gift className="w-3.5 h-3.5" />} label="Rewards Available" value={rewardsFormatted} symbol={symbol} />
+          <FarmDetailRow icon={<Calendar className="w-3.5 h-3.5" />} label="Vesting" value={vestingDetail} />
+        </div>
+
+        {/* Social links */}
+        {socialLinks.length > 0 && (
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-1">
+            {socialLinks.map((link) => (
+              <a
+                key={link.url}
+                href={link.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 font-mono text-[13px] transition hover:opacity-80"
+                style={{ color: "rgba(255,255,255,0.75)" }}
               >
-                Deposit
-              </button>
-            )}
-          </>
-        }
-      />
+                {farmSocialLabel(link.kind, link.label)}
+                <FarmSocialLinkIcon kind={link.kind} />
+              </a>
+            ))}
+          </div>
+        )}
+
+        {penaltyPct > 0 && (
+          <p className="font-mono text-[11px] text-center" style={{ color: "rgba(255,255,255,0.35)" }}>
+            {penaltyPct}% early withdraw fee
+          </p>
+        )}
+
+        {/* Deposit CTA */}
+        {active && (
+          <button
+            type="button"
+            onClick={() => (address ? setShowDeposit(true) : undefined)}
+            disabled={!address}
+            className="w-full py-3.5 rounded-xl font-grotesk text-[15px] font-bold transition hover:brightness-105 active:scale-[0.99] disabled:opacity-45 disabled:cursor-not-allowed"
+            style={{ background: FARM_GOLD, color: "#0a0a0c" }}
+          >
+            {address ? "Stake in Pool" : "Connect Wallet to Stake"}
+          </button>
+        )}
+      </div>
 
       {showDeposit && (
-        <DepositModal farmId={farmId} stakeToken={stakeToken} symbol={symbol} decimals={decimals} userBalance={userBalance} onClose={() => setShowDeposit(false)} />
+        <DepositModal
+          farmId={farmId}
+          stakeToken={stakeToken}
+          symbol={symbol}
+          decimals={decimals}
+          userBalance={userBalance}
+          onClose={() => setShowDeposit(false)}
+        />
       )}
     </>
-  );
-}
-
-function StatBox({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
-  return (
-    <div className="rounded-lg p-3" style={{ background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.2)" }}>
-      <p className="font-mono text-[9px] uppercase tracking-wider mb-1" style={{ color: "rgba(255,255,255,0.5)" }}>{label}</p>
-      <p className="font-mono text-[13px]" style={{ color: accent ? "#A78BFA" : "#FFFFFF" }}>{value}</p>
-    </div>
   );
 }
 
