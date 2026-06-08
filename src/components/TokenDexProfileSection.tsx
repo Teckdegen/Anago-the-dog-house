@@ -159,13 +159,12 @@ export function TokenDexProfileSection({
   if (loading && !profile) {
     return (
       <div className="animate-pulse">
-        <div className="px-4 py-3 flex items-center gap-3" style={{ background: "rgba(255,255,255,0.05)" }}>
-          <div className="w-9 h-9 rounded-lg shrink-0" style={{ background: "rgba(139,92,246,0.15)" }} />
-          <div className="flex-1 h-3.5 rounded" style={{ background: "rgba(139,92,246,0.15)" }} />
-        </div>
-        <div className="px-4 py-3 flex flex-col items-center gap-2" style={{ background: "#0a0a0c" }}>
-          <div className="h-3 w-28 rounded" style={{ background: "rgba(139,92,246,0.12)" }} />
-          <div className="h-2 w-20 rounded" style={{ background: "rgba(139,92,246,0.08)" }} />
+        <div className="px-4 py-3.5 flex items-center gap-3" style={{ background: "rgba(255,255,255,0.05)" }}>
+          <div className="w-10 h-10 rounded-lg shrink-0" style={{ background: "rgba(139,92,246,0.15)" }} />
+          <div className="flex-1 space-y-2">
+            <div className="h-3.5 w-32 rounded" style={{ background: "rgba(139,92,246,0.15)" }} />
+            <div className="h-2.5 w-44 rounded" style={{ background: "rgba(139,92,246,0.1)" }} />
+          </div>
         </div>
         <div className="aspect-[3/1] w-full" style={{ background: "rgba(139,92,246,0.08)" }} />
       </div>
@@ -174,52 +173,56 @@ export function TokenDexProfileSection({
 
   return (
     <div>
-      {/* Title bar — avatar + name + actions */}
+      {/* Top — identity, pool pair, and actions (farm stats / deposit) */}
       <div
-        className="flex items-center gap-3 px-4 py-3"
+        className="px-4 py-3.5"
         style={{ background: "rgba(255,255,255,0.05)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}
       >
-        <TokenIcon address={tokenAddress} symbol={pairSymbol} size={36} logoUrl={icon} />
-        <p
-          className="flex-1 min-w-0 font-grotesk text-[18px] sm:text-[20px] font-semibold tracking-tight truncate leading-tight"
-          style={{ color: "#FFFFFF" }}
-        >
-          {displayName}
-        </p>
-        {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
-      </div>
-
-      {/* Pair info — centered on dark strip */}
-      <div className="px-4 py-3 text-center" style={{ background: "#0a0a0c" }}>
-        <div className="inline-flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1 font-mono text-[16px] font-medium" style={{ color: "#FFFFFF" }}>
-          <span>{pairSymbol}</span>
-          <button
-            type="button"
-            onClick={copyAddress}
-            className="inline-flex items-center transition hover:opacity-80"
-            style={{ color: copied ? "#A78BFA" : "rgba(255,255,255,0.35)" }}
-            title="Copy token address"
-          >
-            <Copy className="w-3.5 h-3.5" />
-          </button>
-          <span style={{ color: "rgba(255,255,255,0.35)" }}>/</span>
-          <span>{quoteSymbol}</span>
-        </div>
-        <div
-          className="flex items-center justify-center gap-1.5 mt-1.5 font-mono text-[13px]"
-          style={{ color: "rgba(255,255,255,0.42)" }}
-        >
-          <span>Monad</span>
-          {dexLabel && (
-            <>
-              <span style={{ color: "rgba(255,255,255,0.25)" }}>{'\u203A'}</span>
-              <span style={{ color: "rgba(255,255,255,0.55)" }}>{dexLabel}</span>
-            </>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+          <div className="flex items-start gap-3 min-w-0 flex-1">
+            <div className="shrink-0">
+              <TokenIcon address={tokenAddress} symbol={pairSymbol} size={40} logoUrl={icon} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p
+                className="font-grotesk text-[18px] sm:text-[20px] font-semibold tracking-tight truncate leading-tight"
+                style={{ color: "#FFFFFF" }}
+              >
+                {displayName}
+              </p>
+              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 mt-1 font-mono text-[13px] sm:text-[14px]" style={{ color: "#FFFFFF" }}>
+                <span>{pairSymbol}</span>
+                <button
+                  type="button"
+                  onClick={copyAddress}
+                  className="inline-flex items-center transition hover:opacity-80"
+                  style={{ color: copied ? "#A78BFA" : "rgba(255,255,255,0.35)" }}
+                  title="Copy token address"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                </button>
+                <span style={{ color: "rgba(255,255,255,0.35)" }}>/</span>
+                <span>{quoteSymbol}</span>
+                <span style={{ color: "rgba(255,255,255,0.25)" }}>·</span>
+                <span style={{ color: "rgba(255,255,255,0.45)" }}>Monad</span>
+                {dexLabel && (
+                  <>
+                    <span style={{ color: "rgba(255,255,255,0.25)" }}>{'\u203A'}</span>
+                    <span style={{ color: "rgba(255,255,255,0.55)" }}>{dexLabel}</span>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+          {actions && (
+            <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-2.5 shrink-0 sm:max-w-[55%]">
+              {actions}
+            </div>
           )}
         </div>
       </div>
 
-      {/* Banner — full bleed between info and footer */}
+      {/* Banner — full bleed between header and footer */}
       {headerImage ? (
         <div
           className="relative w-full aspect-[3/1] bg-cover bg-center"

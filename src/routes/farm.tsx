@@ -256,6 +256,74 @@ function FarmCard({ farmId }: { farmId: number }) {
   );
 }
 
+function FarmStatChip({ label, value, sub, accent, warn }: { label: string; value: string; sub?: string; accent?: boolean; warn?: boolean }) {
+  return (
+    <div
+      className="rounded-lg px-2.5 py-1.5 min-w-0"
+      style={{
+        background: warn ? "rgba(255,100,100,0.1)" : "rgba(0,0,0,0.35)",
+        border: `1px solid ${warn ? "rgba(255,100,100,0.35)" : accent ? "rgba(167,139,250,0.45)" : "rgba(255,255,255,0.1)"}`,
+      }}
+    >
+      <p className="font-mono text-[8px] uppercase tracking-wider whitespace-nowrap" style={{ color: "rgba(255,255,255,0.42)" }}>
+        {label}
+      </p>
+      <p
+        className="font-mono text-[11px] sm:text-[12px] font-medium mt-0.5 whitespace-nowrap"
+        style={{ color: warn ? "rgba(255,160,160,0.95)" : accent ? "#C4B5FD" : "#FFFFFF" }}
+      >
+        {value}
+      </p>
+      {sub && (
+        <p className="font-mono text-[9px] mt-0.5 whitespace-nowrap" style={{ color: "rgba(255,255,255,0.4)" }}>
+          {sub}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function FarmHeaderStats({
+  symbol,
+  stakedFormatted,
+  balanceFormatted,
+  rewardCount,
+  lockDays,
+  penaltyPct,
+  active,
+  showBalance,
+}: {
+  symbol: string;
+  stakedFormatted: string;
+  balanceFormatted: string;
+  rewardCount: number;
+  lockDays: number;
+  penaltyPct: number;
+  active: boolean;
+  showBalance: boolean;
+}) {
+  return (
+    <div className="flex flex-wrap items-stretch justify-end gap-1.5 sm:gap-2 min-w-0">
+      <FarmStatChip label="TVL" value={stakedFormatted} sub={symbol} accent />
+      {showBalance && (
+        <FarmStatChip label="Your balance" value={balanceFormatted} sub={symbol} />
+      )}
+      <FarmStatChip
+        label="Reward streams"
+        value={`${rewardCount}`}
+        sub={rewardCount === 1 ? "active stream" : "active streams"}
+      />
+      {lockDays > 0 && (
+        <FarmStatChip label="Lock" value={`${lockDays} days`} sub="Stake locked" />
+      )}
+      {penaltyPct > 0 && (
+        <FarmStatChip label="Exit fee" value={`${penaltyPct}%`} sub="Early withdraw" />
+      )}
+      {!active && <FarmStatChip label="Status" value="Paused" warn />}
+    </div>
+  );
+}
+
 function FarmCardInner({ farmId, stakeToken, totalStaked, active, lockDays, penaltyPct, rewardCount, showDeposit, setShowDeposit }: any) {
   const { address } = useAccount();
   const contracts = useContracts();
@@ -283,10 +351,20 @@ function FarmCardInner({ farmId, stakeToken, totalStaked, active, lockDays, pena
         tokenAddress={stakeToken}
         actions={
           <>
+            <FarmHeaderStats
+              symbol={symbol}
+              stakedFormatted={stakedFormatted}
+              balanceFormatted={balanceFormatted}
+              rewardCount={rewardCount}
+              lockDays={lockDays}
+              penaltyPct={penaltyPct}
+              active={active}
+              showBalance={!!address}
+            />
             {address && active && (
               <button
                 onClick={() => setShowDeposit(true)}
-                className="px-3.5 py-2 rounded-lg font-grotesk text-[12px] uppercase tracking-wider transition hover:opacity-90 active:scale-[0.98]"
+                className="px-4 py-2.5 rounded-lg font-grotesk text-[12px] uppercase tracking-wider transition hover:opacity-90 active:scale-[0.98] shrink-0 self-center"
                 style={{ background: "rgba(139,92,246,0.35)", color: "#FFFFFF", border: "1px solid rgba(139,92,246,0.55)" }}
               >
                 Deposit
@@ -295,24 +373,6 @@ function FarmCardInner({ farmId, stakeToken, totalStaked, active, lockDays, pena
           </>
         }
       />
-
-      <div
-        className="px-4 pb-4 pt-3"
-        style={{ borderTop: "1px solid rgba(255,255,255,0.06)", background: "rgba(255,255,255,0.02)" }}
-      >
-        <p className="font-mono text-[13px] mb-3 text-center sm:text-left" style={{ color: "rgba(255,255,255,0.45)" }}>
-          {stakedFormatted} {symbol} staked · {rewardCount} stream{rewardCount !== 1 ? "s" : ""}
-          {lockDays > 0 && ` · ${lockDays}d lock`}
-          {penaltyPct > 0 && ` · ${penaltyPct}% exit fee`}
-        </p>
-
-        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-6 gap-y-1 font-mono text-[14px]" style={{ color: "rgba(255,255,255,0.7)" }}>
-          <span>TVL <span style={{ color: "#FFFFFF" }}>{stakedFormatted}</span></span>
-          <span>Balance <span style={{ color: "#FFFFFF" }}>{balanceFormatted}</span></span>
-          {!active && <span style={{ color: "rgba(255,100,100,0.8)" }}>Paused</span>}
-        </div>
-
-      </div>
 
       {showDeposit && (
         <DepositModal farmId={farmId} stakeToken={stakeToken} symbol={symbol} decimals={decimals} userBalance={userBalance} onClose={() => setShowDeposit(false)} />
