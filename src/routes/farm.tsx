@@ -286,7 +286,7 @@ function FarmCardInner({ farmId, stakeToken, totalStaked, active, lockDays, pena
             {address && active && (
               <button
                 onClick={() => setShowDeposit(true)}
-                className="px-3.5 py-1.5 rounded-lg font-grotesk text-[10px] uppercase tracking-wider transition hover:opacity-90 active:scale-[0.98]"
+                className="px-3.5 py-2 rounded-lg font-grotesk text-[12px] uppercase tracking-wider transition hover:opacity-90 active:scale-[0.98]"
                 style={{ background: "rgba(139,92,246,0.35)", color: "#FFFFFF", border: "1px solid rgba(139,92,246,0.55)" }}
               >
                 Deposit
@@ -300,13 +300,13 @@ function FarmCardInner({ farmId, stakeToken, totalStaked, active, lockDays, pena
         className="px-4 pb-4 pt-3"
         style={{ borderTop: "1px solid rgba(255,255,255,0.06)", background: "rgba(255,255,255,0.02)" }}
       >
-        <p className="font-mono text-[10px] mb-3 text-center sm:text-left" style={{ color: "rgba(255,255,255,0.45)" }}>
+        <p className="font-mono text-[13px] mb-3 text-center sm:text-left" style={{ color: "rgba(255,255,255,0.45)" }}>
           {stakedFormatted} {symbol} staked · {rewardCount} stream{rewardCount !== 1 ? "s" : ""}
           {lockDays > 0 && ` · ${lockDays}d lock`}
           {penaltyPct > 0 && ` · ${penaltyPct}% exit fee`}
         </p>
 
-        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-6 gap-y-1 font-mono text-[11px]" style={{ color: "rgba(255,255,255,0.7)" }}>
+        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-6 gap-y-1 font-mono text-[14px]" style={{ color: "rgba(255,255,255,0.7)" }}>
           <span>TVL <span style={{ color: "#FFFFFF" }}>{stakedFormatted}</span></span>
           <span>Balance <span style={{ color: "#FFFFFF" }}>{balanceFormatted}</span></span>
           {!active && <span style={{ color: "rgba(255,100,100,0.8)" }}>Paused</span>}

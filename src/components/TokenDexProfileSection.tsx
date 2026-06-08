@@ -14,13 +14,13 @@ function XIcon({ className }: { className?: string }) {
 function SocialIcon({ kind }: { kind: DexTokenLink["kind"] }) {
   switch (kind) {
     case "twitter":
-      return <UserRound className="w-3.5 h-3.5" strokeWidth={1.75} />;
+      return <UserRound className="w-4 h-4" strokeWidth={1.75} />;
     case "telegram":
-      return <Send className="w-3.5 h-3.5" strokeWidth={1.75} />;
+      return <Send className="w-4 h-4" strokeWidth={1.75} />;
     case "website":
-      return <Globe className="w-3.5 h-3.5" strokeWidth={1.75} />;
+      return <Globe className="w-4 h-4" strokeWidth={1.75} />;
     default:
-      return <Globe className="w-3.5 h-3.5" strokeWidth={1.75} />;
+      return <Globe className="w-4 h-4" strokeWidth={1.75} />;
   }
 }
 
@@ -58,7 +58,7 @@ function SocialBar({ links, dexscreenerUrl }: { links: DexTokenLink[]; dexscreen
             href={link.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex flex-1 min-w-0 items-center justify-center gap-2 px-2 py-3 font-mono text-[11px] transition hover:bg-white/[0.04]"
+            className="flex flex-1 min-w-0 items-center justify-center gap-2 px-2 py-3.5 font-mono text-[14px] transition hover:bg-white/[0.04]"
             style={{ color: "rgba(255,255,255,0.82)" }}
             title={link.url}
           >
@@ -97,7 +97,7 @@ function SocialBar({ links, dexscreenerUrl }: { links: DexTokenLink[]; dexscreen
                     href={link.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-2 px-3 py-2 font-mono text-[11px] transition hover:bg-white/[0.05]"
+                    className="flex items-center gap-2 px-3 py-2 font-mono text-[13px] transition hover:bg-white/[0.05]"
                     style={{ color: "rgba(255,255,255,0.85)" }}
                   >
                     <SocialIcon kind={link.kind} />
@@ -109,7 +109,7 @@ function SocialBar({ links, dexscreenerUrl }: { links: DexTokenLink[]; dexscreen
                     href={dexscreenerUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-2 px-3 py-2 font-mono text-[11px] transition hover:bg-white/[0.05]"
+                    className="flex items-center gap-2 px-3 py-2 font-mono text-[13px] transition hover:bg-white/[0.05]"
                     style={{ color: "#A78BFA" }}
                   >
                     <XIcon className="w-3.5 h-3.5" />
@@ -181,7 +181,7 @@ export function TokenDexProfileSection({
       >
         <TokenIcon address={tokenAddress} symbol={pairSymbol} size={36} logoUrl={icon} />
         <p
-          className="flex-1 min-w-0 font-grotesk text-[15px] sm:text-[16px] font-semibold tracking-tight truncate leading-tight"
+          className="flex-1 min-w-0 font-grotesk text-[18px] sm:text-[20px] font-semibold tracking-tight truncate leading-tight"
           style={{ color: "#FFFFFF" }}
         >
           {displayName}
@@ -191,7 +191,7 @@ export function TokenDexProfileSection({
 
       {/* Pair info — centered on dark strip */}
       <div className="px-4 py-3 text-center" style={{ background: "#0a0a0c" }}>
-        <div className="inline-flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1 font-mono text-[13px] font-medium" style={{ color: "#FFFFFF" }}>
+        <div className="inline-flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1 font-mono text-[16px] font-medium" style={{ color: "#FFFFFF" }}>
           <span>{pairSymbol}</span>
           <button
             type="button"
@@ -200,13 +200,13 @@ export function TokenDexProfileSection({
             style={{ color: copied ? "#A78BFA" : "rgba(255,255,255,0.35)" }}
             title="Copy token address"
           >
-            <Copy className="w-3 h-3" />
+            <Copy className="w-3.5 h-3.5" />
           </button>
           <span style={{ color: "rgba(255,255,255,0.35)" }}>/</span>
           <span>{quoteSymbol}</span>
         </div>
         <div
-          className="flex items-center justify-center gap-1.5 mt-1.5 font-mono text-[10px]"
+          className="flex items-center justify-center gap-1.5 mt-1.5 font-mono text-[13px]"
           style={{ color: "rgba(255,255,255,0.42)" }}
         >
           <span>Monad</span>
@@ -238,7 +238,7 @@ export function TokenDexProfileSection({
 
       {profile?.description?.trim() && (
         <p
-          className="px-4 py-3 font-mono text-[10px] leading-relaxed line-clamp-3 text-center sm:text-left"
+          className="px-4 py-3 font-mono text-[13px] leading-relaxed line-clamp-3 text-center sm:text-left"
           style={{ color: "rgba(255,255,255,0.62)", background: "#0a0a0c", borderTop: "1px solid rgba(255,255,255,0.06)" }}
         >
           {profile.description}
