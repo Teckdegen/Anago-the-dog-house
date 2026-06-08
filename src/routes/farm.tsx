@@ -259,7 +259,7 @@ function FarmCard({ farmId }: { farmId: number }) {
 function FarmStatChip({ label, value, sub, accent, warn }: { label: string; value: string; sub?: string; accent?: boolean; warn?: boolean }) {
   return (
     <div
-      className="rounded-lg px-2.5 py-1.5 min-w-0"
+      className="rounded-lg px-2.5 py-1.5 shrink-0"
       style={{
         background: warn ? "rgba(255,100,100,0.1)" : "rgba(0,0,0,0.35)",
         border: `1px solid ${warn ? "rgba(255,100,100,0.35)" : accent ? "rgba(167,139,250,0.45)" : "rgba(255,255,255,0.1)"}`,
@@ -303,7 +303,7 @@ function FarmHeaderStats({
   showBalance: boolean;
 }) {
   return (
-    <div className="flex flex-wrap items-stretch justify-end gap-1.5 sm:gap-2 min-w-0">
+    <div className="flex flex-nowrap overflow-x-auto items-stretch gap-1.5 sm:flex-wrap sm:overflow-visible sm:justify-end sm:gap-2 min-w-0 w-full sm:w-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       <FarmStatChip label="TVL" value={stakedFormatted} sub={symbol} accent />
       {showBalance && (
         <FarmStatChip label="Your balance" value={balanceFormatted} sub={symbol} />

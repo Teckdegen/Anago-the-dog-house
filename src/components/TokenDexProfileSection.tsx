@@ -215,7 +215,7 @@ export function TokenDexProfileSection({
             </div>
           </div>
           {actions && (
-            <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-2.5 shrink-0 sm:max-w-[55%]">
+            <div className="flex flex-col items-end gap-2 w-full sm:flex-row sm:flex-wrap sm:items-center sm:justify-end sm:gap-2.5 sm:shrink-0 sm:max-w-[55%] sm:w-auto">
               {actions}
             </div>
           )}
