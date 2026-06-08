@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect, useRef, useMemo, type ReactNode } from "react";
-import { Search, Sprout, X, Wallet, TrendingUp, DollarSign, Users, Calendar, Lock, Gift, ExternalLink, Globe, Send, UserRound } from "lucide-react";
+import { Search, Sprout, X, Wallet, DollarSign, Gift, ExternalLink, Globe, Send, UserRound } from "lucide-react";
 import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt, useChainId, usePublicClient } from "wagmi";
 import { prepareTransactionWithGas } from "@/lib/web3/gasUtils";
 import { LIVE_CHAIN_QUERY } from "@/lib/web3/nftImage";
@@ -114,7 +114,8 @@ function FarmPage() {
 
   return (
     <AppShell>
-      <div className="max-w-[1280px] mx-auto px-5 sm:px-8 lg:px-14 pt-8 pb-20">
+      <div className="pt-8 pb-20">
+        <div className="max-w-[1280px] mx-auto px-5 sm:px-8 lg:px-14">
         <div className="flex items-start justify-between gap-4 mb-7">
           <div>
             <h1 className="font-grotesk uppercase text-[22px] sm:text-[28px] leading-none tracking-tight" style={{ color: "#FFFFFF" }}>Stream Farms</h1>
@@ -167,25 +168,20 @@ function FarmPage() {
           )}
         </div>
 
-        {activeTab === ALL_FARMS_TAB && (
-          <>
-            {myPositionCount > 0 && (
-              <button
-                type="button"
-                onClick={() => setActiveTab(MY_POSITIONS_TAB)}
-                className="w-full mb-4 rounded-xl px-4 py-3.5 text-left transition hover:opacity-90"
-                style={{ background: "rgba(139,92,246,0.15)", border: "1px solid rgba(167,139,250,0.45)" }}
-              >
-                <p className="font-grotesk text-[12px] uppercase tracking-wider" style={{ color: "#E9D5FF" }}>
-                  You have {myPositionCount} active position{myPositionCount !== 1 ? "s" : ""}
-                </p>
-                <p className="font-mono text-[10px] mt-1" style={{ color: "rgba(255,255,255,0.55)" }}>
-                  View staked amounts, claimable rewards, and claim →
-                </p>
-              </button>
-            )}
-            <AllFarmsTab farmCount={farmCount} />
-          </>
+        {activeTab === ALL_FARMS_TAB && myPositionCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setActiveTab(MY_POSITIONS_TAB)}
+            className="w-full mb-4 rounded-xl px-4 py-3.5 text-left transition hover:opacity-90"
+            style={{ background: "rgba(139,92,246,0.15)", border: "1px solid rgba(167,139,250,0.45)" }}
+          >
+            <p className="font-grotesk text-[12px] uppercase tracking-wider" style={{ color: "#E9D5FF" }}>
+              You have {myPositionCount} active position{myPositionCount !== 1 ? "s" : ""}
+            </p>
+            <p className="font-mono text-[10px] mt-1" style={{ color: "rgba(255,255,255,0.55)" }}>
+              View staked amounts, claimable rewards, and claim →
+            </p>
+          </button>
         )}
         {activeTab === CREATE_TAB && (canManage ? <FarmManagePanel /> : manageLoading ? (
           <div className="flex justify-center py-16">
@@ -198,6 +194,13 @@ function FarmPage() {
               Your staked positions, claimable rewards, and estimated USD value — updated every few seconds.
             </p>
             <MyPositionsTab />
+          </div>
+        )}
+        </div>
+
+        {activeTab === ALL_FARMS_TAB && (
+          <div className="w-full px-5 sm:px-8 lg:px-14 mt-5">
+            <AllFarmsTab farmCount={farmCount} />
           </div>
         )}
       </div>
@@ -226,7 +229,7 @@ function AllFarmsTab({ farmCount }: { farmCount: number }) {
     );
   }
   return (
-    <div className="max-w-xl mx-auto space-y-5">
+    <div className="w-full space-y-5">
       {Array.from({ length: farmCount }, (_, i) => <FarmCard key={i} farmId={i} />)}
     </div>
   );
@@ -236,91 +239,29 @@ function AllFarmsTab({ farmCount }: { farmCount: number }) {
 //                              FARM CARD
 // ═══════════════════════════════════════════════════════════════════════════
 
-const FARM_GOLD = "#F5C842";
-const FARM_CARD_BG = "rgba(255,255,255,0.04)";
-const FARM_CARD_BORDER = "rgba(255,255,255,0.08)";
+const FARM_PURPLE_LIGHT = "#C4B5FD";
+const FARM_CARD_BG = "rgba(139,92,246,0.08)";
+const FARM_CARD_BORDER = "rgba(139,92,246,0.25)";
 
 type RewardStreamTuple = readonly [
   `0x${string}`, bigint, bigint, bigint, bigint, bigint, bigint, bigint,
 ];
 
-type FarmStreamStats = {
-  apyPercent: number | null;
-  rewardsRemaining: bigint;
-  avgStreamDays: number;
-  activeStreamCount: number;
-};
-
-function computeFarmStreamStats(
+function computeRewardsRemaining(
   streams: readonly ({ status: string; result?: unknown } | undefined)[] | undefined,
   count: number,
-  totalStaked: bigint,
-  stakeDecimals: number,
-  stakePriceUsd: number | null,
-): FarmStreamStats {
-  const now = Math.floor(Date.now() / 1000);
+): bigint {
   let rewardsRemaining = 0n;
-  let annualRewardTokens = 0;
-  let streamDaysSum = 0;
-  let streamDaysCount = 0;
-  let activeStreamCount = 0;
 
   for (let i = 0; i < count; i++) {
     const d = streams?.[i];
     if (d?.status !== "success" || !d.result) continue;
-    const [, rewardRate, startTime, endTime, totalBudget, , totalClaimed] = d.result as RewardStreamTuple;
-    const start = Number(startTime);
-    const end = Number(endTime);
+    const [, , , , totalBudget, , totalClaimed] = d.result as RewardStreamTuple;
     const remaining = totalBudget > totalClaimed ? totalBudget - totalClaimed : 0n;
     rewardsRemaining += remaining;
-
-    if (end > start) {
-      streamDaysSum += (end - start) / 86400;
-      streamDaysCount += 1;
-    }
-
-    if (now >= start && now < end && rewardRate > 0n) {
-      activeStreamCount += 1;
-      const ratePerSec = Number(rewardRate) / 1e18;
-      annualRewardTokens += ratePerSec * 31_536_000;
-    }
   }
 
-  const stakedTokens = Number(formatUnits(totalStaked, stakeDecimals));
-  let apyPercent: number | null = null;
-  if (stakedTokens > 0 && annualRewardTokens > 0) {
-    if (stakePriceUsd != null && stakePriceUsd > 0) {
-      const annualUsd = annualRewardTokens * stakePriceUsd;
-      const tvlUsd = stakedTokens * stakePriceUsd;
-      apyPercent = tvlUsd > 0 ? (annualUsd / tvlUsd) * 100 : null;
-    } else {
-      apyPercent = (annualRewardTokens / stakedTokens) * 100;
-    }
-  }
-
-  return {
-    apyPercent,
-    rewardsRemaining,
-    avgStreamDays: streamDaysCount > 0 ? streamDaysSum / streamDaysCount : 0,
-    activeStreamCount,
-  };
-}
-
-function formatFarmApy(pct: number | null): string {
-  if (pct == null || !Number.isFinite(pct)) return "—";
-  return `${pct.toFixed(2)}%`;
-}
-
-function formatVestingGrid(lockDays: number, streamCount: number, avgStreamDays: number): string {
-  if (lockDays > 0) return `${Math.round(lockDays)}d lock`;
-  if (streamCount > 0 && avgStreamDays > 0) return `${streamCount} × ${Math.round(avgStreamDays)}d`;
-  return "—";
-}
-
-function formatVestingDetail(lockDays: number, streamCount: number, avgStreamDays: number): string {
-  if (lockDays > 0) return `${Math.round(lockDays)} day stake lock`;
-  if (streamCount > 0 && avgStreamDays > 0) return `${streamCount} cycles × ${Math.round(avgStreamDays)} days`;
-  return "Streaming rewards";
+  return rewardsRemaining;
 }
 
 function FarmSocialLinkIcon({ kind }: { kind: DexTokenLink["kind"] }) {
@@ -347,61 +288,35 @@ function FarmDetailGridStat({
   icon,
   label,
   value,
-  gold,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: string;
-  gold?: boolean;
-}) {
-  return (
-    <div
-      className="rounded-xl px-3.5 py-3"
-      style={{ background: FARM_CARD_BG, border: `1px solid ${FARM_CARD_BORDER}` }}
-    >
-      <div className="flex items-center gap-1.5 mb-2">
-        <span style={{ color: "rgba(255,255,255,0.4)" }}>{icon}</span>
-        <p className="font-mono text-[11px]" style={{ color: "rgba(255,255,255,0.45)" }}>
-          {label}
-        </p>
-      </div>
-      <p
-        className="font-grotesk text-[20px] sm:text-[22px] font-semibold leading-none"
-        style={{ color: gold ? FARM_GOLD : "#FFFFFF" }}
-      >
-        {value}
-      </p>
-    </div>
-  );
-}
-
-function FarmDetailRow({
-  icon,
-  label,
-  value,
   symbol,
+  accent,
 }: {
   icon: ReactNode;
   label: string;
   value: string;
   symbol?: string;
+  accent?: boolean;
 }) {
   return (
     <div
-      className="rounded-xl px-4 py-3.5"
+      className="rounded-xl px-4 py-4 sm:px-5 sm:py-5"
       style={{ background: FARM_CARD_BG, border: `1px solid ${FARM_CARD_BORDER}` }}
     >
-      <div className="flex items-center gap-1.5 mb-1.5">
-        <span style={{ color: "rgba(255,255,255,0.4)" }}>{icon}</span>
-        <p className="font-mono text-[11px]" style={{ color: "rgba(255,255,255,0.45)" }}>
+      <div className="flex items-center gap-1.5 mb-2">
+        <span style={{ color: "rgba(255,255,255,0.45)" }}>{icon}</span>
+        <p className="font-mono text-[11px] uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.5)" }}>
           {label}
         </p>
       </div>
-      <p className="font-grotesk text-[22px] sm:text-[24px] font-semibold leading-tight" style={{ color: "#FFFFFF" }}>
+      <p
+        className="font-grotesk text-[22px] sm:text-[26px] font-semibold leading-none truncate"
+        style={{ color: accent ? FARM_PURPLE_LIGHT : "#FFFFFF" }}
+        title={value}
+      >
         {value}
       </p>
       {symbol && (
-        <p className="font-mono text-[12px] mt-0.5" style={{ color: "rgba(255,255,255,0.4)" }}>
+        <p className="font-mono text-[12px] mt-1" style={{ color: "rgba(255,255,255,0.4)" }}>
           {symbol}
         </p>
       )}
@@ -417,37 +332,34 @@ function FarmCard({ farmId }: { farmId: number }) {
   const farm = parseFarmTuple(farmQ.data);
   if (!farm) {
     return (
-      <div className="rounded-2xl p-5 animate-pulse space-y-4" style={{ border: `1px solid ${FARM_CARD_BORDER}`, background: "#0a0a0c" }}>
+      <div className="rounded-2xl p-5 sm:p-8 animate-pulse space-y-4 w-full" style={{ border: `1px solid ${FARM_CARD_BORDER}`, background: "#0a0a0c" }}>
         <div className="flex gap-3">
-          <div className="w-12 h-12 rounded-xl shrink-0" style={{ background: "rgba(245,200,66,0.12)" }} />
+          <div className="w-12 h-12 rounded-xl shrink-0" style={{ background: "rgba(139,92,246,0.15)" }} />
           <div className="flex-1 space-y-2 pt-1">
-            <div className="h-5 w-40 rounded" style={{ background: "rgba(245,200,66,0.12)" }} />
+            <div className="h-5 w-40 rounded" style={{ background: "rgba(139,92,246,0.15)" }} />
             <div className="h-3 w-16 rounded" style={{ background: "rgba(255,255,255,0.06)" }} />
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-20 rounded-xl" style={{ background: FARM_CARD_BG }} />
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="h-24 rounded-xl" style={{ background: FARM_CARD_BG }} />
           ))}
         </div>
       </div>
     );
   }
 
-  const { stakeToken, totalShares, totalStaked, active, lockDuration, earlyWithdrawBps, rewardStreamCount } = farm;
+  const { stakeToken, totalStaked, active, earlyWithdrawBps, rewardStreamCount } = farm;
   const rewardCount = Number(rewardStreamCount);
-  const lockDays = Number(lockDuration ?? 0) / 86400;
   const penaltyPct = Number(earlyWithdrawBps ?? 0) / 100;
 
   return (
-    <div className="rounded-2xl overflow-hidden" style={{ border: `1px solid ${FARM_CARD_BORDER}`, background: "#0a0a0c" }}>
+    <div className="rounded-2xl overflow-hidden w-full" style={{ border: `1px solid ${FARM_CARD_BORDER}`, background: "#0a0a0c" }}>
       <FarmCardInner
         farmId={farmId}
         stakeToken={stakeToken}
-        totalShares={totalShares}
         totalStaked={totalStaked}
         active={active}
-        lockDays={lockDays}
         penaltyPct={penaltyPct}
         rewardCount={rewardCount}
         showDeposit={showDeposit}
@@ -460,10 +372,8 @@ function FarmCard({ farmId }: { farmId: number }) {
 function FarmCardInner({
   farmId,
   stakeToken,
-  totalShares,
   totalStaked,
   active,
-  lockDays,
   penaltyPct,
   rewardCount,
   showDeposit,
@@ -471,10 +381,8 @@ function FarmCardInner({
 }: {
   farmId: number;
   stakeToken: `0x${string}`;
-  totalShares: bigint;
   totalStaked: bigint;
   active: boolean;
-  lockDays: number;
   penaltyPct: number;
   rewardCount: number;
   showDeposit: boolean;
@@ -508,16 +416,17 @@ function FarmCardInner({
   const displayName = dexProfile?.name?.trim() || remote?.name?.trim() || `${symbol} Farm`;
   const icon = remote?.logoURI || dexProfile?.icon;
 
-  const stakedAmount = Number(formatUnits(totalStaked ?? 0n, decimals));
-  const stakedFormatted = stakedAmount.toLocaleString(undefined, { maximumFractionDigits: 5 });
   const tvlUsd = bigintToUsd(totalStaked ?? 0n, decimals, stakePriceUsd);
+  const balanceFormatted = Number(formatUnits(userBalance, decimals)).toLocaleString(undefined, {
+    maximumFractionDigits: 5,
+  });
 
-  const streamStats = useMemo(
-    () => computeFarmStreamStats(streamsQ.data, rewardCount, totalStaked ?? 0n, decimals, stakePriceUsd),
-    [streamsQ.data, rewardCount, totalStaked, decimals, stakePriceUsd],
+  const rewardsRemaining = useMemo(
+    () => computeRewardsRemaining(streamsQ.data, rewardCount),
+    [streamsQ.data, rewardCount],
   );
 
-  const rewardsFormatted = Number(formatUnits(streamStats.rewardsRemaining, decimals)).toLocaleString(undefined, {
+  const rewardsFormatted = Number(formatUnits(rewardsRemaining, decimals)).toLocaleString(undefined, {
     maximumFractionDigits: 5,
   });
 
@@ -527,17 +436,13 @@ function FarmCardInner({
     return [...dexProfile.links].sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind)).slice(0, 4);
   }, [dexProfile?.links]);
 
-  const stakerCount = totalShares > 0n ? Number(totalShares).toLocaleString() : "—";
-  const vestingGrid = formatVestingGrid(lockDays, rewardCount, streamStats.avgStreamDays);
-  const vestingDetail = formatVestingDetail(lockDays, rewardCount, streamStats.avgStreamDays);
-
   if (dexProfileLoading && !dexProfile) {
     return (
-      <div className="p-5 animate-pulse space-y-4">
+      <div className="p-5 sm:p-8 animate-pulse space-y-4">
         <div className="flex gap-3">
-          <div className="w-12 h-12 rounded-xl shrink-0" style={{ background: "rgba(245,200,66,0.12)" }} />
+          <div className="w-12 h-12 rounded-xl shrink-0" style={{ background: "rgba(139,92,246,0.15)" }} />
           <div className="flex-1 space-y-2 pt-1">
-            <div className="h-5 w-40 rounded" style={{ background: "rgba(245,200,66,0.12)" }} />
+            <div className="h-5 w-40 rounded" style={{ background: "rgba(139,92,246,0.15)" }} />
             <div className="h-3 w-16 rounded" style={{ background: "rgba(255,255,255,0.06)" }} />
           </div>
         </div>
@@ -547,7 +452,7 @@ function FarmCardInner({
 
   return (
     <>
-      <div className="p-4 sm:p-5 space-y-4">
+      <div className="p-5 sm:p-8 space-y-6 w-full">
         {/* Header — logo, name, badge, description */}
         <div>
           <div className="flex items-start gap-3">
@@ -557,7 +462,7 @@ function FarmCardInner({
             <div className="min-w-0 flex-1">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="font-grotesk text-[20px] sm:text-[22px] font-bold leading-tight truncate" style={{ color: FARM_GOLD }}>
+                  <p className="font-grotesk text-[20px] sm:text-[24px] font-bold leading-tight truncate" style={{ color: "#FFFFFF" }}>
                     {displayName}
                   </p>
                   <p className="font-mono text-[13px] mt-0.5" style={{ color: "rgba(255,255,255,0.4)" }}>
@@ -585,19 +490,11 @@ function FarmCardInner({
           )}
         </div>
 
-        {/* 2×2 stats grid */}
-        <div className="grid grid-cols-2 gap-3">
-          <FarmDetailGridStat icon={<TrendingUp className="w-3.5 h-3.5" />} label="APY" value={formatFarmApy(streamStats.apyPercent)} gold />
-          <FarmDetailGridStat icon={<DollarSign className="w-3.5 h-3.5" />} label="TVL" value={tvlUsd > 0 ? formatUsdTable(tvlUsd) : "—"} gold />
-          <FarmDetailGridStat icon={<Users className="w-3.5 h-3.5" />} label="Stakers" value={stakerCount} gold />
-          <FarmDetailGridStat icon={<Calendar className="w-3.5 h-3.5" />} label="Vesting" value={vestingGrid} />
-        </div>
-
-        {/* Detail rows */}
-        <div className="space-y-3">
-          <FarmDetailRow icon={<Lock className="w-3.5 h-3.5" />} label="Total Staked" value={stakedFormatted} symbol={symbol} />
-          <FarmDetailRow icon={<Gift className="w-3.5 h-3.5" />} label="Rewards Available" value={rewardsFormatted} symbol={symbol} />
-          <FarmDetailRow icon={<Calendar className="w-3.5 h-3.5" />} label="Vesting" value={vestingDetail} />
+        {/* Farm stats — full page width */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 w-full">
+          <FarmDetailGridStat icon={<DollarSign className="w-3.5 h-3.5" />} label="TVL" value={tvlUsd > 0 ? formatUsdTable(tvlUsd) : "—"} accent />
+          <FarmDetailGridStat icon={<Gift className="w-3.5 h-3.5" />} label="Rewards Available" value={rewardsFormatted} symbol={symbol} accent />
+          <FarmDetailGridStat icon={<Wallet className="w-3.5 h-3.5" />} label="Your Balance" value={address ? balanceFormatted : "—"} symbol={address ? symbol : undefined} />
         </div>
 
         {/* Social links */}
@@ -632,7 +529,7 @@ function FarmCardInner({
             onClick={() => (address ? setShowDeposit(true) : undefined)}
             disabled={!address}
             className="w-full py-3.5 rounded-xl font-grotesk text-[15px] font-bold transition hover:brightness-105 active:scale-[0.99] disabled:opacity-45 disabled:cursor-not-allowed"
-            style={{ background: FARM_GOLD, color: "#0a0a0c" }}
+            style={{ background: "rgba(139,92,246,0.45)", color: "#FFFFFF", border: "1px solid rgba(167,139,250,0.6)" }}
           >
             {address ? "Stake in Pool" : "Connect Wallet to Stake"}
           </button>
