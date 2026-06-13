@@ -14,7 +14,7 @@ async function main() {
   const addr = await otc.getAddress();
 
   console.log("✅ OTCMarket deployed:", addr);
-  console.log("   Fee:", (await otc.platformFeeBps()).toString(), "bps (1%)");
+  console.log("   Fee:", (await otc.platformFeeBps()).toString(), "bps (0.75%)");
 
   // Update deployments
   const deploymentsPath = path.resolve(__dirname, "..", "deployments.json");

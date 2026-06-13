@@ -134,6 +134,13 @@ export const TOKEN_LOCK_ABI = [
   // ── Write ──────────────────────────────────────────────────────────────
   {
     type: "function",
+    name: "platformFeeBps",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "uint256" }],
+  },
+  {
+    type: "function",
     name: "createLock",
     stateMutability: "nonpayable",
     inputs: [
@@ -149,6 +156,21 @@ export const TOKEN_LOCK_ABI = [
     stateMutability: "nonpayable",
     inputs: [{ name: "tokenId", type: "uint256" }],
     outputs: [],
+  },
+  {
+    type: "function",
+    name: "emergencyRecoverToken",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "token", type: "address" }, { name: "amount", type: "uint256" }],
+    outputs: [],
+  },
+  { type: "function", name: "owner", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
+  {
+    type: "function",
+    name: "totalEscrowed",
+    stateMutability: "view",
+    inputs: [{ name: "token", type: "address" }],
+    outputs: [{ type: "uint256" }],
   },
   // ── Lock reads ─────────────────────────────────────────────────────────
   {
@@ -313,6 +335,13 @@ export const VESTING_NFT_ABI = [
   // ── Write ──────────────────────────────────────────────────────────────
   {
     type: "function",
+    name: "platformFeeBps",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "uint256" }],
+  },
+  {
+    type: "function",
     name: "createVesting",
     stateMutability: "nonpayable",
     inputs: [
@@ -337,6 +366,21 @@ export const VESTING_NFT_ABI = [
     stateMutability: "nonpayable",
     inputs: [{ name: "tokenId", type: "uint256" }],
     outputs: [],
+  },
+  {
+    type: "function",
+    name: "emergencyRecoverToken",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "token", type: "address" }, { name: "amount", type: "uint256" }],
+    outputs: [],
+  },
+  { type: "function", name: "owner", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
+  {
+    type: "function",
+    name: "totalEscrowed",
+    stateMutability: "view",
+    inputs: [{ name: "token", type: "address" }],
+    outputs: [{ type: "uint256" }],
   },
   // ── Read ───────────────────────────────────────────────────────────────
   {
@@ -441,6 +485,7 @@ export { ERC20_ABI } from "./tokens";
 // ── STREAM_FARM_ABI ────────────────────────────────────────────────────────
 export const STREAM_FARM_ABI = [
   // ── Read ───────────────────────────────────────────────────────────────
+  { type: "function", name: "platformFeeBps", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
   { type: "function", name: "farmCount", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
   { type: "function", name: "owner", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
   { type: "function", name: "admins", stateMutability: "view", inputs: [{ name: "account", type: "address" }], outputs: [{ type: "bool" }] },
@@ -622,6 +667,7 @@ export const STREAM_FARM_ABI = [
 
 // ── OTC_MARKET_ABI ────────────────────────────────────────────────────────
 export const OTC_MARKET_ABI = [
+  { type: "function", name: "owner", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
   { type: "function", name: "listingCount", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
   { type: "function", name: "platformFeeBps", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
   {

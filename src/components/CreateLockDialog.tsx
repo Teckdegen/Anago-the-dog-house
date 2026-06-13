@@ -9,6 +9,7 @@ import { useContractAddresses } from "@/lib/web3/hooks";
 import { TOKEN_LOCK_ABI } from "@/lib/web3/contracts";
 import { ERC20_ABI, type TokenInfo } from "@/lib/web3/tokens";
 import { formatAmount } from "@/lib/web3/format";
+import { formatFeePercent, netAfterPlatformFee, platformFeeAmount } from "@/lib/web3/platformFee";
 import { useToast } from "./Toast";
 import { prepareTransactionWithGas } from "@/lib/web3/gasUtils";
 
@@ -33,6 +34,8 @@ export function CreateLockDialog({ open, onClose }: Props) {
     if (!token || !amount) return 0n;
     try { return parseUnits(amount, token.decimals); } catch { return 0n; }
   })();
+  const lockFee = platformFeeAmount(parsedAmount);
+  const lockedNet = netAfterPlatformFee(parsedAmount);
 
   const allowanceQ = useReadContract({
     address: token?.address,
@@ -173,9 +176,15 @@ export function CreateLockDialog({ open, onClose }: Props) {
             >
               <ConfirmRow label="Token" value={token.symbol} />
               <ConfirmRow
-                label="Amount"
-                value={`${formatUnits(parsedAmount, token.decimals)} ${token.symbol}`}
+                label="Locked"
+                value={`${formatUnits(lockedNet, token.decimals)} ${token.symbol}`}
               />
+              {lockFee > 0n && (
+                <ConfirmRow
+                  label="Platform fee"
+                  value={`${formatUnits(lockFee, token.decimals)} ${token.symbol} (${formatFeePercent()})`}
+                />
+              )}
               <ConfirmRow
                 label="Unlocks"
                 value={unlockDate.toLocaleDateString(undefined, {
@@ -241,6 +250,22 @@ export function CreateLockDialog({ open, onClose }: Props) {
                   }}
                 />
               </div>
+
+              {parsedAmount > 0n && token && (
+                <div
+                  className="rounded-xl px-4 py-3 space-y-1.5"
+                  style={{ background: "rgba(139,92,246,0.06)", border: "1px solid rgba(139,92,246,0.18)" }}
+                >
+                  <ConfirmRow
+                    label="You lock"
+                    value={`${formatAmount(lockedNet, token.decimals)} ${token.symbol}`}
+                  />
+                  <ConfirmRow
+                    label={`Platform fee (${formatFeePercent()})`}
+                    value={`${formatAmount(lockFee, token.decimals)} ${token.symbol}`}
+                  />
+                </div>
+              )}
 
               <div>
                 <Label>3. Lock Duration</Label>

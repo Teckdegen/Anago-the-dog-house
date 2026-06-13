@@ -50,7 +50,7 @@ contract OTCMarket is ERC721Holder, Ownable2Step, ReentrancyGuard {
     }
 
     Listing[] public listings;
-    uint256 public platformFeeBps = 100;
+    uint256 public platformFeeBps = 75;
     uint256 public constant MAX_FEE = 1000;
     uint256 public constant BASIS_POINTS = 10000;
     address public constant NATIVE_PAYMENT = address(0);

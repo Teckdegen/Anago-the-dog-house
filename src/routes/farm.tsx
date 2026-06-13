@@ -27,6 +27,7 @@ import { SharePositionButton } from "@/components/SharePositionButton";
 import { SharedPositionBanner } from "@/components/SharedPositionBanner";
 import { parsePositionSearchParam, validatePositionSearch } from "@/lib/positionShare";
 import { useSharedFarmPositionExists } from "@/lib/web3/useSharedPositions";
+import { formatFeePercent, netAfterPlatformFee, platformFeeAmount } from "@/lib/web3/platformFee";
 
 export const Route = createFileRoute("/farm")({
   validateSearch: validatePositionSearch,
@@ -518,7 +519,7 @@ function FarmCardInner({
 
         {penaltyPct > 0 && (
           <p className="font-mono text-[11px] text-center" style={{ color: "rgba(255,255,255,0.35)" }}>
-            {penaltyPct}% early withdraw fee
+            {penaltyPct}% early withdraw penalty (paid in tokens to protocol admin)
           </p>
         )}
 
@@ -640,6 +641,8 @@ function DepositModal({ farmId, stakeToken, symbol, decimals, userBalance, onClo
   const depositRcpt = useWaitForTransactionReceipt({ hash: depositTx.data });
 
   const parsedAmount = (() => { try { return amount ? parseUnits(amount, decimals) : 0n; } catch { return 0n; } })();
+  const depositFee = platformFeeAmount(parsedAmount);
+  const stakedNet = netAfterPlatformFee(parsedAmount);
 
   // Check allowance
   const { address } = useAccount();
@@ -711,7 +714,10 @@ function DepositModal({ farmId, stakeToken, symbol, decimals, userBalance, onClo
         subtext="Your stake is active and you received an NFT position."
         rows={[
           { label: "Farm", value: `#${farmId}` },
-          { label: "Amount", value: `${amount} ${symbol}` },
+          { label: "Staked", value: `${formatUnits(stakedNet, decimals)} ${symbol}` },
+          ...(depositFee > 0n
+            ? [{ label: `Platform fee (${formatFeePercent()})`, value: `${formatUnits(depositFee, decimals)} ${symbol}` }]
+            : []),
           ...(farmLockDays > 0
             ? [{ label: "Farm lock", value: `${farmLockDays} day${farmLockDays === 1 ? "" : "s"} (set by creator)` }]
             : []),
@@ -745,6 +751,28 @@ function DepositModal({ farmId, stakeToken, symbol, decimals, userBalance, onClo
               className="w-full bg-transparent rounded-xl px-4 py-3 font-grotesk text-[20px] outline-none"
               style={{ color: "#FFFFFF", border: "1px solid rgba(139,92,246,0.3)", background: "rgba(139,92,246,0.06)" }} />
           </div>
+
+          {parsedAmount > 0n && (
+            <div
+              className="rounded-xl px-4 py-3 space-y-1.5"
+              style={{ background: "rgba(139,92,246,0.06)", border: "1px solid rgba(139,92,246,0.18)" }}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-mono text-[10px] uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.5)" }}>You stake</span>
+                <span className="font-mono text-[11px]" style={{ color: "rgba(255,255,255,0.9)" }}>
+                  {Number(formatUnits(stakedNet, decimals)).toLocaleString()} {symbol}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-mono text-[10px] uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.5)" }}>
+                  Platform fee ({formatFeePercent()})
+                </span>
+                <span className="font-mono text-[11px]" style={{ color: "rgba(255,255,255,0.9)" }}>
+                  {Number(formatUnits(depositFee, decimals)).toLocaleString()} {symbol}
+                </span>
+              </div>
+            </div>
+          )}
 
           {farmLockDays > 0 && (
             <p className="font-mono text-[10px] leading-relaxed" style={{ color: "rgba(255,255,255,0.5)" }}>

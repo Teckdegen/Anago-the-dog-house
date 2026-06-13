@@ -21,6 +21,10 @@ export const VESTING_NFT_ADDRESS = addr(
   "NEXT_PUBLIC_VESTING_NFT_ADDRESS",
   MAINNET_DEPLOYMENTS.vestingNFT,
 );
+export const OTC_MARKET_ADDRESS = addr(
+  "NEXT_PUBLIC_OTC_MARKET_ADDRESS",
+  MAINNET_DEPLOYMENTS.otcMarket,
+);
 
 export const EXPLORER_BASE = "https://monadexplorer.com";
 

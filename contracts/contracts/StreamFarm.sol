@@ -67,6 +67,8 @@ contract StreamFarm is ERC721, Ownable2Step, ReentrancyGuard {
 
     uint256 public nextTokenId;
     uint256 public constant BASIS_POINTS = 10000;
+    uint256 public platformFeeBps = 75;
+    uint256 public constant MAX_FEE = 1000;
     uint256 public constant PRECISION = 1e36;
     /// @dev Max boost multiplier (5x) — prevents admin from setting extreme tiers
     uint256 public constant MAX_BOOST_MULTIPLIER = 5e18;
@@ -100,6 +102,9 @@ contract StreamFarm is ERC721, Ownable2Step, ReentrancyGuard {
     event AdminRemoved(address indexed admin);
     event FarmOperatorUpdated(address indexed operator, bool allowed);
     event EmergencyWithdrawn(uint256 indexed tokenId, uint256 indexed farmId, address indexed user, uint256 amount);
+    event PlatformFeeCollected(address indexed token, uint256 fee);
+    event FeeUpdated(uint256 newFeeBps);
+    event EarlyPenaltyCollected(uint256 indexed farmId, address indexed token, uint256 penalty);
 
     // ═══════════════════════════════════════════════════════════════════════
     //                          MODIFIERS
@@ -171,6 +176,12 @@ contract StreamFarm is ERC721, Ownable2Step, ReentrancyGuard {
 
     function isFarmOperator(address account) external view returns (bool) {
         return farmOperators[account] || admins[account] || account == owner();
+    }
+
+    function setPlatformFee(uint256 newFeeBps) external onlyOwner {
+        require(newFeeBps <= MAX_FEE, "Fee too high");
+        platformFeeBps = newFeeBps;
+        emit FeeUpdated(newFeeBps);
     }
 
     function getFarmCreator(uint256 farmId) external view returns (address) {
@@ -245,9 +256,11 @@ contract StreamFarm is ERC721, Ownable2Step, ReentrancyGuard {
         rewardToken.safeTransferFrom(msg.sender, address(this), totalBudget);
         uint256 received = rewardToken.balanceOf(address(this)) - balBefore;
         require(received > 0, "Zero received");
+        uint256 netBudget = _applyPlatformFee(address(rewardToken), received);
+        require(netBudget > 0, "Budget too small after fee");
 
         uint256 duration = endTime - startTime;
-        uint256 rewardRate = (received * 1e18) / duration;
+        uint256 rewardRate = (netBudget * 1e18) / duration;
 
         farmRewards[farmId].push(RewardStream({
             token: rewardToken,
@@ -256,7 +269,7 @@ contract StreamFarm is ERC721, Ownable2Step, ReentrancyGuard {
             endTime: endTime,
             lastUpdateTime: startTime,
             accRewardPerShare: 0,
-            totalBudget: received,
+            totalBudget: netBudget,
             totalDistributed: 0,
             totalClaimed: 0
         }));
@@ -321,6 +334,8 @@ contract StreamFarm is ERC721, Ownable2Step, ReentrancyGuard {
         farm.stakeToken.safeTransferFrom(msg.sender, address(this), amount);
         uint256 received = farm.stakeToken.balanceOf(address(this)) - balBefore;
         require(received > 0, "Zero received");
+        uint256 stakedAmount = _applyPlatformFee(address(farm.stakeToken), received);
+        require(stakedAmount > 0, "Amount too small after fee");
 
         // Calculate boost — farm lock duration is a floor; tier cannot shorten it
         uint256 boost = 1e18; // base 1x
@@ -344,13 +359,13 @@ contract StreamFarm is ERC721, Ownable2Step, ReentrancyGuard {
             }
         }
 
-        uint256 shares = (received * boost) / 1e18;
+        uint256 shares = (stakedAmount * boost) / 1e18;
 
         // Mint NFT position
         tokenId = nextTokenId++;
         positions[tokenId] = Position({
             farmId: farmId,
-            amount: received,
+            amount: stakedAmount,
             shares: shares,
             depositTime: block.timestamp,
             lockExpiry: lockExpiry,
@@ -365,10 +380,10 @@ contract StreamFarm is ERC721, Ownable2Step, ReentrancyGuard {
 
         // Update farm totals
         farm.totalShares += shares;
-        farm.totalStaked += received;
+        farm.totalStaked += stakedAmount;
 
         _mint(msg.sender, tokenId);
-        emit Deposited(tokenId, farmId, msg.sender, received, shares);
+        emit Deposited(tokenId, farmId, msg.sender, stakedAmount, shares);
     }
 
     /**
@@ -416,7 +431,11 @@ contract StreamFarm is ERC721, Ownable2Step, ReentrancyGuard {
         uint256 userAmount = amount - penalty;
         farm.stakeToken.safeTransfer(msg.sender, userAmount);
 
-        // Penalty stays in contract (can be recovered by admin)
+        if (penalty > 0) {
+            farm.stakeToken.safeTransfer(owner(), penalty);
+            emit EarlyPenaltyCollected(pos.farmId, address(farm.stakeToken), penalty);
+        }
+
         emit Withdrawn(tokenId, pos.farmId, msg.sender, userAmount, penalty);
     }
 
@@ -456,6 +475,11 @@ contract StreamFarm is ERC721, Ownable2Step, ReentrancyGuard {
 
         uint256 userAmount = amount - penalty;
         farm.stakeToken.safeTransfer(msg.sender, userAmount);
+
+        if (penalty > 0) {
+            farm.stakeToken.safeTransfer(owner(), penalty);
+            emit EarlyPenaltyCollected(pos.farmId, address(farm.stakeToken), penalty);
+        }
 
         emit EmergencyWithdrawn(tokenId, pos.farmId, msg.sender, userAmount);
     }
@@ -608,7 +632,7 @@ contract StreamFarm is ERC721, Ownable2Step, ReentrancyGuard {
     // ═══════════════════════════════════════════════════════════════════════
 
     /**
-     * @notice Recover penalty tokens or accidentally sent tokens (never user stake/reward escrow).
+     * @notice Recover accidentally sent tokens (never user stake/reward escrow).
      */
     function recoverTokens(IERC20 token, uint256 amount) external onlyAdmin {
         uint256 recoverable = _recoverableBalance(token);
@@ -651,6 +675,15 @@ contract StreamFarm is ERC721, Ownable2Step, ReentrancyGuard {
     // ═══════════════════════════════════════════════════════════════════════
     //                          INTERNAL
     // ═══════════════════════════════════════════════════════════════════════
+
+    function _applyPlatformFee(address token, uint256 received) internal returns (uint256 net) {
+        uint256 fee = (received * platformFeeBps) / BASIS_POINTS;
+        net = received - fee;
+        if (fee > 0) {
+            IERC20(token).safeTransfer(owner(), fee);
+            emit PlatformFeeCollected(token, fee);
+        }
+    }
 
     function _updateFarmRewards(uint256 farmId) internal {
         uint256 rewardCount = farmRewards[farmId].length;

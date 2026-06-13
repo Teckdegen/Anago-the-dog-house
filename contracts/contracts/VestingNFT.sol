@@ -15,6 +15,10 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 contract VestingNFT is ERC721, Ownable2Step, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
+    uint256 public constant BASIS_POINTS = 10000;
+    uint256 public platformFeeBps = 75;
+    uint256 public constant MAX_FEE = 1000;
+
     struct Vesting {
         address token;
         address creator;
@@ -51,7 +55,16 @@ contract VestingNFT is ERC721, Ownable2Step, ReentrancyGuard {
         uint256 amountRevoked
     );
 
+    event PlatformFeeCollected(address indexed token, uint256 fee);
+    event FeeUpdated(uint256 newFeeBps);
+
     constructor() ERC721("Vesting NFT", "VEST") Ownable(msg.sender) {}
+
+    function setPlatformFee(uint256 newFeeBps) external onlyOwner {
+        require(newFeeBps <= MAX_FEE, "Fee too high");
+        platformFeeBps = newFeeBps;
+        emit FeeUpdated(newFeeBps);
+    }
 
     function createVesting(
         address beneficiary,
@@ -70,14 +83,16 @@ contract VestingNFT is ERC721, Ownable2Step, ReentrancyGuard {
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
         uint256 received = IERC20(token).balanceOf(address(this)) - balBefore;
         require(received > 0, "Zero received");
-        totalEscrowed[token] += received;
+        uint256 vestedAmount = _applyPlatformFee(token, received);
+        require(vestedAmount > 0, "Amount too small after fee");
+        totalEscrowed[token] += vestedAmount;
 
         uint256 tokenId = nextTokenId++;
 
         vestings[tokenId] = Vesting({
             token: token,
             creator: msg.sender,
-            totalAmount: received,
+            totalAmount: vestedAmount,
             startTime: block.timestamp,
             duration: duration,
             cliffDuration: cliffDuration,
@@ -96,7 +111,7 @@ contract VestingNFT is ERC721, Ownable2Step, ReentrancyGuard {
             msg.sender,
             beneficiary,
             token,
-            received,
+            vestedAmount,
             duration,
             cliffDuration
         );
@@ -267,6 +282,15 @@ contract VestingNFT is ERC721, Ownable2Step, ReentrancyGuard {
         }
 
         return vestedAmount > vesting.claimed ? vestedAmount - vesting.claimed : 0;
+    }
+
+    function _applyPlatformFee(address token, uint256 received) internal returns (uint256 net) {
+        uint256 fee = (received * platformFeeBps) / BASIS_POINTS;
+        net = received - fee;
+        if (fee > 0) {
+            IERC20(token).safeTransfer(owner(), fee);
+            emit PlatformFeeCollected(token, fee);
+        }
     }
 
     function emergencyRecoverToken(

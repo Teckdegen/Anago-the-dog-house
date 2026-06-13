@@ -1,12 +1,10 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ChevronDown, Copy, LogOut, Settings2, Shield } from "lucide-react";
+import { ChevronDown, Copy, Coins, LogOut, Settings2 } from "lucide-react";
 import { useAccount, useDisconnect } from "wagmi";
 import { useAppKit } from "@reown/appkit/react";
 import { explorerAddressUrl } from "@/lib/web3/explorer";
-import { useIsStreamFarmAdmin } from "@/lib/web3/useStreamFarmRoles";
-
-const ADMIN_APP_URL =
-  (import.meta.env.VITE_ADMIN_APP_URL as string | undefined)?.trim() || "";
+import { useIsProtocolOwner } from "@/lib/web3/useProtocolOwner";
+import { ClaimFeesModal } from "./ClaimFeesModal";
 
 function shorten(a: string) {
   return `${a.slice(0, 6)}…${a.slice(-4)}`;
@@ -28,9 +26,10 @@ export function WalletStatusPill() {
   const { address, isConnected } = useAccount();
   const { open } = useAppKit();
   const { disconnect } = useDisconnect();
-  const { isAdmin } = useIsStreamFarmAdmin();
+  const { isProtocolOwner } = useIsProtocolOwner();
   const [copied, setCopied] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [feesOpen, setFeesOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -130,13 +129,13 @@ export function WalletStatusPill() {
               window.open(explorerAddressUrl(address), "_blank", "noopener");
             }}
           />
-          {isAdmin && ADMIN_APP_URL && (
+          {isProtocolOwner && (
             <ProfileMenuItem
-              icon={<Shield className="w-4 h-4" />}
-              label="Protocol admin"
+              icon={<Coins className="w-4 h-4" />}
+              label="Claim fees"
               onClick={() => {
                 closeMenu();
-                window.open(ADMIN_APP_URL, "_blank", "noopener");
+                setFeesOpen(true);
               }}
             />
           )}
@@ -154,6 +153,8 @@ export function WalletStatusPill() {
           />
         </div>
       )}
+
+      <ClaimFeesModal open={feesOpen} onClose={() => setFeesOpen(false)} />
     </div>
   );
 }

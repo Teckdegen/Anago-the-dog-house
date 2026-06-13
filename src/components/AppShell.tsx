@@ -2,6 +2,7 @@ import { Link, useLocation } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { LayoutDashboard, Timer, LockKeyhole, Sprout, ShoppingBag, BarChart2 } from "lucide-react";
 import { WalletStatusPill } from "./WalletStatusPill";
+import { ClaimFeesButton } from "./ClaimFeesButton";
 import { NetworkRouteBanner } from "./NetworkRouteBanner";
 import { theme } from "@/lib/theme";
 
@@ -81,7 +82,10 @@ export function AppShell({ children }: { children: ReactNode }) {
             </ul>
           </nav>
 
-          <WalletStatusPill />
+          <div className="flex items-center gap-2 shrink-0">
+            <ClaimFeesButton />
+            <WalletStatusPill />
+          </div>
         </header>
       )}
 

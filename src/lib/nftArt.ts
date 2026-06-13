@@ -2,15 +2,11 @@ import type { ContractAddresses } from "@/lib/web3/contracts";
 
 export type NftKind = "lock" | "vesting" | "farm";
 
-/**
- * Drop your artwork into `public/images/nft/` using these exact filenames.
- * Served at `/images/nft/...` — PNG, WebP, or SVG all work.
- * Recommended size: 400×250 (matches on-chain card) or square 512×512.
- */
+/** Custom NFT card art — remote URLs or `/public/images/nft/...` paths. */
 export const NFT_CUSTOM_ART: Record<NftKind, string> = {
-  lock: "/images/nft/lock.png",
-  vesting: "/images/nft/vesting.png",
-  farm: "/images/nft/farm.png",
+  lock: "https://www.image2url.com/r2/default/images/1781347039322-42a5f5ba-833a-4c23-b5bb-9b89acc99652.jpg",
+  vesting: "https://www.image2url.com/r2/default/images/1781346975174-c7be879b-3954-4651-8186-d3deab22fecd.jpg",
+  farm: "https://www.image2url.com/r2/default/images/1781347075685-1459a4e0-474e-4f97-be8c-d096d988aae7.jpg",
 };
 
 export function nftKindFromContract(

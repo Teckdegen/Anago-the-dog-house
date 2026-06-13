@@ -13,10 +13,12 @@ import {
   STREAM_FARM_ADDRESS,
   TOKEN_LOCK_ADDRESS,
   VESTING_NFT_ADDRESS,
+  OTC_MARKET_ADDRESS,
   STREAM_FARM_ABI,
   TOKEN_LOCK_ABI,
   VESTING_NFT_ABI,
 } from "@/lib/contracts";
+import { ClaimFeesSection } from "./ClaimFeesSection";
 import {
   DEFAULT_CHAIN_ID,
   EXPLORER_BASE,
@@ -25,12 +27,13 @@ import {
 import { admin } from "@/lib/theme";
 import { Card, CardTitle, Field, Btn, Msg, Err, StatCard } from "./adminUi";
 
-type NavKey = "overview" | "operators" | "admins";
+type NavKey = "overview" | "operators" | "admins" | "fees";
 
 const NAV: { key: NavKey; label: string; icon: string }[] = [
-  { key: "overview", label: "Overview", icon: "â—ˆ" },
-  { key: "operators", label: "Farm creators", icon: "â—Ž" },
-  { key: "admins", label: "Admins", icon: "âš™" },
+  { key: "overview", label: "Overview", icon: "◆" },
+  { key: "fees", label: "Claim fees", icon: "◎" },
+  { key: "operators", label: "Farm creators", icon: "◉" },
+  { key: "admins", label: "Admins", icon: "⚙" },
 ];
 
 export default function AdminDashboard() {
@@ -43,8 +46,18 @@ export default function AdminDashboard() {
     args: address ? [address] : undefined,
     query: { enabled: !!address, refetchInterval: 10_000 },
   });
+  const ownerQ = useReadContract({
+    address: STREAM_FARM_ADDRESS,
+    abi: STREAM_FARM_ABI,
+    functionName: "owner",
+    query: { enabled: !!address, refetchInterval: 15_000 },
+  });
   const isAdmin = isAdminQ.data === true;
-  const roleResolved = !address || isAdminQ.isFetched;
+  const streamOwner = ownerQ.data as string | undefined;
+  const isDeployer =
+    !!address && !!streamOwner && streamOwner.toLowerCase() === address.toLowerCase();
+  const canAccess = isAdmin || isDeployer;
+  const roleResolved = !address || (isAdminQ.isFetched && ownerQ.isFetched);
 
   return (
     <div className="min-h-screen flex" style={{ background: admin.bg }}>
@@ -102,10 +115,10 @@ export default function AdminDashboard() {
                 style={{ borderColor: admin.border, borderTopColor: admin.purple }}
               />
             </div>
-          ) : !isAdmin ? (
+          ) : !canAccess ? (
             <AccessDenied address={address} />
           ) : (
-            <Dashboard />
+            <Dashboard isDeployer={isDeployer} isAdmin={isAdmin} />
           )}
         </main>
       </div>
@@ -156,7 +169,7 @@ function AccessDenied({ address }: { address?: string }) {
   );
 }
 
-function Dashboard() {
+function Dashboard({ isDeployer, isAdmin }: { isDeployer: boolean; isAdmin: boolean }) {
   const { address } = useAccount();
   const [nav, setNav] = useState<NavKey>("overview");
 
@@ -192,7 +205,12 @@ function Dashboard() {
     Number(locksQ.data?.[0]?.result ?? locksQ.data?.[1]?.result ?? 0) || 0;
   const vestCount = Number(vestQ.data ?? 0);
 
-  const visibleNav = NAV.filter((n) => n.key !== "admins" || isOwner);
+  const visibleNav = NAV.filter((n) => {
+    if (n.key === "admins") return isOwner;
+    if (n.key === "fees") return isDeployer;
+    if (n.key === "operators") return isAdmin;
+    return true;
+  });
 
   return (
     <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
@@ -232,8 +250,8 @@ function Dashboard() {
               <StatCard label="Vestings" value={String(vestCount)} sub="Vesting schedules" />
               <StatCard
                 label="Your role"
-                value={isOwner ? "Owner" : "Admin"}
-                sub={isOwner ? "Whitelist + admins" : "Whitelist creators"}
+                value={isOwner ? "Owner" : isAdmin ? "Admin" : "Deployer"}
+                sub={isOwner ? "Whitelist + admins + fees" : isAdmin ? "Whitelist creators" : "Claim fees only"}
                 accent
               />
             </div>
@@ -252,6 +270,7 @@ function Dashboard() {
         )}
 
         {nav === "operators" && <OperatorsSection />}
+        {nav === "fees" && <ClaimFeesSection />}
         {nav === "admins" && isOwner && <AdminsSection />}
       </div>
     </div>
@@ -263,6 +282,7 @@ function ContractsPanel() {
     { label: "StreamFarm", addr: STREAM_FARM_ADDRESS },
     { label: "Token Lock", addr: TOKEN_LOCK_ADDRESS },
     { label: "Vesting NFT", addr: VESTING_NFT_ADDRESS },
+    { label: "OTC Market", addr: OTC_MARKET_ADDRESS },
   ];
   return (
     <Card>
@@ -317,8 +337,6 @@ function QuickLinksPanel() {
     </Card>
   );
 }
-
-function FarmsOverview({ farmCount, isOwner }: { farmCount: number; isOwner: boolean }) {
 
 function OperatorsSection() {
   const [addr, setAddr] = useState("");

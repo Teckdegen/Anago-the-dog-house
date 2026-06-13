@@ -12,6 +12,7 @@ import { formatUnits, parseEventLogs, parseUnits } from "viem";
 import { STREAM_FARM_ABI, CONTRACTS, ERC20_ABI } from "@/lib/web3/contracts";
 import { LIVE_CHAIN_QUERY } from "@/lib/web3/nftImage";
 import { prepareTransactionWithGas } from "@/lib/web3/gasUtils";
+import { formatFeePercent, netAfterPlatformFee, platformFeeAmount } from "@/lib/web3/platformFee";
 import { useToast } from "@/components/Toast";
 import { SuccessModal } from "@/components/SuccessModal";
 import { useTransactionSuccess } from "@/lib/web3/useTransactionSuccess";
@@ -141,7 +142,7 @@ function RewardStreamFields({
           <div className="flex-1 min-w-0">
             <FarmFieldLabel
               title="Total reward budget"
-              hint="Full amount you are funding upfront. Leave at least 1 wei in your wallet."
+              hint={`Full amount you fund upfront. A ${formatFeePercent()} platform fee is deducted in tokens; the rest streams to farmers.`}
             />
           </div>
           {token && balance > 0n && (
@@ -162,6 +163,12 @@ function RewardStreamFields({
           className={farmInput}
           style={inputStyle}
         />
+        {parsedBudget > 0n && token && (
+          <div className="mt-2 space-y-1 font-mono text-[10px]" style={{ color: "rgba(255,255,255,0.55)" }}>
+            <p>Streams to farmers: {formatUnits(netAfterPlatformFee(parsedBudget), decimals)} {token.symbol}</p>
+            <p>Platform fee ({formatFeePercent()}): {formatUnits(platformFeeAmount(parsedBudget), decimals)} {token.symbol}</p>
+          </div>
+        )}
       </div>
 
       <div className="grid sm:grid-cols-2 gap-4">
@@ -815,7 +822,7 @@ function CreateFarmForm() {
                 <div>
                   <FarmFieldLabel
                     title="Early exit penalty (%)"
-                    hint="Fee charged if users withdraw before lock ends."
+                    hint="Token penalty if users withdraw before lock ends. Collected by protocol admin, not the farm creator."
                   />
                   <input
                     inputMode="decimal"

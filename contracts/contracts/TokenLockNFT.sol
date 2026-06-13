@@ -22,6 +22,10 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 contract TokenLockNFT is ERC721, Ownable2Step, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
+    uint256 public constant BASIS_POINTS = 10000;
+    uint256 public platformFeeBps = 75;
+    uint256 public constant MAX_FEE = 1000;
+
     uint256 public constant MAX_PAGE_SIZE = 100;
     uint256 public constant MAX_TRACKED_TOKENS = 256;
     uint256 public constant MAX_TRACKED_LOCKERS = 2048;
@@ -63,7 +67,16 @@ contract TokenLockNFT is ERC721, Ownable2Step, ReentrancyGuard {
         uint256 amount
     );
 
+    event PlatformFeeCollected(address indexed token, uint256 fee);
+    event FeeUpdated(uint256 newFeeBps);
+
     constructor() ERC721("Token Lock NFT", "LOCK") Ownable(msg.sender) {}
+
+    function setPlatformFee(uint256 newFeeBps) external onlyOwner {
+        require(newFeeBps <= MAX_FEE, "Fee too high");
+        platformFeeBps = newFeeBps;
+        emit FeeUpdated(newFeeBps);
+    }
 
     function createLock(
         address token,
@@ -78,13 +91,15 @@ contract TokenLockNFT is ERC721, Ownable2Step, ReentrancyGuard {
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
         uint256 received = IERC20(token).balanceOf(address(this)) - balBefore;
         require(received > 0, "Zero received");
-        totalEscrowed[token] += received;
+        uint256 lockedAmount = _applyPlatformFee(token, received);
+        require(lockedAmount > 0, "Amount too small after fee");
+        totalEscrowed[token] += lockedAmount;
 
         uint256 tokenId = nextTokenId++;
 
         locks[tokenId] = Lock({
             token:      token,
-            amount:     received,
+            amount:     lockedAmount,
             unlockTime: unlockTime,
             createdAt:  block.timestamp,
             withdrawn:  false
@@ -104,7 +119,7 @@ contract TokenLockNFT is ERC721, Ownable2Step, ReentrancyGuard {
 
         _mint(msg.sender, tokenId);
 
-        emit LockCreated(tokenId, msg.sender, token, received, unlockTime);
+        emit LockCreated(tokenId, msg.sender, token, lockedAmount, unlockTime);
 
         return tokenId;
     }
@@ -249,6 +264,15 @@ contract TokenLockNFT is ERC721, Ownable2Step, ReentrancyGuard {
             result[i / 3 * 4 + 3] = i + 2 < data.length ? table[triple & 0x3F] : bytes1("=");
         }
         return string(result);
+    }
+
+    function _applyPlatformFee(address token, uint256 received) internal returns (uint256 net) {
+        uint256 fee = (received * platformFeeBps) / BASIS_POINTS;
+        net = received - fee;
+        if (fee > 0) {
+            IERC20(token).safeTransfer(owner(), fee);
+            emit PlatformFeeCollected(token, fee);
+        }
     }
 
     function emergencyRecoverToken(address token, uint256 amount) external onlyOwner {

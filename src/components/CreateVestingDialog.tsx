@@ -9,6 +9,7 @@ import { useContractAddresses } from "@/lib/web3/hooks";
 import { VESTING_NFT_ABI } from "@/lib/web3/contracts";
 import { ERC20_ABI, type TokenInfo } from "@/lib/web3/tokens";
 import { formatAmount } from "@/lib/web3/format";
+import { formatFeePercent, netAfterPlatformFee, platformFeeAmount } from "@/lib/web3/platformFee";
 import { prepareTransactionWithGas } from "@/lib/web3/gasUtils";
 import { useToast } from "./Toast";
 
@@ -43,6 +44,8 @@ export function CreateVestingDialog({ open, onClose }: Props) {
     if (!token || !amount) return 0n;
     try { return parseUnits(amount, token.decimals); } catch { return 0n; }
   })();
+  const vestFee = platformFeeAmount(parsedAmount);
+  const vestedNet = netAfterPlatformFee(parsedAmount);
 
   const allowanceQ = useReadContract({
     address: token?.address,
@@ -250,6 +253,19 @@ export function CreateVestingDialog({ open, onClose }: Props) {
                 />
               </div>
 
+              {parsedAmount > 0n && (
+                <div
+                  className="rounded-xl px-4 py-3 space-y-1.5"
+                  style={{ background: "rgba(139,92,246,0.06)", border: "1px solid rgba(139,92,246,0.18)" }}
+                >
+                  <FeeRow label="You vest" value={`${formatAmount(vestedNet, token.decimals)} ${token.symbol}`} />
+                  <FeeRow
+                    label={`Platform fee (${formatFeePercent()})`}
+                    value={`${formatAmount(vestFee, token.decimals)} ${token.symbol}`}
+                  />
+                </div>
+              )}
+
               {/* Step 3 — Beneficiary */}
               <div>
                 <Label>3. Beneficiary</Label>
@@ -406,6 +422,19 @@ function Label({ children }: { children: React.ReactNode }) {
     <p className="font-mono text-[9px] uppercase tracking-[0.18em] mb-2" style={{ color: "rgba(255,255,255,0.55)" }}>
       {children}
     </p>
+  );
+}
+
+function FeeRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="font-mono text-[10px] uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.5)" }}>
+        {label}
+      </span>
+      <span className="font-mono text-[11px] text-right" style={{ color: "rgba(255,255,255,0.9)" }}>
+        {value}
+      </span>
+    </div>
   );
 }
 
