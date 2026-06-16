@@ -290,7 +290,7 @@ function VestingRowUI({
       <div className="flex items-center gap-3">
         {/* Token icon + name */}
         <div className="flex items-center gap-2.5 min-w-0 flex-1">
-          <TokenIcon address={vesting.token} symbol={symbol} size={28} logoUrl={logoUrl} />
+          <TokenIcon address={vesting.token} symbol={symbol} size={44} logoUrl={logoUrl} />
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <p className="font-grotesk uppercase text-[12px] tracking-wider truncate" style={{ color: "#FFFFFF" }}>{symbol}</p>

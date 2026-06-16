@@ -209,7 +209,7 @@ function LockRow({
         <TokenIcon
           address={token}
           symbol={symbol}
-          size={28}
+          size={44}
           logoUrl={logoUrl}
         />
         <div className="min-w-0">
