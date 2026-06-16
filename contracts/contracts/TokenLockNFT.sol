@@ -218,27 +218,13 @@ contract TokenLockNFT is ERC721, Ownable2Step, ReentrancyGuard {
         string memory unlockStr = _toString(lock.unlockTime);
         string memory status = lock.withdrawn ? "WITHDRAWN" : (block.timestamp >= lock.unlockTime ? "UNLOCKED" : "LOCKED");
 
-        string memory svg = string(abi.encodePacked(
-            '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="250" viewBox="0 0 400 250">',
-            '<defs><linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#0D0B14"/><stop offset="100%" style="stop-color:#1a1528"/></linearGradient></defs>',
-            '<rect width="400" height="250" fill="url(#bg)" rx="16"/>',
-            '<rect x="1" y="1" width="398" height="248" rx="15" fill="none" stroke="#9B7FD4" stroke-opacity="0.4"/>',
-            '<text x="24" y="36" font-family="monospace" font-size="10" fill="#9B7FD4" opacity="0.6">TOKEN LOCK</text>',
-            '<text x="24" y="70" font-family="sans-serif" font-size="22" font-weight="bold" fill="#EDE0FF">Lock #', idStr, '</text>',
-            '<text x="24" y="100" font-family="monospace" font-size="12" fill="#C4A8F0">', status, '</text>',
-            '<rect x="24" y="120" width="352" height="1" fill="#9B7FD4" opacity="0.2"/>',
-            '<text x="24" y="155" font-family="monospace" font-size="11" fill="#9B7FD4">AMOUNT</text>',
-            '<text x="24" y="175" font-family="sans-serif" font-size="18" fill="#EDE0FF">', amountStr, ' tokens</text>',
-            '<text x="24" y="215" font-family="monospace" font-size="11" fill="#9B7FD4">UNLOCK TIME</text>',
-            '<text x="24" y="235" font-family="sans-serif" font-size="14" fill="#EDE0FF">', unlockStr, '</text>',
-            '<circle cx="360" cy="36" r="16" fill="#9B7FD4" opacity="0.2"/><text x="352" y="41" font-family="sans-serif" font-size="14" fill="#C4A8F0">&#x1F512;</text>',
-            '</svg>'
-        ));
+        // Hosted artwork shown on marketplaces (OpenSea, etc.). Square, high-res image.
+        string memory image = "https://www.image2url.com/r2/default/images/1781347039322-42a5f5ba-833a-4c23-b5bb-9b89acc99652.jpg";
 
         string memory json = string(abi.encodePacked(
             '{"name":"Token Lock #', idStr,
             '","description":"', amountStr, ' tokens locked | Status: ', status,
-            '","image":"data:image/svg+xml;base64,', _base64Encode(bytes(svg)),
+            '","image":"', image,
             '","attributes":[{"trait_type":"Amount","value":"', amountStr,
             '"},{"trait_type":"Status","value":"', status,
             '"},{"trait_type":"Unlock Time","value":"', unlockStr, '"}]}'

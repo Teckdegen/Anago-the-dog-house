@@ -209,33 +209,13 @@ contract VestingNFT is ERC721, Ownable2Step, ReentrancyGuard {
         string memory pctStr = _toString(pct);
         string memory status = vesting.revoked ? "REVOKED" : (vesting.claimed >= vesting.totalAmount ? "COMPLETE" : "VESTING");
 
-        string memory svg = string(abi.encodePacked(
-            '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="250" viewBox="0 0 400 250">',
-            '<defs><linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#0D0B14"/><stop offset="100%" style="stop-color:#1a1528"/></linearGradient></defs>',
-            '<rect width="400" height="250" fill="url(#bg)" rx="16"/>',
-            '<rect x="1" y="1" width="398" height="248" rx="15" fill="none" stroke="#6B5CE7" stroke-opacity="0.4"/>',
-            '<text x="24" y="36" font-family="monospace" font-size="10" fill="#6B5CE7" opacity="0.6">VESTING SCHEDULE</text>',
-            '<text x="24" y="70" font-family="sans-serif" font-size="22" font-weight="bold" fill="#EDE0FF">Vesting #', idStr, '</text>',
-            '<text x="24" y="100" font-family="monospace" font-size="12" fill="#C4A8F0">', status, '</text>',
-            '<rect x="24" y="120" width="352" height="1" fill="#6B5CE7" opacity="0.2"/>',
-            '<text x="24" y="150" font-family="monospace" font-size="11" fill="#6B5CE7">TOTAL</text>',
-            '<text x="24" y="170" font-family="sans-serif" font-size="18" fill="#EDE0FF">', totalStr, ' tokens</text>',
-            '<text x="240" y="150" font-family="monospace" font-size="11" fill="#6B5CE7">CLAIMED</text>',
-            '<text x="240" y="170" font-family="sans-serif" font-size="18" fill="#EDE0FF">', claimedStr, '</text>'
-        ));
-
-        svg = string(abi.encodePacked(svg,
-            '<rect x="24" y="200" width="352" height="8" rx="4" fill="#1a1528" stroke="#6B5CE7" stroke-opacity="0.2"/>',
-            '<rect x="24" y="200" width="', _toString(pct * 352 / 100), '" height="8" rx="4" fill="#6B5CE7"/>',
-            '<text x="24" y="230" font-family="monospace" font-size="11" fill="#C4A8F0">', pctStr, '% claimed</text>',
-            '<circle cx="360" cy="36" r="16" fill="#6B5CE7" opacity="0.2"/><text x="353" y="41" font-family="sans-serif" font-size="14" fill="#C4A8F0">&#x23F3;</text>',
-            '</svg>'
-        ));
+        // Hosted artwork shown on marketplaces (OpenSea, etc.). Square, high-res image.
+        string memory image = "https://www.image2url.com/r2/default/images/1781346975174-c7be879b-3954-4651-8186-d3deab22fecd.jpg";
 
         string memory json = string(abi.encodePacked(
             '{"name":"Vesting #', idStr,
             '","description":"', totalStr, ' tokens vesting | ', pctStr, '% claimed | Status: ', status,
-            '","image":"data:image/svg+xml;base64,', _base64Encode(bytes(svg)),
+            '","image":"', image,
             '","attributes":[{"trait_type":"Total","value":"', totalStr,
             '"},{"trait_type":"Claimed","value":"', claimedStr,
             '"},{"trait_type":"Progress","value":"', pctStr, '%"},{"trait_type":"Status","value":"', status, '"}]}'
