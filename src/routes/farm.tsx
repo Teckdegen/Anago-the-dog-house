@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect, useRef, useMemo, type ReactNode } from "react";
-import { Search, Sprout, X, Wallet, DollarSign, Gift, ExternalLink, Globe, Send, UserRound } from "lucide-react";
+import { Search, Sprout, X, Wallet, DollarSign, Gift, ExternalLink, Globe, Send, UserRound, Users } from "lucide-react";
 import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt, useChainId, usePublicClient } from "wagmi";
 import { prepareTransactionWithGas } from "@/lib/web3/gasUtils";
 import { LIVE_CHAIN_QUERY } from "@/lib/web3/nftImage";
@@ -28,6 +28,7 @@ import { SharedPositionBanner } from "@/components/SharedPositionBanner";
 import { parsePositionSearchParam, validatePositionSearch } from "@/lib/positionShare";
 import { useSharedFarmPositionExists } from "@/lib/web3/useSharedPositions";
 import { formatFeePercent, netAfterPlatformFee, platformFeeAmount } from "@/lib/web3/platformFee";
+import { useFarmStakerCounts } from "@/lib/web3/useFarmStakerCounts";
 
 export const Route = createFileRoute("/farm")({
   validateSearch: validatePositionSearch,
@@ -214,6 +215,8 @@ function FarmPage() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 function AllFarmsTab({ farmCount }: { farmCount: number }) {
+  const { getStakerCount, loading: stakersLoading } = useFarmStakerCounts();
+
   if (farmCount === 0) {
     return (
       <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(139,92,246,0.35)" }}>
@@ -231,7 +234,14 @@ function AllFarmsTab({ farmCount }: { farmCount: number }) {
   }
   return (
     <div className="w-full space-y-5">
-      {Array.from({ length: farmCount }, (_, i) => <FarmCard key={i} farmId={i} />)}
+      {Array.from({ length: farmCount }, (_, i) => (
+        <FarmCard
+          key={i}
+          farmId={i}
+          stakerCount={getStakerCount(i)}
+          stakersLoading={stakersLoading}
+        />
+      ))}
     </div>
   );
 }
@@ -325,7 +335,15 @@ function FarmDetailGridStat({
   );
 }
 
-function FarmCard({ farmId }: { farmId: number }) {
+function FarmCard({
+  farmId,
+  stakerCount,
+  stakersLoading,
+}: {
+  farmId: number;
+  stakerCount?: number;
+  stakersLoading?: boolean;
+}) {
   const [showDeposit, setShowDeposit] = useState(false);
   const contracts = useContracts();
 
@@ -365,6 +383,8 @@ function FarmCard({ farmId }: { farmId: number }) {
         rewardCount={rewardCount}
         showDeposit={showDeposit}
         setShowDeposit={setShowDeposit}
+        stakerCount={stakerCount}
+        stakersLoading={stakersLoading}
       />
     </div>
   );
@@ -379,6 +399,8 @@ function FarmCardInner({
   rewardCount,
   showDeposit,
   setShowDeposit,
+  stakerCount,
+  stakersLoading,
 }: {
   farmId: number;
   stakeToken: `0x${string}`;
@@ -388,6 +410,8 @@ function FarmCardInner({
   rewardCount: number;
   showDeposit: boolean;
   setShowDeposit: (v: boolean) => void;
+  stakerCount?: number;
+  stakersLoading?: boolean;
 }) {
   const { address } = useAccount();
   const contracts = useContracts();
@@ -492,9 +516,15 @@ function FarmCardInner({
         </div>
 
         {/* Farm stats — full page width */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 w-full">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 w-full">
           <FarmDetailGridStat icon={<DollarSign className="w-3.5 h-3.5" />} label="TVL" value={tvlUsd > 0 ? formatUsdTable(tvlUsd) : "—"} accent />
           <FarmDetailGridStat icon={<Gift className="w-3.5 h-3.5" />} label="Rewards Available" value={rewardsFormatted} symbol={symbol} accent />
+          <FarmDetailGridStat
+            icon={<Users className="w-3.5 h-3.5" />}
+            label="Stakers"
+            value={stakersLoading ? "…" : String(stakerCount ?? 0)}
+            accent
+          />
           <FarmDetailGridStat icon={<Wallet className="w-3.5 h-3.5" />} label="Your Balance" value={address ? balanceFormatted : "—"} symbol={address ? symbol : undefined} />
         </div>
 

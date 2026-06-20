@@ -192,7 +192,7 @@ function LockRow({
       />
 
       <div
-        className="grid sm:grid-cols-[2fr_1fr_1fr_1fr_1fr_100px] grid-cols-2 gap-2 px-5 py-3.5 items-center hover:bg-[rgba(139,92,246,0.04)] transition-colors cursor-pointer"
+        className="grid sm:grid-cols-[2fr_1fr_1fr_1fr_1fr_120px] grid-cols-2 gap-3 px-6 py-4 items-center hover:bg-[rgba(139,92,246,0.04)] transition-colors cursor-pointer"
         style={{ borderBottom: isLast ? "none" : "1px solid rgba(139,92,246,0.15)" }}
         onClick={openExplorer}
         onKeyDown={(e) => {
@@ -205,30 +205,30 @@ function LockRow({
         tabIndex={0}
         title="View on MonadScan"
       >
-      <div className="flex items-center gap-2.5">
+      <div className="flex items-center gap-3">
         <TokenIcon
           address={token}
           symbol={symbol}
-          size={44}
+          size={52}
           logoUrl={logoUrl}
         />
         <div className="min-w-0">
-          <p className="font-grotesk uppercase text-[12px] tracking-wider truncate" style={{ color: "#FFFFFF" }}>{symbol}</p>
-          <p className="font-mono text-[9px] truncate" style={{ color: "rgba(255,255,255,0.5)" }}>
+          <p className="font-grotesk uppercase text-[14px] tracking-wider truncate" style={{ color: "#FFFFFF" }}>{symbol}</p>
+          <p className="font-mono text-[10px] truncate" style={{ color: "rgba(255,255,255,0.5)" }}>
             #{lockId.toString()} · {shortAddr(owner)}{isOwner ? " (you)" : ""}
           </p>
         </div>
       </div>
-      <div className="text-right font-grotesk text-[12px] tabular-nums" style={{ color: "rgba(255,255,255,0.9)" }}>
+      <div className="text-right font-grotesk text-[14px] tabular-nums" style={{ color: "rgba(255,255,255,0.9)" }}>
         {formatAmount(amount, decimals)}
       </div>
-      <div className="hidden sm:block text-right font-mono text-[10px] tabular-nums" style={{ color: "rgba(255,255,255,0.75)" }}>
+      <div className="hidden sm:block text-right font-mono text-[11px] tabular-nums" style={{ color: "rgba(255,255,255,0.75)" }}>
         {priceLoading ? "…" : lockUsd > 0 ? formatUsdTable(lockUsd) : "—"}
       </div>
-      <div className="hidden sm:block text-right font-mono text-[10px]" style={{ color: "rgba(255,255,255,0.6)" }}>
+      <div className="hidden sm:block text-right font-mono text-[11px]" style={{ color: "rgba(255,255,255,0.6)" }}>
         {formatDate(unlockAt)}
       </div>
-      <div className="hidden sm:block text-right font-mono text-[10px]" style={{ color: unlocked ? "#A78BFA" : "rgba(255,255,255,0.6)" }}>
+      <div className="hidden sm:block text-right font-mono text-[11px]" style={{ color: unlocked ? "#A78BFA" : "rgba(255,255,255,0.6)" }}>
         {timeUntil(unlockAt)}
       </div>
       <div className="col-span-2 sm:col-span-1 flex sm:justify-end items-center gap-2">
@@ -240,7 +240,7 @@ function LockRow({
             type="button"
             onClick={(e) => { stopPositionRowClick(e); void doWithdraw(); }}
             disabled={tx.isPending || rcpt.isLoading}
-            className="px-4 py-2 rounded-full font-grotesk text-[10px] uppercase tracking-wider disabled:opacity-50 shrink-0"
+            className="px-5 py-2.5 rounded-full font-grotesk text-[11px] uppercase tracking-wider disabled:opacity-50 shrink-0"
             style={{
               background: "rgba(139,92,246,0.35)",
               color: "#FFFFFF",
@@ -513,10 +513,10 @@ function LockPage() {
       <div className="max-w-[1280px] mx-auto px-5 sm:px-8 lg:px-14 pt-8 pb-20">
         <div className="flex items-center justify-between gap-3 mb-7">
           <div>
-            <h1 className="font-grotesk uppercase text-[22px] sm:text-[28px] leading-none tracking-tight" style={{ color: "#FFFFFF" }}>
+            <h1 className="font-grotesk uppercase text-[26px] sm:text-[34px] leading-none tracking-tight" style={{ color: "#FFFFFF" }}>
               Token Lock
             </h1>
-            <p className="font-mono text-[10px] mt-1 tracking-wide" style={{ color: "rgba(255,255,255,0.55)" }}>
+            <p className="font-mono text-[11px] mt-1.5 tracking-wide" style={{ color: "rgba(255,255,255,0.55)" }}>
               Time-based locks · transparent on-chain unlock schedules
             </p>
           </div>
@@ -558,7 +558,7 @@ function LockPage() {
               <button
                 key={t}
                 onClick={() => setActiveTab(t)}
-                className="px-4 py-1.5 rounded-full font-grotesk text-[11px] uppercase tracking-wider transition whitespace-nowrap inline-flex items-center gap-1.5"
+                className="px-5 py-2 rounded-full font-grotesk text-[12px] uppercase tracking-wider transition whitespace-nowrap inline-flex items-center gap-1.5"
                 style={
                   activeTab === t
                     ? { background: "rgba(139,92,246,0.35)", color: "#FFFFFF", border: "1px solid rgba(139,92,246,0.6)" }
@@ -579,16 +579,16 @@ function LockPage() {
           </div>
           {showSearch && (
             <div
-              className="flex items-center gap-2 px-3 py-2 rounded-full"
+              className="flex items-center gap-2.5 px-4 py-2.5 rounded-full"
               style={{ background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.25)" }}
             >
-              <Search className="w-3.5 h-3.5" style={{ color: "rgba(255,255,255,0.5)" }} strokeWidth={1.5} />
+              <Search className="w-4 h-4" style={{ color: "rgba(255,255,255,0.5)" }} strokeWidth={1.5} />
               <input
                 type="text"
                 placeholder="Search by token or address…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="bg-transparent font-mono text-[11px] outline-none w-40 sm:w-56"
+                className="bg-transparent font-mono text-[12px] outline-none w-44 sm:w-64"
                 style={{ color: "#FFFFFF" }}
               />
             </div>
@@ -611,9 +611,9 @@ function LockPage() {
           activeTab === "Unlocking Soon") && (
           <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(139,92,246,0.35)" }}>
             <div
-              className="hidden sm:grid px-5 py-3 text-[9px] font-mono uppercase tracking-[0.2em]"
+              className="hidden sm:grid px-6 py-3.5 text-[10px] font-mono uppercase tracking-[0.2em]"
               style={{
-                gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr 100px",
+                gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr 120px",
                 borderBottom: "1px solid rgba(139,92,246,0.2)",
                 background: "rgba(139,92,246,0.08)",
                 color: "rgba(255,255,255,0.6)",

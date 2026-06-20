@@ -12,8 +12,7 @@ import { shortAddr } from "@/lib/web3/format";
 import { prepareTransactionWithGas } from "@/lib/web3/gasUtils";
 import { LIVE_CHAIN_QUERY } from "@/lib/web3/nftImage";
 import { NftImage } from "@/components/NftImage";
-import { useOpenNftExplorer, stopPositionRowClick } from "@/components/NftExplorerLink";
-import { explorerNftUrl } from "@/lib/web3/explorer";
+import { stopPositionRowClick } from "@/components/NftExplorerLink";
 import { TokenPicker } from "@/components/TokenPicker";
 import { parseListingTuple } from "@/lib/web3/parseOtc";
 
@@ -51,8 +50,8 @@ function OTCPage() {
       <div className="max-w-[1280px] mx-auto px-5 sm:px-8 lg:px-14 pt-8 pb-20">
         <div className="flex items-start justify-between gap-4 mb-7">
           <div>
-            <h1 className="font-grotesk uppercase text-[22px] sm:text-[28px] leading-none tracking-tight" style={{ color: "#FFFFFF" }}>OTC Market</h1>
-            <p className="font-mono text-[10px] mt-1 tracking-wide" style={{ color: "rgba(255,255,255,0.55)" }}>
+            <h1 className="font-grotesk uppercase text-[26px] sm:text-[34px] leading-none tracking-tight" style={{ color: "#FFFFFF" }}>OTC Market</h1>
+            <p className="font-mono text-[11px] mt-1.5 tracking-wide" style={{ color: "rgba(255,255,255,0.55)" }}>
               Buy and sell locked positions · Set your price · Peer-to-peer
             </p>
           </div>
@@ -61,7 +60,7 @@ function OTCPage() {
         <div className="inline-flex items-center gap-0.5 p-1 rounded-full mb-6" style={{ background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.25)" }}>
           {TABS.map((t) => (
             <button key={t} onClick={() => setActiveTab(t)}
-              className="px-4 py-1.5 rounded-full font-grotesk text-[11px] uppercase tracking-wider transition whitespace-nowrap"
+              className="px-5 py-2 rounded-full font-grotesk text-[12px] uppercase tracking-wider transition whitespace-nowrap"
               style={activeTab === t ? { background: "rgba(139,92,246,0.35)", color: "#FFFFFF", border: "1px solid rgba(139,92,246,0.6)" } : { color: "rgba(255,255,255,0.5)" }}>
               {t}
             </button>
@@ -107,7 +106,7 @@ function BrowseTab({ totalListings }: { totalListings: number }) {
         subtext={txSuccess?.subtext ?? ""}
         rows={txSuccess?.rows}
       />
-      <div className="space-y-3">
+      <div className="space-y-4">
         {activeIds.map((id) => (
           <ListingCard key={id.toString()} listingId={id} showBuy onSuccess={setTxSuccess} />
         ))}
@@ -170,7 +169,7 @@ function MyListingsTab() {
         subtext={txSuccess?.subtext ?? ""}
         rows={txSuccess?.rows}
       />
-      <div className="space-y-3">
+      <div className="space-y-4">
         <PendingPaymentsPanel onSuccess={setTxSuccess} />
         {activeMyIds.map((id) => (
           <ListingCard key={id.toString()} listingId={id} showUnlist onSuccess={setTxSuccess} />
@@ -292,10 +291,6 @@ function ListingCard({
     && BigInt(vestingData.claimed ?? 0) >= BigInt(vestingData.totalAmount);
   const lockWithdrawn = isLockNft && !!lockData?.withdrawn;
   const listingInvalid = vestingRevoked || vestingComplete || lockWithdrawn;
-  const openExplorer = useOpenNftExplorer(
-    (listing?.nftContract ?? "0x0000000000000000000000000000000000000000") as `0x${string}`,
-    listing?.tokenId ?? 0n,
-  );
 
   const paymentToken = listing?.paymentToken ?? NATIVE_PAYMENT;
   const isNativePayment = isNativePaymentToken(paymentToken);
@@ -484,32 +479,20 @@ function ListingCard({
   };
 
   return (
-    <div className="rounded-xl p-5 flex items-center justify-between gap-4" style={{ border: "1px solid rgba(139,92,246,0.3)", background: "rgba(139,92,246,0.04)" }}>
-      <div
-        className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer"
-        onClick={() => listing && openExplorer()}
-        onKeyDown={(e) => {
-          if ((e.key === "Enter" || e.key === " ") && listing) {
-            e.preventDefault();
-            openExplorer();
-          }
-        }}
-        role="link"
-        tabIndex={0}
-        title="View on MonadScan"
-      >
+    <div className="rounded-xl p-6 flex items-center justify-between gap-5" style={{ border: "1px solid rgba(139,92,246,0.3)", background: "rgba(139,92,246,0.04)" }}>
+      <div className="flex items-center gap-4 min-w-0 flex-1">
         <NftImage
           contract={nftContract as `0x${string}`}
           tokenId={BigInt(tokenId ?? 0)}
-          size={56}
+          size={64}
           fallbackLetter={nftLabel}
         />
         <div className="min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="px-2 py-0.5 rounded font-mono text-[9px] uppercase" style={{ background: "rgba(139,92,246,0.15)", color: "#A78BFA", border: "1px solid rgba(139,92,246,0.3)" }}>{nftLabel}</span>
-            <p className="font-grotesk text-[14px] font-medium" style={{ color: "#FFFFFF" }}>#{tokenId?.toString()}</p>
+          <div className="flex items-center gap-2.5 mb-1.5">
+            <span className="px-2.5 py-0.5 rounded font-mono text-[10px] uppercase" style={{ background: "rgba(139,92,246,0.15)", color: "#A78BFA", border: "1px solid rgba(139,92,246,0.3)" }}>{nftLabel}</span>
+            <p className="font-grotesk text-[16px] font-medium" style={{ color: "#FFFFFF" }}>#{tokenId?.toString()}</p>
           </div>
-          <p className="font-mono text-[10px]" style={{ color: "rgba(255,255,255,0.5)" }}>
+          <p className="font-mono text-[11px]" style={{ color: "rgba(255,255,255,0.5)" }}>
             Seller: {shortAddr(seller)} · Price: {priceFormatted} {paySym}
             {showBuy && address && !isSeller && (
               <> · Balance: {Number(formatUnits(payBalance, payDec)).toLocaleString()} {paySym}</>
@@ -662,15 +645,15 @@ function SellTab() {
     <div className="space-y-6">
       {/* Step 1: Pick a position */}
       <div className="rounded-xl p-5" style={{ border: "1px solid rgba(139,92,246,0.35)", background: "rgba(139,92,246,0.04)" }}>
-        <p className="font-grotesk text-[14px] font-medium mb-4" style={{ color: "#FFFFFF" }}>Select Position to Sell</p>
+        <p className="font-grotesk text-[16px] font-medium mb-4" style={{ color: "#FFFFFF" }}>Select Position to Sell</p>
         <UserPositionsList selected={selected} onSelect={setSelected} />
       </div>
 
       {/* Step 2: Set price (only shows after selecting) */}
       {selected && (
         <div className="rounded-xl p-5" style={{ border: "1px solid rgba(139,92,246,0.35)", background: "rgba(139,92,246,0.04)" }}>
-          <p className="font-grotesk text-[14px] font-medium mb-1" style={{ color: "#FFFFFF" }}>Set Price</p>
-          <p className="font-mono text-[10px] mb-4" style={{ color: "rgba(255,255,255,0.5)" }}>
+          <p className="font-grotesk text-[16px] font-medium mb-1" style={{ color: "#FFFFFF" }}>Set Price</p>
+          <p className="font-mono text-[11px] mb-4" style={{ color: "rgba(255,255,255,0.5)" }}>
             Selling: {selected.label} #{selected.tokenId}
           </p>
 
@@ -734,7 +717,6 @@ function SellTab() {
 
 function UserPositionsList({ selected, onSelect }: { selected: any; onSelect: (s: any) => void }) {
   const { address } = useAccount();
-  const chainId = useChainId();
   const contracts = useContracts();
 
   const locksQ = useReadContract({ address: contracts.tokenLock, abi: TOKEN_LOCK_ABI, functionName: "locksOf", args: address ? [address] : undefined, query: { ...LIVE_CHAIN_QUERY, enabled: !!address, refetchInterval: 10_000 } });
@@ -789,20 +771,16 @@ function UserPositionsList({ selected, onSelect }: { selected: any; onSelect: (s
         return (
           <button
             key={`${pos.contract}-${pos.tokenId}`}
-            onClick={() => {
-              window.open(explorerNftUrl(pos.contract, pos.tokenId, chainId), "_blank", "noopener,noreferrer");
-              onSelect(isSelected ? null : pos);
-            }}
-            className="w-full text-left p-3 rounded-xl transition cursor-pointer"
+            onClick={() => onSelect(isSelected ? null : pos)}
+            className="w-full text-left p-4 rounded-xl transition"
             style={{ background: isSelected ? "rgba(139,92,246,0.2)" : "rgba(139,92,246,0.06)", border: `1px solid ${isSelected ? "rgba(139,92,246,0.6)" : "rgba(139,92,246,0.2)"}` }}
-            title="View on MonadScan · click to select for listing"
           >
             <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <NftImage contract={pos.contract} tokenId={BigInt(pos.tokenId)} size={44} fallbackLetter={pos.label} />
+              <div className="flex items-center gap-3 min-w-0">
+                <NftImage contract={pos.contract} tokenId={BigInt(pos.tokenId)} size={52} fallbackLetter={pos.label} />
                 <div className="min-w-0">
-                  <span className="px-2 py-0.5 rounded font-mono text-[8px] uppercase" style={{ background: "rgba(139,92,246,0.15)", color: "#A78BFA" }}>{pos.label}</span>
-                  <span className="font-mono text-[12px] ml-2" style={{ color: "#FFFFFF" }}>#{pos.tokenId}</span>
+                  <span className="px-2.5 py-0.5 rounded font-mono text-[9px] uppercase" style={{ background: "rgba(139,92,246,0.15)", color: "#A78BFA" }}>{pos.label}</span>
+                  <span className="font-mono text-[14px] ml-2" style={{ color: "#FFFFFF" }}>#{pos.tokenId}</span>
                 </div>
               </div>
               {isSelected && (

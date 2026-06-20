@@ -273,7 +273,7 @@ function VestingRowUI({
 
   return (
     <div
-      className="px-5 py-4 hover:bg-[rgba(139,92,246,0.03)] transition-colors cursor-pointer"
+      className="px-6 py-5 hover:bg-[rgba(139,92,246,0.03)] transition-colors cursor-pointer"
       style={{ borderBottom: isLast ? "none" : "1px solid rgba(139,92,246,0.15)" }}
       onClick={openExplorer}
       onKeyDown={(e) => {
@@ -289,15 +289,15 @@ function VestingRowUI({
       {/* Compact row: token, progress bar, action */}
       <div className="flex items-center gap-3">
         {/* Token icon + name */}
-        <div className="flex items-center gap-2.5 min-w-0 flex-1">
-          <TokenIcon address={vesting.token} symbol={symbol} size={44} logoUrl={logoUrl} />
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          <TokenIcon address={vesting.token} symbol={symbol} size={52} logoUrl={logoUrl} />
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <p className="font-grotesk uppercase text-[12px] tracking-wider truncate" style={{ color: "#FFFFFF" }}>{symbol}</p>
-              <span className="font-mono text-[9px]" style={{ color: "rgba(255,255,255,0.4)" }}>#{vesting.id.toString()}</span>
+              <p className="font-grotesk uppercase text-[14px] tracking-wider truncate" style={{ color: "#FFFFFF" }}>{symbol}</p>
+              <span className="font-mono text-[10px]" style={{ color: "rgba(255,255,255,0.4)" }}>#{vesting.id.toString()}</span>
             </div>
             {/* Progress bar inline */}
-            <div className="relative w-full h-1.5 rounded-full overflow-hidden mt-1.5" style={{ background: "rgba(139,92,246,0.12)" }}>
+            <div className="relative w-full h-2 rounded-full overflow-hidden mt-2" style={{ background: "rgba(139,92,246,0.12)" }}>
               <div className="absolute left-0 top-0 h-full rounded-full transition-all duration-500" style={{ width: `${Math.min(vestedPct, 100)}%`, background: "rgba(139,92,246,0.45)" }} />
               <div className="absolute left-0 top-0 h-full rounded-full transition-all duration-500" style={{ width: `${Math.min(claimedPct, 100)}%`, background: "#8B5CF6" }} />
               {hasCliff && duration > 0 && (
@@ -318,7 +318,7 @@ function VestingRowUI({
             <button
               onClick={doClaim}
               disabled={txPending}
-              className="px-3 py-1.5 rounded-full font-grotesk text-[10px] uppercase tracking-wider disabled:opacity-50 transition"
+              className="px-5 py-2 rounded-full font-grotesk text-[11px] uppercase tracking-wider disabled:opacity-50 transition"
               style={{ background: "rgba(139,92,246,0.25)", color: "#FFFFFF", border: "1px solid rgba(139,92,246,0.6)" }}
             >
               {txPending ? "…" : "Claim"}
@@ -441,10 +441,10 @@ function VestingPage() {
 
         <div className="flex items-center justify-between gap-3 mb-7">
           <div>
-            <h1 className="font-grotesk uppercase text-[22px] sm:text-[28px] leading-none tracking-tight" style={{ color: "#FFFFFF" }}>
+            <h1 className="font-grotesk uppercase text-[26px] sm:text-[34px] leading-none tracking-tight" style={{ color: "#FFFFFF" }}>
               Vesting
             </h1>
-            <p className="font-mono text-[10px] mt-1 tracking-wide" style={{ color: "rgba(255,255,255,0.55)" }}>
+            <p className="font-mono text-[11px] mt-1.5 tracking-wide" style={{ color: "rgba(255,255,255,0.55)" }}>
               Linear &amp; cliff vesting · NFT positions · transferable
             </p>
           </div>
@@ -479,7 +479,7 @@ function VestingPage() {
               <button
                 key={t}
                 onClick={() => setActiveTab(t)}
-                className="px-4 py-1.5 rounded-full font-grotesk text-[11px] uppercase tracking-wider transition whitespace-nowrap"
+                className="px-5 py-2 rounded-full font-grotesk text-[12px] uppercase tracking-wider transition whitespace-nowrap"
                 style={
                   activeTab === t
                     ? { background: "rgba(139,92,246,0.35)", color: "#FFFFFF", border: "1px solid rgba(139,92,246,0.6)" }
@@ -491,16 +491,16 @@ function VestingPage() {
             ))}
           </div>
           <div
-            className="flex items-center gap-2 px-3 py-2 rounded-full"
+            className="flex items-center gap-2.5 px-4 py-2.5 rounded-full"
             style={{ background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.25)" }}
           >
-            <Search className="w-3.5 h-3.5" style={{ color: "rgba(255,255,255,0.5)" }} strokeWidth={1.5} />
+            <Search className="w-4 h-4" style={{ color: "rgba(255,255,255,0.5)" }} strokeWidth={1.5} />
             <input
               type="text"
               placeholder="Search by token or NFT ID…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="bg-transparent font-mono text-[11px] outline-none w-40 sm:w-56"
+              className="bg-transparent font-mono text-[12px] outline-none w-44 sm:w-64"
               style={{ color: "#FFFFFF" }}
             />
           </div>
