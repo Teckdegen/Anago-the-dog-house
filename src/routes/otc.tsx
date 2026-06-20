@@ -9,12 +9,15 @@ import { SuccessModal } from "@/components/SuccessModal";
 import { useTransactionSuccess } from "@/lib/web3/useTransactionSuccess";
 import { OTC_MARKET_ABI, ERC721_ABI, ERC20_ABI, CONTRACTS, TOKEN_LOCK_ABI, VESTING_NFT_ABI, STREAM_FARM_ABI } from "@/lib/web3/contracts";
 import { shortAddr } from "@/lib/web3/format";
+import { bigintToUsd, useTokenPriceUsdLive } from "@/lib/web3/prices";
+import { formatUsdTable } from "@/lib/capricorn/poolMetrics";
 import { prepareTransactionWithGas } from "@/lib/web3/gasUtils";
 import { LIVE_CHAIN_QUERY } from "@/lib/web3/nftImage";
 import { NftImage } from "@/components/NftImage";
 import { stopPositionRowClick } from "@/components/NftExplorerLink";
 import { TokenPicker } from "@/components/TokenPicker";
 import { parseListingTuple } from "@/lib/web3/parseOtc";
+import { OtcListingPositionInfo } from "@/components/OtcListingPositionInfo";
 
 export const Route = createFileRoute("/otc")({
   component: OTCPage,
@@ -322,6 +325,10 @@ function ListingCard({
     query: { enabled: !!address && hasErc20Payment, refetchInterval: 5_000 },
   });
 
+  const { priceUsd: payPriceUsd, loading: payPriceLoading } = useTokenPriceUsdLive(
+    isNativePayment ? NATIVE_PAYMENT : paymentToken,
+  );
+
   useEffect(() => {
     buyTx.reset();
     approveTx.reset();
@@ -420,6 +427,8 @@ function ListingCard({
   const paySym = isNativePayment ? "MON" : ((paySymQ.data as string) || "...");
   const payDec = isNativePayment ? 18 : ((payDecQ.data as number) ?? 18);
   const priceFormatted = Number(formatUnits(price, payDec)).toLocaleString();
+  const listingPriceUsd = bigintToUsd(price, payDec, payPriceUsd);
+  const listingPriceUsdLabel = payPriceLoading ? "…" : listingPriceUsd > 0 ? formatUsdTable(listingPriceUsd) : null;
   const allowance = (allowanceQ.data as bigint) ?? 0n;
   const payBalance = isNativePayment ? (monBalQ.data?.value ?? 0n) : ((balanceQ.data as bigint) ?? 0n);
   const needsApproval = hasErc20Payment && price > 0n && allowance < price;
@@ -479,29 +488,52 @@ function ListingCard({
   };
 
   return (
-    <div className="rounded-xl p-6 flex items-center justify-between gap-5" style={{ border: "1px solid rgba(139,92,246,0.3)", background: "rgba(139,92,246,0.04)" }}>
-      <div className="flex items-center gap-4 min-w-0 flex-1">
+    <div className="rounded-xl p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5" style={{ border: "1px solid rgba(139,92,246,0.3)", background: "rgba(139,92,246,0.04)" }}>
+      <div className="flex items-start gap-4 min-w-0 flex-1">
         <NftImage
           contract={nftContract as `0x${string}`}
           tokenId={BigInt(tokenId ?? 0)}
           size={64}
           fallbackLetter={nftLabel}
         />
-        <div className="min-w-0">
-          <div className="flex items-center gap-2.5 mb-1.5">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2.5 mb-1">
             <span className="px-2.5 py-0.5 rounded font-mono text-[10px] uppercase" style={{ background: "rgba(139,92,246,0.15)", color: "#A78BFA", border: "1px solid rgba(139,92,246,0.3)" }}>{nftLabel}</span>
             <p className="font-grotesk text-[16px] font-medium" style={{ color: "#FFFFFF" }}>#{tokenId?.toString()}</p>
           </div>
-          <p className="font-mono text-[11px]" style={{ color: "rgba(255,255,255,0.5)" }}>
-            Seller: {shortAddr(seller)} · Price: {priceFormatted} {paySym}
+
+          <OtcListingPositionInfo
+            nftContract={nftContract as `0x${string}`}
+            tokenId={BigInt(tokenId ?? 0)}
+            tokenLock={contracts.tokenLock}
+            vestingNFT={contracts.vestingNFT}
+            streamFarm={contracts.streamFarm}
+            nftLabel={nftLabel}
+          />
+
+          <p className="font-mono text-[11px] mt-2.5" style={{ color: "rgba(255,255,255,0.45)" }}>
+            Seller {shortAddr(seller)}
             {showBuy && address && !isSeller && (
-              <> · Balance: {Number(formatUnits(payBalance, payDec)).toLocaleString()} {paySym}</>
+              <> · Your balance {Number(formatUnits(payBalance, payDec)).toLocaleString()} {paySym}</>
             )}
           </p>
         </div>
       </div>
 
-      <div className="flex items-center gap-2 shrink-0" onClick={stopPositionRowClick}>
+      <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-3 shrink-0 sm:min-w-[140px]" onClick={stopPositionRowClick}>
+        <div className="text-left sm:text-right">
+          <p className="font-mono text-[9px] uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.4)" }}>Asking</p>
+          <p className="font-grotesk text-[18px] font-semibold leading-tight" style={{ color: "#FFFFFF" }}>
+            {priceFormatted} {paySym}
+          </p>
+          {listingPriceUsdLabel && (
+            <p className="font-mono text-[11px] mt-0.5" style={{ color: "#A78BFA" }}>
+              {listingPriceUsdLabel}
+            </p>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
         {showBuy && !isSeller && (
           listingInvalid ? (
             <span className="font-mono text-[9px] px-3 py-2 rounded-xl" style={{ color: "rgba(255,120,120,0.9)", border: "1px solid rgba(255,120,120,0.35)" }}>
@@ -539,6 +571,7 @@ function ListingCard({
           </button>
         )}
         {isSeller && showBuy && <span className="font-mono text-[9px]" style={{ color: "rgba(255,255,255,0.4)" }}>Your listing</span>}
+        </div>
       </div>
     </div>
   );

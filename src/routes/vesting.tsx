@@ -543,13 +543,13 @@ function Empty({ title, sub }: { title: string; sub: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
       <div
-        className="w-10 h-10 rounded-xl flex items-center justify-center mb-4"
+        className="w-12 h-12 rounded-xl flex items-center justify-center mb-4"
         style={{ background: "rgba(139,92,246,0.12)", border: "1px solid rgba(139,92,246,0.3)" }}
       >
         <Timer className="w-4 h-4" style={{ color: "rgba(255,255,255,0.6)" }} strokeWidth={1.5} />
       </div>
-      <p className="font-grotesk uppercase text-[13px] tracking-wider" style={{ color: "#FFFFFF" }}>{title}</p>
-      <p className="font-mono text-[10px] mt-1.5 max-w-[220px]" style={{ color: "rgba(255,255,255,0.55)" }}>{sub}</p>
+      <p className="font-grotesk uppercase text-[14px] tracking-wider" style={{ color: "#FFFFFF" }}>{title}</p>
+      <p className="font-mono text-[11px] mt-1.5 max-w-[260px]" style={{ color: "rgba(255,255,255,0.55)" }}>{sub}</p>
     </div>
   );
 }

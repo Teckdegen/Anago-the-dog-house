@@ -1,8 +1,8 @@
 import { CheckCircle2, X } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
-type Row = { label: string; value: string };
+type Row = { label: string; value: ReactNode };
 
 type Props = {
   open: boolean;

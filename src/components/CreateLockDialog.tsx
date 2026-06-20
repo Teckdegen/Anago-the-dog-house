@@ -9,7 +9,8 @@ import { useContractAddresses } from "@/lib/web3/hooks";
 import { TOKEN_LOCK_ABI } from "@/lib/web3/contracts";
 import { ERC20_ABI, type TokenInfo } from "@/lib/web3/tokens";
 import { formatAmount } from "@/lib/web3/format";
-import { formatFeePercent, netAfterPlatformFee, platformFeeAmount } from "@/lib/web3/platformFee";
+import { netAfterPlatformFee, platformFeeAmount } from "@/lib/web3/platformFee";
+import { PlatformFeeValue } from "@/components/PlatformFeeValue";
 import { useToast } from "./Toast";
 import { prepareTransactionWithGas } from "@/lib/web3/gasUtils";
 
@@ -182,7 +183,8 @@ export function CreateLockDialog({ open, onClose }: Props) {
               {lockFee > 0n && (
                 <ConfirmRow
                   label="Platform fee"
-                  value={`${formatUnits(lockFee, token.decimals)} ${token.symbol} (${formatFeePercent()})`}
+                  value={<PlatformFeeValue amount={lockFee} decimals={token.decimals} symbol={token.symbol} />}
+                  divided
                 />
               )}
               <ConfirmRow
@@ -261,8 +263,9 @@ export function CreateLockDialog({ open, onClose }: Props) {
                     value={`${formatAmount(lockedNet, token.decimals)} ${token.symbol}`}
                   />
                   <ConfirmRow
-                    label={`Platform fee (${formatFeePercent()})`}
-                    value={`${formatAmount(lockFee, token.decimals)} ${token.symbol}`}
+                    label="Platform fee"
+                    value={<PlatformFeeValue amount={lockFee} decimals={token.decimals} symbol={token.symbol} />}
+                    divided
                   />
                 </div>
               )}
@@ -340,9 +343,12 @@ function Label({ children }: { children: React.ReactNode }) {
   );
 }
 
-function ConfirmRow({ label, value }: { label: string; value: string }) {
+function ConfirmRow({ label, value, divided }: { label: string; value: React.ReactNode; divided?: boolean }) {
   return (
-    <div className="flex items-center justify-between">
+    <div
+      className="flex items-center justify-between"
+      style={divided ? { borderTop: "1px solid rgba(139,92,246,0.15)", paddingTop: "0.375rem" } : undefined}
+    >
       <span className="font-mono text-[10px] uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.5)" }}>
         {label}
       </span>

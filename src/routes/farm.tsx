@@ -27,8 +27,13 @@ import { SharePositionButton } from "@/components/SharePositionButton";
 import { SharedPositionBanner } from "@/components/SharedPositionBanner";
 import { parsePositionSearchParam, validatePositionSearch } from "@/lib/positionShare";
 import { useSharedFarmPositionExists } from "@/lib/web3/useSharedPositions";
-import { formatFeePercent, netAfterPlatformFee, platformFeeAmount } from "@/lib/web3/platformFee";
+import { netAfterPlatformFee, platformFeeAmount } from "@/lib/web3/platformFee";
+import { PlatformFeeValue } from "@/components/PlatformFeeValue";
+import { computeRewardsByToken, rewardTokensFromStreams } from "@/lib/web3/farmRewards";
+import { formatAmount } from "@/lib/web3/format";
 import { useFarmStakerCounts } from "@/lib/web3/useFarmStakerCounts";
+import { useRewardTokenSummary } from "@/lib/web3/useRewardTokenSummary";
+import type { FarmRewardRemaining } from "@/lib/web3/farmRewards";
 
 export const Route = createFileRoute("/farm")({
   validateSearch: validatePositionSearch,
@@ -120,8 +125,8 @@ function FarmPage() {
         <div className="max-w-[1280px] mx-auto px-5 sm:px-8 lg:px-14">
         <div className="flex items-start justify-between gap-4 mb-7">
           <div>
-            <h1 className="font-grotesk uppercase text-[22px] sm:text-[28px] leading-none tracking-tight" style={{ color: "#FFFFFF" }}>Stream Farms</h1>
-            <p className="font-mono text-[10px] mt-1 tracking-wide" style={{ color: "rgba(255,255,255,0.55)" }}>
+            <h1 className="font-grotesk uppercase text-[26px] sm:text-[34px] leading-none tracking-tight" style={{ color: "#FFFFFF" }}>Stream Farms</h1>
+            <p className="font-mono text-[11px] mt-1.5 tracking-wide" style={{ color: "rgba(255,255,255,0.55)" }}>
               Continuous reward streaming · Deposit · Earn · Withdraw anytime
             </p>
           </div>
@@ -147,7 +152,7 @@ function FarmPage() {
           <div className="flex items-center gap-0.5 p-1 rounded-full" style={{ background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.25)" }}>
             {visibleTabs.map((t) => (
               <button key={t} onClick={() => setActiveTab(t)}
-                className="px-4 py-1.5 rounded-full font-grotesk text-[11px] uppercase tracking-wider transition whitespace-nowrap flex items-center gap-1.5"
+                className="px-5 py-2 rounded-full font-grotesk text-[12px] uppercase tracking-wider transition whitespace-nowrap flex items-center gap-1.5"
                 style={activeTab === t ? { background: "rgba(139,92,246,0.35)", color: "#FFFFFF", border: "1px solid rgba(139,92,246,0.6)" } : { color: "rgba(255,255,255,0.5)" }}>
                 {t}
                 {t === MY_POSITIONS_TAB && myPositionCount > 0 && (
@@ -162,10 +167,10 @@ function FarmPage() {
             ))}
           </div>
           {activeTab === ALL_FARMS_TAB && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-full" style={{ background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.25)" }}>
-              <Search className="w-3.5 h-3.5" style={{ color: "rgba(255,255,255,0.5)" }} strokeWidth={1.5} />
+            <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-full" style={{ background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.25)" }}>
+              <Search className="w-4 h-4" style={{ color: "rgba(255,255,255,0.5)" }} strokeWidth={1.5} />
               <input type="text" placeholder="Search farms…" value={search} onChange={(e) => setSearch(e.target.value)}
-                className="bg-transparent font-mono text-[11px] outline-none w-32 sm:w-44" style={{ color: "#FFFFFF" }} />
+                className="bg-transparent font-mono text-[12px] outline-none w-36 sm:w-48" style={{ color: "#FFFFFF" }} />
             </div>
           )}
         </div>
@@ -258,23 +263,6 @@ type RewardStreamTuple = readonly [
   `0x${string}`, bigint, bigint, bigint, bigint, bigint, bigint, bigint,
 ];
 
-function computeRewardsRemaining(
-  streams: readonly ({ status: string; result?: unknown } | undefined)[] | undefined,
-  count: number,
-): bigint {
-  let rewardsRemaining = 0n;
-
-  for (let i = 0; i < count; i++) {
-    const d = streams?.[i];
-    if (d?.status !== "success" || !d.result) continue;
-    const [, , , , totalBudget, , totalClaimed] = d.result as RewardStreamTuple;
-    const remaining = totalBudget > totalClaimed ? totalBudget - totalClaimed : 0n;
-    rewardsRemaining += remaining;
-  }
-
-  return rewardsRemaining;
-}
-
 function FarmSocialLinkIcon({ kind }: { kind: DexTokenLink["kind"] }) {
   switch (kind) {
     case "twitter":
@@ -300,12 +288,14 @@ function FarmDetailGridStat({
   label,
   value,
   symbol,
+  sub,
   accent,
 }: {
   icon: ReactNode;
   label: string;
   value: string;
   symbol?: string;
+  sub?: string;
   accent?: boolean;
 }) {
   return (
@@ -320,7 +310,7 @@ function FarmDetailGridStat({
         </p>
       </div>
       <p
-        className="font-grotesk text-[22px] sm:text-[26px] font-semibold leading-none truncate"
+        className="font-grotesk text-[20px] sm:text-[24px] font-semibold leading-tight line-clamp-2"
         style={{ color: accent ? FARM_PURPLE_LIGHT : "#FFFFFF" }}
         title={value}
       >
@@ -331,7 +321,52 @@ function FarmDetailGridStat({
           {symbol}
         </p>
       )}
+      {sub && (
+        <p className="font-mono text-[11px] mt-1" style={{ color: "rgba(255,255,255,0.45)" }}>
+          {sub}
+        </p>
+      )}
     </div>
+  );
+}
+
+function FarmRewardsAvailableStat({ rewardsByToken, rewardCount, streamsData }: {
+  rewardsByToken: FarmRewardRemaining[];
+  rewardCount: number;
+  streamsData: readonly ({ status: string; result?: unknown } | undefined)[] | undefined;
+}) {
+  const fallbackTokens = useMemo(
+    () => rewardTokensFromStreams(streamsData, rewardCount),
+    [streamsData, rewardCount],
+  );
+  const entries = useMemo(() => {
+    if (rewardsByToken.length > 0) {
+      return rewardsByToken.map((r) => ({ token: r.token, amount: r.remaining }));
+    }
+    return fallbackTokens.map((token) => ({ token, amount: 0n }));
+  }, [rewardsByToken, fallbackTokens]);
+
+  const { summary, totalUsd, loading } = useRewardTokenSummary(entries);
+  const hasRewards = entries.some((e) => e.amount > 0n);
+
+  return (
+    <FarmDetailGridStat
+      icon={<Gift className="w-3.5 h-3.5" />}
+      label="Rewards Available"
+      value={loading && entries.length > 0 ? "…" : summary}
+      sub={
+        loading
+          ? "Fetching prices…"
+          : totalUsd > 0
+            ? formatUsdTable(totalUsd)
+            : hasRewards
+              ? "In reward token"
+              : rewardCount > 0
+                ? "Pool funded · accrues on stake"
+                : "No reward streams"
+      }
+      accent
+    />
   );
 }
 
@@ -442,18 +477,18 @@ function FarmCardInner({
   const icon = remote?.logoURI || dexProfile?.icon;
 
   const tvlUsd = bigintToUsd(totalStaked ?? 0n, decimals, stakePriceUsd);
+  const tvlFormatted =
+    totalStaked > 0n
+      ? Number(formatUnits(totalStaked, decimals)).toLocaleString(undefined, { maximumFractionDigits: 4 })
+      : "0";
   const balanceFormatted = Number(formatUnits(userBalance, decimals)).toLocaleString(undefined, {
     maximumFractionDigits: 5,
   });
 
-  const rewardsRemaining = useMemo(
-    () => computeRewardsRemaining(streamsQ.data, rewardCount),
+  const rewardsByToken = useMemo(
+    () => computeRewardsByToken(streamsQ.data, rewardCount),
     [streamsQ.data, rewardCount],
   );
-
-  const rewardsFormatted = Number(formatUnits(rewardsRemaining, decimals)).toLocaleString(undefined, {
-    maximumFractionDigits: 5,
-  });
 
   const socialLinks = useMemo(() => {
     if (!dexProfile?.links.length) return [];
@@ -517,8 +552,19 @@ function FarmCardInner({
 
         {/* Farm stats — full page width */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 w-full">
-          <FarmDetailGridStat icon={<DollarSign className="w-3.5 h-3.5" />} label="TVL" value={tvlUsd > 0 ? formatUsdTable(tvlUsd) : "—"} accent />
-          <FarmDetailGridStat icon={<Gift className="w-3.5 h-3.5" />} label="Rewards Available" value={rewardsFormatted} symbol={symbol} accent />
+          <FarmDetailGridStat
+            icon={<DollarSign className="w-3.5 h-3.5" />}
+            label="TVL"
+            value={tvlFormatted}
+            symbol={symbol}
+            sub={totalStaked > 0n ? (tvlUsd > 0 ? formatUsdTable(tvlUsd) : "USD price unavailable") : "Nothing staked yet"}
+            accent
+          />
+          <FarmRewardsAvailableStat
+            rewardsByToken={rewardsByToken}
+            rewardCount={rewardCount}
+            streamsData={streamsQ.data}
+          />
           <FarmDetailGridStat
             icon={<Users className="w-3.5 h-3.5" />}
             label="Stakers"
@@ -746,7 +792,10 @@ function DepositModal({ farmId, stakeToken, symbol, decimals, userBalance, onClo
           { label: "Farm", value: `#${farmId}` },
           { label: "Staked", value: `${formatUnits(stakedNet, decimals)} ${symbol}` },
           ...(depositFee > 0n
-            ? [{ label: `Platform fee (${formatFeePercent()})`, value: `${formatUnits(depositFee, decimals)} ${symbol}` }]
+            ? [{
+                label: "Platform fee",
+                value: <PlatformFeeValue amount={depositFee} decimals={decimals} symbol={symbol} />,
+              }]
             : []),
           ...(farmLockDays > 0
             ? [{ label: "Farm lock", value: `${farmLockDays} day${farmLockDays === 1 ? "" : "s"} (set by creator)` }]
@@ -793,12 +842,15 @@ function DepositModal({ farmId, stakeToken, symbol, decimals, userBalance, onClo
                   {Number(formatUnits(stakedNet, decimals)).toLocaleString()} {symbol}
                 </span>
               </div>
-              <div className="flex items-center justify-between gap-3">
+              <div
+                className="flex items-center justify-between gap-3"
+                style={{ borderTop: "1px solid rgba(139,92,246,0.15)", paddingTop: "0.375rem" }}
+              >
                 <span className="font-mono text-[10px] uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.5)" }}>
-                  Platform fee ({formatFeePercent()})
+                  Platform fee
                 </span>
                 <span className="font-mono text-[11px]" style={{ color: "rgba(255,255,255,0.9)" }}>
-                  {Number(formatUnits(depositFee, decimals)).toLocaleString()} {symbol}
+                  <PlatformFeeValue amount={depositFee} decimals={decimals} symbol={symbol} />
                 </span>
               </div>
             </div>
@@ -1299,7 +1351,7 @@ function PositionStatBox({
 }
 
 function FarmClaimableStat({ entries }: { entries: { token: string; amount: bigint }[] }) {
-  const { totalUsd, loading, summary } = useRewardEntriesUsd(entries);
+  const { totalUsd, loading, summary } = useRewardTokenSummary(entries);
   const hasClaimable = entries.some((e) => e.amount > 0n);
   return (
     <PositionStatBox
@@ -1310,69 +1362,6 @@ function FarmClaimableStat({ entries }: { entries: { token: string; amount: bigi
       highlight={hasClaimable}
     />
   );
-}
-
-function useRewardEntriesUsd(entries: { token: string; amount: bigint }[]) {
-  const metaQ = useReadContracts({
-    allowFailure: true,
-    contracts: entries.flatMap((e) => [
-      { address: e.token as `0x${string}`, abi: ERC20_ABI, functionName: "symbol" as const },
-      { address: e.token as `0x${string}`, abi: ERC20_ABI, functionName: "decimals" as const },
-    ]),
-    query: { enabled: entries.length > 0, refetchInterval: 10_000 },
-  });
-
-  const [totalUsd, setTotalUsd] = useState(0);
-  const [loading, setLoading] = useState(entries.length > 0);
-
-  useEffect(() => {
-    if (entries.length === 0) {
-      setTotalUsd(0);
-      setLoading(false);
-      return;
-    }
-    if (!metaQ.data) return;
-
-    let cancelled = false;
-    setLoading(true);
-
-    (async () => {
-      const { getTokenPriceUsd } = await import("@/lib/web3/dexscreener");
-      let sum = 0;
-
-      for (let i = 0; i < entries.length; i++) {
-        const { token, amount } = entries[i];
-        const dec = (metaQ.data?.[i * 2 + 1]?.result as number | undefined) ?? 18;
-        const price = await getTokenPriceUsd(token).catch(() => null);
-        sum += bigintToUsd(amount, dec, price ?? 0);
-      }
-
-      if (!cancelled) {
-        setTotalUsd(sum);
-        setLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [entries, metaQ.data]);
-
-  const summary = (() => {
-    if (entries.length === 0) return "0";
-    if (!metaQ.data) return "…";
-    const parts: string[] = [];
-    for (let i = 0; i < entries.length; i++) {
-      if (entries[i].amount === 0n) continue;
-      const sym = (metaQ.data[i * 2]?.result as string | undefined) ?? "…";
-      const dec = (metaQ.data[i * 2 + 1]?.result as number | undefined) ?? 18;
-      const formatted = Number(formatUnits(entries[i].amount, dec)).toLocaleString(undefined, { maximumFractionDigits: 4 });
-      parts.push(`${formatted} ${sym}`);
-    }
-    return parts.length > 0 ? parts.join(" + ") : "0";
-  })();
-
-  return { totalUsd, loading, summary };
 }
 
 function PendingRewardLine({ token, amount, highlight }: { token: string; amount: bigint; highlight?: boolean }) {

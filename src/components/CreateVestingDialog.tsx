@@ -9,7 +9,8 @@ import { useContractAddresses } from "@/lib/web3/hooks";
 import { VESTING_NFT_ABI } from "@/lib/web3/contracts";
 import { ERC20_ABI, type TokenInfo } from "@/lib/web3/tokens";
 import { formatAmount } from "@/lib/web3/format";
-import { formatFeePercent, netAfterPlatformFee, platformFeeAmount } from "@/lib/web3/platformFee";
+import { formatPlatformFeeValue, netAfterPlatformFee, platformFeeAmount } from "@/lib/web3/platformFee";
+import { PlatformFeeValue } from "@/components/PlatformFeeValue";
 import { prepareTransactionWithGas } from "@/lib/web3/gasUtils";
 import { useToast } from "./Toast";
 
@@ -260,8 +261,9 @@ export function CreateVestingDialog({ open, onClose }: Props) {
                 >
                   <FeeRow label="You vest" value={`${formatAmount(vestedNet, token.decimals)} ${token.symbol}`} />
                   <FeeRow
-                    label={`Platform fee (${formatFeePercent()})`}
-                    value={`${formatAmount(vestFee, token.decimals)} ${token.symbol}`}
+                    label="Platform fee"
+                    value={<PlatformFeeValue amount={vestFee} decimals={token.decimals} symbol={token.symbol} />}
+                    divided
                   />
                 </div>
               )}
@@ -425,9 +427,12 @@ function Label({ children }: { children: React.ReactNode }) {
   );
 }
 
-function FeeRow({ label, value }: { label: string; value: string }) {
+function FeeRow({ label, value, divided }: { label: string; value: React.ReactNode; divided?: boolean }) {
   return (
-    <div className="flex items-center justify-between gap-3">
+    <div
+      className="flex items-center justify-between gap-3"
+      style={divided ? { borderTop: "1px solid rgba(139,92,246,0.15)", paddingTop: "0.375rem" } : undefined}
+    >
       <span className="font-mono text-[10px] uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.5)" }}>
         {label}
       </span>

@@ -13,6 +13,7 @@ import { STREAM_FARM_ABI, CONTRACTS, ERC20_ABI } from "@/lib/web3/contracts";
 import { LIVE_CHAIN_QUERY } from "@/lib/web3/nftImage";
 import { prepareTransactionWithGas } from "@/lib/web3/gasUtils";
 import { formatFeePercent, netAfterPlatformFee, platformFeeAmount } from "@/lib/web3/platformFee";
+import { PlatformFeeValue } from "@/components/PlatformFeeValue";
 import { useToast } from "@/components/Toast";
 import { SuccessModal } from "@/components/SuccessModal";
 import { useTransactionSuccess } from "@/lib/web3/useTransactionSuccess";
@@ -166,7 +167,10 @@ function RewardStreamFields({
         {parsedBudget > 0n && token && (
           <div className="mt-2 space-y-1 font-mono text-[10px]" style={{ color: "rgba(255,255,255,0.55)" }}>
             <p>Streams to farmers: {formatUnits(netAfterPlatformFee(parsedBudget), decimals)} {token.symbol}</p>
-            <p>Platform fee ({formatFeePercent()}): {formatUnits(platformFeeAmount(parsedBudget), decimals)} {token.symbol}</p>
+            <p className="flex items-center gap-2 flex-wrap">
+              <span>Platform fee:</span>
+              <PlatformFeeValue amount={platformFeeAmount(parsedBudget)} decimals={decimals} symbol={token.symbol} />
+            </p>
           </div>
         )}
       </div>
