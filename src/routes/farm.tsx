@@ -641,17 +641,17 @@ function RewardStreams({ farmId, count }: { farmId: number; count: number }) {
       {Array.from({ length: count }, (_, i) => {
         const d = streamsQ.data?.[i];
         if (d?.status !== "success") return null;
-        const [token, rewardRate, startTime, endTime, totalBudget, , totalClaimed] = d.result as readonly [
+        const [token, rewardRate, startTime, endTime, totalBudget, totalDistributed, totalClaimed] = d.result as readonly [
           `0x${string}`, bigint, bigint, bigint, bigint, bigint, bigint, bigint,
         ];
-        return <RewardStreamRow key={i} token={token} rewardRate={rewardRate} startTime={startTime} endTime={endTime} totalBudget={totalBudget} totalClaimed={totalClaimed} />;
+        return <RewardStreamRow key={i} token={token} rewardRate={rewardRate} startTime={startTime} endTime={endTime} totalBudget={totalBudget} totalDistributed={totalDistributed} totalClaimed={totalClaimed} />;
       })}
     </div>
   );
 }
 
-function RewardStreamRow({ token, rewardRate, startTime, endTime, totalBudget, totalClaimed }: {
-  token: `0x${string}`; rewardRate: bigint; startTime: bigint; endTime: bigint; totalBudget: bigint; totalClaimed: bigint;
+function RewardStreamRow({ token, rewardRate, startTime, endTime, totalBudget, totalDistributed, totalClaimed }: {
+  token: `0x${string}`; rewardRate: bigint; startTime: bigint; endTime: bigint; totalBudget: bigint; totalDistributed: bigint; totalClaimed: bigint;
 }) {
   const symbolQ = useReadContract({ address: token, abi: ERC20_ABI, functionName: "symbol", query: { enabled: !!token } });
   const decimalsQ = useReadContract({ address: token, abi: ERC20_ABI, functionName: "decimals", query: { enabled: !!token } });
@@ -679,8 +679,11 @@ function RewardStreamRow({ token, rewardRate, startTime, endTime, totalBudget, t
           </div>
         </div>
       </div>
-      <p className="font-mono text-[10px] shrink-0" style={{ color: "rgba(255,255,255,0.5)" }}>
-        {Number(formatUnits(totalClaimed, dec)).toLocaleString()} / {Number(formatUnits(totalBudget, dec)).toLocaleString()} {sym} claimed
+      <p className="font-mono text-[10px] shrink-0 text-right" style={{ color: "rgba(255,255,255,0.5)" }}>
+        {Number(formatUnits(totalDistributed, dec)).toLocaleString()} / {Number(formatUnits(totalBudget, dec)).toLocaleString()} {sym} distributed
+        <span className="block text-[8px] mt-0.5" style={{ color: "rgba(255,255,255,0.35)" }}>
+          {Number(formatUnits(totalClaimed, dec)).toLocaleString()} claimed
+        </span>
       </p>
     </div>
   );

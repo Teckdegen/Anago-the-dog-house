@@ -17,8 +17,8 @@ export function computeRewardsByToken(
   for (let i = 0; i < count; i++) {
     const d = streams?.[i];
     if (d?.status !== "success" || !d.result) continue;
-    const [token, , , , totalBudget, , totalClaimed] = d.result as RewardStreamTuple;
-    const remaining = totalBudget > totalClaimed ? totalBudget - totalClaimed : 0n;
+    const [token, , , , totalBudget, totalDistributed] = d.result as RewardStreamTuple;
+    const remaining = totalBudget > totalDistributed ? totalBudget - totalDistributed : 0n;
     const key = (token as string).toLowerCase();
     map.set(key, (map.get(key) ?? 0n) + remaining);
   }

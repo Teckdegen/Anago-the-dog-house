@@ -273,6 +273,7 @@ function ListingCard({
   const listing = parseListingTuple(listingQ.data);
   const isVestingNft = listing?.nftContract?.toLowerCase() === contracts.vestingNFT.toLowerCase();
   const isLockNft = listing?.nftContract?.toLowerCase() === contracts.tokenLock.toLowerCase();
+  const isFarmNft = listing?.nftContract?.toLowerCase() === contracts.streamFarm.toLowerCase();
   const vestingQ = useReadContract({
     address: contracts.vestingNFT,
     abi: VESTING_NFT_ABI,
@@ -287,13 +288,22 @@ function ListingCard({
     args: listing?.tokenId !== undefined ? [listing.tokenId] : undefined,
     query: { enabled: !!listing && isLockNft, refetchInterval: 10_000 },
   });
+  const farmPosQ = useReadContract({
+    address: contracts.streamFarm,
+    abi: STREAM_FARM_ABI,
+    functionName: "getPosition",
+    args: listing?.tokenId !== undefined ? [listing.tokenId] : undefined,
+    query: { enabled: !!listing && isFarmNft, refetchInterval: 10_000 },
+  });
   const vestingData = vestingQ.data as { revoked?: boolean; claimed?: bigint; totalAmount?: bigint } | undefined;
   const lockData = lockQ.data as { withdrawn?: boolean } | undefined;
+  const farmPosData = farmPosQ.data as readonly [bigint, bigint, ...unknown[]] | undefined;
   const vestingRevoked = isVestingNft && !!vestingData?.revoked;
   const vestingComplete = isVestingNft && vestingData?.totalAmount != null
     && BigInt(vestingData.claimed ?? 0) >= BigInt(vestingData.totalAmount);
   const lockWithdrawn = isLockNft && !!lockData?.withdrawn;
-  const listingInvalid = vestingRevoked || vestingComplete || lockWithdrawn;
+  const farmEmpty = isFarmNft && farmPosData != null && (farmPosData[1] as bigint) === 0n;
+  const listingInvalid = vestingRevoked || vestingComplete || lockWithdrawn || farmEmpty;
 
   const paymentToken = listing?.paymentToken ?? NATIVE_PAYMENT;
   const isNativePayment = isNativePaymentToken(paymentToken);
@@ -537,7 +547,7 @@ function ListingCard({
         {showBuy && !isSeller && (
           listingInvalid ? (
             <span className="font-mono text-[9px] px-3 py-2 rounded-xl" style={{ color: "rgba(255,120,120,0.9)", border: "1px solid rgba(255,120,120,0.35)" }}>
-              {lockWithdrawn ? "Lock empty" : vestingComplete ? "Vesting complete" : "Vesting revoked"}
+              {lockWithdrawn ? "Lock empty" : vestingComplete ? "Vesting complete" : farmEmpty ? "Farm empty" : "Vesting revoked"}
             </span>
           ) : insufficientBalance ? (
             <span className="font-mono text-[9px] px-3 py-2 rounded-xl" style={{ color: "rgba(255,120,120,0.9)", border: "1px solid rgba(255,120,120,0.35)" }}>
@@ -689,6 +699,16 @@ function SellTab() {
           <p className="font-mono text-[11px] mb-4" style={{ color: "rgba(255,255,255,0.5)" }}>
             Selling: {selected.label} #{selected.tokenId}
           </p>
+          <div className="mb-4">
+            <OtcListingPositionInfo
+              nftContract={selected.contract}
+              tokenId={BigInt(selected.tokenId)}
+              tokenLock={contracts.tokenLock}
+              vestingNFT={contracts.vestingNFT}
+              streamFarm={contracts.streamFarm}
+              nftLabel={selected.label}
+            />
+          </div>
 
           <div className="space-y-4">
             <div>
@@ -814,6 +834,14 @@ function UserPositionsList({ selected, onSelect }: { selected: any; onSelect: (s
                 <div className="min-w-0">
                   <span className="px-2.5 py-0.5 rounded font-mono text-[9px] uppercase" style={{ background: "rgba(139,92,246,0.15)", color: "#A78BFA" }}>{pos.label}</span>
                   <span className="font-mono text-[14px] ml-2" style={{ color: "#FFFFFF" }}>#{pos.tokenId}</span>
+                  <OtcListingPositionInfo
+                    nftContract={pos.contract}
+                    tokenId={BigInt(pos.tokenId)}
+                    tokenLock={contracts.tokenLock}
+                    vestingNFT={contracts.vestingNFT}
+                    streamFarm={contracts.streamFarm}
+                    nftLabel={pos.label}
+                  />
                 </div>
               </div>
               {isSelected && (

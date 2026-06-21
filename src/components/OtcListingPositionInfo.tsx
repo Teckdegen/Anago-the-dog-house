@@ -96,9 +96,12 @@ export function OtcListingPositionInfo({
     query: { enabled: isFarm, refetchInterval: 10_000 },
   });
 
-  const farmPos = farmPosQ.data as readonly [bigint, bigint, ...unknown[]] | undefined;
+  const farmPos = farmPosQ.data as readonly [bigint, bigint, bigint, bigint, bigint, bigint] | undefined;
   const farmId = farmPos ? Number(farmPos[0]) : undefined;
-  const farmStaked = farmPos ? (farmPos[1] as bigint) : 0n;
+  const farmStaked = farmPos ? farmPos[1] : 0n;
+  const farmDepositTime = farmPos ? farmPos[3] : 0n;
+  const farmLockExpiry = farmPos ? farmPos[4] : 0n;
+  const farmBoost = farmPos ? farmPos[5] : 1e18;
 
   const farmQ = useReadContract({
     address: streamFarm,
@@ -120,8 +123,12 @@ export function OtcListingPositionInfo({
   }, [isLock, isVesting, isFarm, lock, vesting, farm]);
 
   const positionAmount = useMemo(() => {
-    if (isLock && lock) return lock.amount;
+    if (isLock && lock) {
+      if (lock.withdrawn) return 0n;
+      return lock.amount;
+    }
     if (isVesting && vesting) {
+      if (vesting.revoked) return 0n;
       const remaining = vesting.totalAmount - vesting.claimed;
       return remaining > 0n ? remaining : 0n;
     }
@@ -175,10 +182,18 @@ export function OtcListingPositionInfo({
       return `Vesting ${start} → ${end} · ${left}${cliff}`;
     }
     if (isFarm && farmId !== undefined) {
-      return `Farm stake · Pool #${farmId}`;
+      const deposited = farmDepositTime > 0n ? formatDate(farmDepositTime) : "—";
+      const boost = Number(farmBoost) / 1e18;
+      const boostStr = boost > 1.001 ? ` · ${boost.toFixed(2).replace(/\.?0+$/, "")}x boost` : "";
+      if (Number(farmLockExpiry) > 0) {
+        const unlock = formatDate(farmLockExpiry);
+        const left = timeUntil(farmLockExpiry);
+        return `Staked ${deposited} → unlock ${unlock} · ${left}${boostStr}`;
+      }
+      return `Staked ${deposited} · Pool #${farmId}${boostStr}`;
     }
     return null;
-  }, [isLock, isVesting, isFarm, lock, vesting, farmId]);
+  }, [isLock, isVesting, isFarm, lock, vesting, farmId, farmDepositTime, farmLockExpiry, farmBoost]);
 
   if (loading) {
     return (
